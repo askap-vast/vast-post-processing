@@ -45,6 +45,7 @@ class VastOverlap:
 
 
 def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFrame:
+    logger.debug(f"Reading surveys repo at path {repo_path} ...")
     fields_df = pd.DataFrame()
     for field_data in repo_path.glob("epoch_*/field_data.csv"):
         df = pd.read_csv(field_data)
@@ -52,6 +53,7 @@ def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFram
         if rename_racs:
             df["FIELD_NAME"] = df.FIELD_NAME.str.replace("RACS_", "VAST_")
         fields_df = fields_df.append(df)
+    logger.debug("Read surveys repo.")
     return fields_df
 
 
@@ -64,18 +66,23 @@ def read_release_epochs(
 ) -> dict[VastObservationId, str]:
     # although these end up being converted back to a DataFrame, we convert it to a dict
     # here to ensure the input column names don't matter
+    logger.debug("Reading release epochs ...")
     release_df = (
         pd.read_csv(epochs_csv_path)
         .set_index([obs_epoch_col, field_col, sbid_col])
         .sort_index()
     )
+    logger.debug("Read release epochs.")
     return release_df[release_epoch_col].to_dict()
 
 
 def get_observation_from_moc_path(
-    moc_path: Path, surveys_db_df: pd.DataFrame, use_corrected: bool = True,
+    moc_path: Path,
+    surveys_db_df: pd.DataFrame,
+    use_corrected: bool = True,
 ) -> Optional[VastObservation]:
     obs_epoch = int(moc_path.parent.name.split("_")[-1])
+    # always use the MOC, but support being given the STMOC path
     moc = mocpy.MOC.from_fits(
         moc_path.with_name(moc_path.name.replace(".stmoc", ".moc"))
     )
@@ -208,7 +215,8 @@ def find_vast_neighbours_by_release_epoch(
         )
         if overlap_tile_fraction > 0:
             delta_t_days = abs(
-                observations_df.obs_start_mjd.iloc[a] - observations_df.obs_start_mjd.iloc[b]
+                observations_df.obs_start_mjd.iloc[a]
+                - observations_df.obs_start_mjd.iloc[b]
             )
             observation_overlaps.append(
                 VastOverlap(
@@ -228,6 +236,7 @@ def find_vast_neighbours_by_release_epoch(
 def main(
     release_epoch: int,
     vast_db_repo: Path,
+    racs_db_repo: Path,
     vast_data_root: Path,
     release_epochs_csv: Path,
     output_root: Path,
@@ -239,7 +248,10 @@ def main(
     # get the neighbours DataFrame and filter for the requested release epoch and
     # overlap area threshold
     vast_neighbours_df = find_vast_neighbours_by_release_epoch(
-        vast_data_root, vast_db_repo, release_epochs
+        vast_data_root,
+        vast_db_repo,
+        release_epochs,
+        racs_db_repo=racs_db_repo,
     ).query(
         "release_epoch_a == @release_epoch and overlap_frac >= @overlap_frac_thresh"
     )
