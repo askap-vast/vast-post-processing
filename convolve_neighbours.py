@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 import sys
 from typing import Optional, List
+import warnings
 
+from astropy.wcs import FITSFixedWarning
 from loguru import logger
 import schwimmbad
 from racs_tools import beamcon_2D
@@ -27,6 +29,7 @@ class Beamcon2DArgs:
     log: Optional[str] = None
     logfile: Optional[str] = None
     cutoff: Optional[float] = None
+    circularise: bool = False
     tolerance: float = 0.0001
     epsilon: float = 0.0005
     nsamps: int = 200
@@ -58,7 +61,9 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False):
             sys.exit(0)
     for field, args in args_list:
         logger.debug(f"Convolving {field} ...")
-        beamcon_2D.main(pool, args)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=FITSFixedWarning)
+            beamcon_2D.main(pool, args)
         logger.debug(f"Finished convolving {field}.")
     pool.close()
 

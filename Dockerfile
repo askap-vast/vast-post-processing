@@ -25,5 +25,8 @@ RUN poetry export -f requirements.txt | pip install -r /dev/stdin
 FROM base as final
 ARG VIRTUAL_ENV
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+RUN apt-get update && \
+    apt-get -y install libgfortran5 && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=builder $VIRTUAL_ENV $VIRTUAL_ENV
 COPY link_neighbours.py correct_vast.py convolve_neighbours.py ./
