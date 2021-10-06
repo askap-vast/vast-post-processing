@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, astuple
 from pathlib import Path
 from typing import Optional
 
@@ -10,10 +10,7 @@ import pandas as pd
 import typer
 
 
-EXPERIMENTAL_RELEASE_EPOCHS = (3, 4, 5, 6, 7, 10, 11)
-
-
-@dataclass
+@dataclass(frozen=True)
 class VastObservationId:
     obs_epoch: int
     field: str
@@ -73,7 +70,10 @@ def read_release_epochs(
         .sort_index()
     )
     logger.debug("Read release epochs.")
-    return release_df[release_epoch_col].to_dict()
+    return {
+        VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid): row[release_epoch_col]
+        for (obs_epoch, field, sbid), row in release_df.iterrows()
+    }
 
 
 def get_observation_from_moc_path(
@@ -114,6 +114,7 @@ def get_observation_from_moc_path(
         / image_path.name.replace("image.", "weights.")
         .replace(".restored", "")
         .replace(".conv", "")
+        .replace(".corrected", "")
     )
 
     skip = False
@@ -128,6 +129,7 @@ def get_observation_from_moc_path(
             f"Could not find weights for {field} SB{sbid} in epoch_{obs_epoch}."
             " Skipping field."
         )
+        logger.debug(f"Tried weights path: {weights_path}.")
         skip = True
     if not skip:
         return VastObservation(
@@ -147,6 +149,7 @@ def get_observation_from_moc_path(
 
 
 def find_vast_neighbours_by_release_epoch(
+    release_epoch: str,
     data_root: Path,
     vast_db_repo: Path,
     release_epochs_dict: dict[VastObservationId, str],
@@ -167,18 +170,24 @@ def find_vast_neighbours_by_release_epoch(
     observation_data: list[VastObservation] = []
     moc_root = data_root / "STOKESI_MOCS"
     for moc_path in moc_root.glob("epoch_*/*.moc.fits"):
-        obs = get_observation_from_moc_path(moc_path, surveys_db_df)
-        if obs is not None:
-            observation_data.append(obs)
-            logger.debug(
-                f"Added field {obs.field} SB{obs.sbid} in epoch_{obs.obs_epoch}."
-            )
+        obs_epoch = int(moc_path.parent.name.split("_")[-1])
+        _, _, field, sbid, *_ = moc_path.name.split(".")
+        sbid = int(sbid[2:])
+        vast_obs_id = VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid)
+        obs_release_epoch = release_epochs_dict.get(vast_obs_id, None)
+        if obs_release_epoch == release_epoch:
+            obs = get_observation_from_moc_path(moc_path, surveys_db_df)
+            if obs is not None:
+                observation_data.append(obs)
+                logger.debug(
+                    f"Added field {obs.field} SB{obs.sbid} in epoch_{obs.obs_epoch}."
+                )
 
     observations_df = pd.DataFrame(observation_data)
     observations_df["low_band"] = observations_df.field.str.endswith("A")
     # add the release epochs for each observation
     observations_df = observations_df.join(
-        pd.Series(release_epochs_dict).rename("release_epoch"),
+        pd.Series({astuple(k): v for k, v in release_epochs_dict.items()}).rename("release_epoch"),
         on=["obs_epoch", "field", "sbid"],
     )
 
@@ -234,7 +243,7 @@ def find_vast_neighbours_by_release_epoch(
 
 
 def main(
-    release_epoch: int,
+    release_epoch: str,
     vast_db_repo: Path,
     racs_db_repo: Path,
     vast_data_root: Path,
@@ -248,6 +257,7 @@ def main(
     # get the neighbours DataFrame and filter for the requested release epoch and
     # overlap area threshold
     vast_neighbours_df = find_vast_neighbours_by_release_epoch(
+        release_epoch,
         vast_data_root,
         vast_db_repo,
         release_epochs,
@@ -257,10 +267,7 @@ def main(
     )
 
     # create a directory for each field and create links to the neighbouring images
-    release_output_path = (
-        output_root
-        / f"EPOCH{release_epoch:02d}{'x' if release_epoch in EXPERIMENTAL_RELEASE_EPOCHS else ''}"
-    )
+    release_output_path = output_root / release_epoch
     release_output_path.mkdir(parents=True, exist_ok=True)
     for _, obs_pair in vast_neighbours_df.iterrows():
         # create directories
