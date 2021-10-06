@@ -1,5 +1,6 @@
+from itertools import chain
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Generator
 import warnings
 
 from astropy.coordinates import SkyCoord
@@ -25,6 +26,9 @@ def shift_and_scale_image(
 ) -> Path:
     """Apply astrometric and flux corrections to a FITS image."""
     output_path = output_dir_path / image_path.with_suffix(".corrected.fits").name
+    if output_path.exists() and not overwrite:
+        logger.warning(f"Will not overwrite existing image: {output_path}.")
+        return output_path
 
     image_hdul = fits.open(image_path)
     image_hdu = image_hdul[0]
@@ -59,16 +63,12 @@ def shift_and_scale_image(
     image_hdu.header["RAOFF"] = ra_offset_arcsec
     image_hdu.header["DECOFF"] = dec_offset_arcsec
 
-    if output_path.exists():
-        if overwrite:
-            logger.warning(f"Overwriting existing image: {output_path}.")
-            image_hdul.writeto(str(output_path), overwrite=True)
-            logger.debug(f"Wrote corrected image: {output_path}.")
-        else:
-            logger.warning(f"Will not overwrite existing image: {output_path}.")
+    if output_path.exists() and overwrite:
+        logger.warning(f"Overwriting existing image: {output_path}.")
+        image_hdul.writeto(str(output_path), overwrite=True)
     else:
         image_hdul.writeto(str(output_path))
-        logger.debug(f"Wrote corrected image: {output_path}.")
+    logger.debug(f"Wrote corrected image: {output_path}.")
     image_hdul.close()
     return output_path
 
@@ -104,6 +104,10 @@ def shift_and_scale_catalog(
     )
     is_island = ".islands" in catalog_path.name
     output_path = output_dir_path / catalog_path.with_suffix(".corrected.xml").name
+    if output_path.exists() and not overwrite:
+        logger.warning(f"Will not overwrite existing catalogue: {output_path}.")
+        return output_path
+
     votablefile = parse(catalog_path)
     votable = votablefile.get_first_table()
 
@@ -140,24 +144,42 @@ def shift_and_scale_catalog(
         votable.array[col] = flux_scale * (votable.array[col] + flux_offset_mJy)
 
     # write corrected VOTable
-    if output_path.exists():
-        if overwrite:
-            logger.warning(f"Overwriting existing catalogue: {output_path}.")
-            output_path.unlink()
-            votablefile.to_xml(str(output_path))
-            logger.debug(f"Wrote corrected catalogue: {output_path}.")
-        else:
-            logger.warning(f"Will not overwrite existing catalogue: {output_path}.")
+    if output_path.exists() and overwrite:
+        logger.warning(f"Overwriting existing catalogue: {output_path}.")
+        output_path.unlink()
+        votablefile.to_xml(str(output_path))
     else:
         votablefile.to_xml(str(output_path))
-        logger.debug(f"Wrote corrected catalogue: {output_path}.")
+    logger.debug(f"Wrote corrected catalogue: {output_path}.")
     return output_path
 
 
 def main(
-    vast_tile_data_root: Path,
-    vast_corrections_csv: Path,
-    epoch: Optional[int] = None,
+    vast_tile_data_root: Path = typer.Argument(
+        ...,
+        help=(
+            "Path to VAST TILES data directory, i.e. the directory that contains the"
+            " STOKES* directories."
+        ),
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    vast_corrections_csv: Path = typer.Argument(
+        ...,
+        help="Path to VAST corrections CSV file produced by vast-xmatch.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+    ),
+    epoch: Optional[list[int]] = typer.Option(
+        None,
+        help=(
+            "Only correct the given observation epochs. Can be given multiple times,"
+            " e.g. --epoch 1 --epoch 2. If no epochs are given (the default), then"
+            " correct all available epochs."
+        ),
+    ),
     overwrite: bool = False,
 ):
     """Read astrometric and flux corrections produced by vast-xmatch and apply them to
@@ -169,13 +191,26 @@ def main(
         .set_index(["release_epoch", "field", "sbid"])
         .sort_index()
     )
-    if epoch is not None:
-        epoch_glob = f"epoch_{epoch}"
+    image_path_glob_list: list[Generator[Path, None, None]] = []
+    components_path_glob_list: list[Generator[Path, None, None]] = []
+    if epoch is None or len(epoch) == 0:
+        image_path_glob_list.append(
+            vast_tile_data_root.glob("STOKESI_IMAGES/epoch_*/*.fits")
+        )
+        components_path_glob_list.append(
+            vast_tile_data_root.glob("STOKESI_SELAVY/epoch_*/*.components.xml")
+        )
     else:
-        epoch_glob = "epoch_*"
+        for n in epoch:
+            image_path_glob_list.append(
+                vast_tile_data_root.glob(f"STOKESI_IMAGES/epoch_{n}/*.fits")
+            )
+            components_path_glob_list.append(
+                vast_tile_data_root.glob(f"STOKESI_SELAVY/epoch_{n}/*.components.xml")
+            )
 
     # correct images
-    for image_path in vast_tile_data_root.glob(f"STOKESI_IMAGES/{epoch_glob}/*.fits"):
+    for image_path in chain.from_iterable(image_path_glob_list):
         epoch_dir = image_path.parent.name
         _, _, field, sbid_str, *_ = image_path.name.split(".")
         sbid = int(sbid_str[2:])
@@ -226,10 +261,8 @@ def main(
             )
 
     # correct catalogs
-    for components_path in vast_tile_data_root.glob(
-        f"STOKESI_SELAVY/{epoch_glob}/*.components.xml"
-    ):
-        epoch_dir = image_path.parent.name
+    for components_path in chain.from_iterable(components_path_glob_list):
+        epoch_dir = components_path.parent.name
         _, _, field, sbid_str, *_ = components_path.name.split(".")
         sbid = int(sbid_str[2:])
         # get island catalog
