@@ -1,5 +1,6 @@
 from itertools import chain
 from pathlib import Path
+import sys
 from typing import Optional, Generator
 import warnings
 
@@ -25,6 +26,7 @@ def shift_and_scale_image(
     overwrite: bool = False,
 ) -> Path:
     """Apply astrometric and flux corrections to a FITS image."""
+    logger.debug(f"Correcting {image_path} ...")
     output_path = output_dir_path / image_path.with_suffix(".corrected.fits").name
     if output_path.exists() and not overwrite:
         logger.warning(f"Will not overwrite existing image: {output_path}.")
@@ -68,7 +70,7 @@ def shift_and_scale_image(
         image_hdul.writeto(str(output_path), overwrite=True)
     else:
         image_hdul.writeto(str(output_path))
-    logger.debug(f"Wrote corrected image: {output_path}.")
+    logger.success(f"Wrote corrected image: {output_path}.")
     image_hdul.close()
     return output_path
 
@@ -102,6 +104,7 @@ def shift_and_scale_catalog(
         "col_rms_residual",
         "col_stdev_residual",
     )
+    logger.debug(f"Correcting {catalog_path} ...")
     is_island = ".islands" in catalog_path.name
     output_path = output_dir_path / catalog_path.with_suffix(".corrected.xml").name
     if output_path.exists() and not overwrite:
@@ -150,7 +153,7 @@ def shift_and_scale_catalog(
         votablefile.to_xml(str(output_path))
     else:
         votablefile.to_xml(str(output_path))
-    logger.debug(f"Wrote corrected catalogue: {output_path}.")
+    logger.success(f"Wrote corrected catalogue: {output_path}.")
     return output_path
 
 
@@ -181,10 +184,17 @@ def main(
         ),
     ),
     overwrite: bool = False,
+    verbose: bool = False,
 ):
     """Read astrometric and flux corrections produced by vast-xmatch and apply them to
     VAST images and catalogues in vast-data. See https://github.com/marxide/vast-xmatch.
     """
+    # configure logger
+    if not verbose:
+        # replace the default sink
+        logger.remove()
+        logger.add(sys.stderr, level="INFO")
+
     # read corrections
     corrections_df = (
         pd.read_csv(vast_corrections_csv)
