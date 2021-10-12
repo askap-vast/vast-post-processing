@@ -6,8 +6,11 @@ import sys
 from typing import Optional, List
 import warnings
 
-from astropy.wcs import FITSFixedWarning
+from astropy.io import fits
+import astropy.units as u
+import astropy.wcs
 from loguru import logger
+import numpy as np
 import schwimmbad
 from racs_tools import beamcon_2D
 from radio_beam import Beam
@@ -55,6 +58,72 @@ class Beamcon2D_WorkerArgs:
         return (getattr(self, field.name) for field in fields(self))
 
 
+def worker(args):
+    # replace beamcon_2D worker for more control, e.g. NaN blanking
+    file, outdir, new_beam, conv_mode, clargs = args
+    outfile = str(Path(file).with_suffix(f".{clargs.suffix}.fits").name)
+    if clargs.prefix is not None:
+        outfile = clargs.prefix + outfile
+
+    with fits.open(file, memmap=True, mode="readonly") as hdu:
+        w = astropy.wcs.WCS(hdu[0])
+        pixelscales = astropy.wcs.utils.proj_plane_pixel_scales(w)
+        dxas = pixelscales[0] * u.deg
+        dyas = pixelscales[1] * u.deg
+
+        if len(hdu[0].data.shape) == 4:
+            # has spectral, polarization axes
+            data = hdu[0].data[0, 0]
+        else:
+            data = hdu[0].data
+        nx, ny = data.shape[-1], data.shape[-2]
+
+        old_beam = Beam.from_fits_header(hdu[0].header)
+
+        datadict = {
+            "filename": Path(file).name,
+            "image": data,
+            "4d": (len(hdu[0].data.shape) == 4),
+            "header": hdu[0].header,
+            "oldbeam": old_beam,
+            "nx": nx,
+            "ny": ny,
+            "dx": dxas,
+            "dy": dyas,
+        }
+
+    logger.debug(f"Blanking NaNs in {file} ...")
+    nan_mask = np.isnan(datadict["image"])
+    datadict["image"][nan_mask] = 0
+
+    logger.debug(f"Determining convolving beam for {file} ...")
+    conbeam, sfactor = beamcon_2D.getbeam(
+        datadict,
+        new_beam,
+        cutoff=clargs.cutoff,
+    )
+    datadict.update({"conbeam": conbeam, "final_beam": new_beam, "sfactor": sfactor})
+    if not clargs.dryrun:
+        if (
+            conbeam == Beam(major=0 * u.deg, minor=0 * u.deg, pa=0 * u.deg)
+            and sfactor == 1
+        ):
+            newim = datadict["image"]
+        else:
+            logger.debug(f"Smoothing {file} ...")
+            newim = beamcon_2D.smooth(datadict, conv_mode=conv_mode)
+        if datadict["4d"]:
+            # make it back into a 4D image
+            newim = np.expand_dims(np.expand_dims(newim, axis=0), axis=0)
+            nan_mask = np.expand_dims(np.expand_dims(nan_mask, axis=0), axis=0)
+        datadict.update({"newimage": newim})
+
+        logger.debug(f"Restoring NaNs for {file} ...")
+        datadict["newimage"][nan_mask] = np.nan
+        beamcon_2D.savefile(datadict, outfile, outdir)
+        logger.success(f"Wrote smoothed image for {file}.")
+
+
 def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False):
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field>/inputs contains the input FITS images
@@ -66,7 +135,7 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False):
             sys.exit(0)
     worker_args_list: list[Beamcon2D_WorkerArgs] = []
     for field_dir in neighbour_data_dir.glob("VAST_*"):
-        if len(list(field_dir.glob("*.smoothed.fits"))) > 0:
+        if len(list(field_dir.glob("*.sm.fits"))) > 0:
             logger.warning(f"Smoothed images already exist in {field_dir}. Skipping.")
             continue
         image_str_list = [str(p) for p in field_dir.glob("inputs/image.*.fits")]
@@ -87,11 +156,11 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False):
             ]
         )
     # start convolutions
-    pool.map(beamcon_2D.worker, (tuple(args) for args in worker_args_list))
+    pool.map(worker, (tuple(args) for args in worker_args_list))
     pool.close()
 
 
 if __name__ == "__main__":
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=FITSFixedWarning)
+        warnings.simplefilter("ignore", category=astropy.wcs.FITSFixedWarning)
         typer.run(main)
