@@ -9,10 +9,13 @@ ARG VIRTUAL_ENV
 ENV POETRY_VERSION=1.1.8 \
     PIP_NO_CACHE_DIR=1 \
     VIRTUAL_ENV=$VIRTUAL_ENV
-RUN pip install "poetry==${POETRY_VERSION}"
+RUN pip install "poetry==${POETRY_VERSION}" && \
+    apt-get update && \
+    apt-get -y install git swarp && \
+    rm -rf /var/lib/apt/lists/*
 ENV DEBIAN_FRONTEND=noninteractive
 COPY pyproject.toml poetry.lock ./
-RUN poetry export -f requirements.txt | pip install -r /dev/stdin
+RUN poetry export -f requirements.txt --without-hashes | pip install -r /dev/stdin
 
 FROM builder as final
-COPY link_neighbours.py correct_vast.py convolve_neighbours.py ./
+COPY link_neighbours.py correct_vast.py convolve_neighbours.py swarp.py ./

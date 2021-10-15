@@ -16,7 +16,7 @@ scipy = "^1.7.1"
 numpy = "^1.21.2"
 schwimmbad = "^0.3.2"
 radio-beam = "^0.3.3"
-racs-tools = {git = "https://github.com/marxide/RACS-tools.git", rev = "mpi-efficiency"}
+racs-tools = {url = "https://github.com/marxide/RACS-tools/archive/refs/heads/master.zip"}
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.910"
