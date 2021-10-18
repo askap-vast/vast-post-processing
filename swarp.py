@@ -105,16 +105,26 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
                 hdu.header[keyword] = hdu_ref.header[keyword]
             hdu.header["NAXIS"] = 4
             hdu.writeto(image_path, overwrite=True)
+            logger.success(f"Added degenerate axes to {image_path}.")
 
 
-def worker(args: tuple[list[str], str, Path, Path]):
+def mask_weightless_pixels(image_path: Path, weights_path: Path):
+    with fits.open(image_path, mode="update") as hdul, fits.open(weights_path) as hdul_weights:
+        hdu = hdul[0]
+        hdu_weights = hdul_weights[0]
+        hdu.data[hdu_weights.data == 0] = np.nan
+        logger.success(f"Masked weightless pixels in {image_path}.")
+
+
+def worker(args: tuple[list[str], str, Path, Path, Path]):
     swarp_cmd: list[str]
     field_name: str
     output_mosaic_path: Path
+    output_weight_path: Path
     central_image_path: Path
 
     logger.debug(f"worker args: {args}")
-    swarp_cmd, field_name, output_mosaic_path, central_image_path = args
+    swarp_cmd, field_name, output_mosaic_path, output_weight_path, central_image_path = args
     config_path = Path(swarp_cmd[2])
     field_name = config_path.parent.name
     try:
@@ -128,6 +138,8 @@ def worker(args: tuple[list[str], str, Path, Path]):
         logger.debug(e.cmd)
         raise e
     add_degenerate_axes(output_mosaic_path, central_image_path)
+    add_degenerate_axes(output_weight_path, central_image_path)
+    mask_weightless_pixels(output_mosaic_path, output_weight_path)
     logger.success(f"SWarp completed for {field_name}.")
 
 
@@ -141,7 +153,7 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: boo
             pool.wait()
             sys.exit(0)
     epoch_name = neighbour_data_dir.name
-    arg_list: list[tuple[list[str], str, Path, Path]] = []
+    arg_list: list[tuple[list[str], str, Path, Path, Path]] = []
     for field_path in neighbour_data_dir.glob("VAST_*"):
         field_name = field_path.name
         output_mosaic_path = field_path / f"{field_name}.{epoch_name}.I.conv.fits"
@@ -205,7 +217,7 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: boo
         ]
         swarp_cmd.extend([str(p) for p in images])
         arg_list.append(
-            (swarp_cmd, field_name, output_mosaic_path, central_image)
+            (swarp_cmd, field_name, output_mosaic_path, output_weight_path, central_image)
         )
         logger.info(f"Added SWarp command for {field_path.name}.")
         logger.debug(swarp_cmd)
