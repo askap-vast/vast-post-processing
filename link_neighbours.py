@@ -44,7 +44,7 @@ class VastOverlap:
 def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFrame:
     logger.debug(f"Reading surveys repo at path {repo_path} ...")
     fields_df = pd.DataFrame()
-    for field_data in repo_path.glob("epoch_*/field_data.csv"):
+    for field_data in repo_path.glob("db/epoch_*/field_data.csv"):
         df = pd.read_csv(field_data)
         df["obs_epoch"] = field_data.parent.name
         if rename_racs:
@@ -71,7 +71,9 @@ def read_release_epochs(
     )
     logger.debug("Read release epochs.")
     return {
-        VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid): row[release_epoch_col]
+        VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid): row[
+            release_epoch_col
+        ]
         for (obs_epoch, field, sbid), row in release_df.iterrows()
     }
 
@@ -98,9 +100,9 @@ def get_observation_from_moc_path(
         surveys_db_df.loc[(field, sbid), "SCAN_START"] / (60 * 60 * 24), format="mjd"
     )
     duration = surveys_db_df.loc[(field, sbid), "SCAN_LEN"]
-    data_root = moc_path.parent.parent.parent
+    tile_root = moc_path.parent.parent.parent
     image_path = (
-        data_root
+        tile_root
         / f"STOKESI_IMAGES{'_CORRECTED' if use_corrected else ''}"
         / f"epoch_{obs_epoch}"
         / moc_path.name.replace(".moc", "")
@@ -108,7 +110,7 @@ def get_observation_from_moc_path(
     if use_corrected:
         image_path = image_path.with_suffix(".corrected.fits")
     weights_path = (
-        data_root
+        tile_root
         / "STOKESI_WEIGHTS"
         / f"epoch_{obs_epoch}"
         / image_path.name.replace("image.", "weights.")
@@ -168,7 +170,7 @@ def find_vast_neighbours_by_release_epoch(
     )
 
     observation_data: list[VastObservation] = []
-    moc_root = data_root / "STOKESI_MOCS"
+    moc_root = data_root / "vast-data/TILES/STOKESI_MOCS"
     for moc_path in moc_root.glob("epoch_*/*.moc.fits"):
         obs_epoch = int(moc_path.parent.name.split("_")[-1])
         _, _, field, sbid, *_ = moc_path.name.split(".")
@@ -187,7 +189,9 @@ def find_vast_neighbours_by_release_epoch(
     observations_df["low_band"] = observations_df.field.str.endswith("A")
     # add the release epochs for each observation
     observations_df = observations_df.join(
-        pd.Series({astuple(k): v for k, v in release_epochs_dict.items()}).rename("release_epoch"),
+        pd.Series({astuple(k): v for k, v in release_epochs_dict.items()}).rename(
+            "release_epoch"
+        ),
         on=["obs_epoch", "field", "sbid"],
     )
 
@@ -244,13 +248,56 @@ def find_vast_neighbours_by_release_epoch(
 
 def main(
     release_epoch: str,
-    vast_db_repo: Path,
-    racs_db_repo: Path,
-    vast_data_root: Path,
-    release_epochs_csv: Path,
-    output_root: Path,
-    overlap_frac_thresh: float = 0.05,
-    use_corrected: bool = True,
+    vast_db_repo: Path = typer.Argument(
+        ...,
+        help="Path to VAST ASKAP Surveys database repository.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    racs_db_repo: Path = typer.Argument(
+        ...,
+        help="Path to RACS ASKAP Surveys database repository.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    vast_data_root: Path = typer.Argument(
+        ...,
+        help=(
+            "Path to VAST data. Must follow the VAST data organization and naming"
+            " scheme."
+        ),
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    release_epochs_csv: Path = typer.Argument(
+        ...,
+        help=(
+            "Path to CSV file containing the release epoch for each VAST image. Each"
+            " row must contain at least the observation epoch, field name, SBID, and"
+            " release epoch."
+        ),
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+    ),
+    output_root: Path = typer.Argument(
+        ...,
+        help="Directory to write output links organized by release epoch and field.",
+    ),
+    overlap_frac_thresh: float = typer.Option(
+        0.05,
+        help=(
+            "Exclude fields that overlap by less than the given fractional overlap."
+            " e.g. the default of 0.05 will exclude fields that overlap by less than 5%"
+            " of the area of the central field."
+        ),
+    ),
+    use_corrected: bool = typer.Option(
+        True, help="Use the corrected versions of images."
+    ),
 ):
     # get the release epochs
     release_epochs = read_release_epochs(release_epochs_csv)
