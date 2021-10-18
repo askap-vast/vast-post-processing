@@ -173,9 +173,9 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: boo
         ]
         image_geo = get_image_geometry(central_image)
         swarp_config_dict = {
-            "VMEM_MAX": 4096,
-            "MEM_MAX": 5120,
-            "COMBINE_BUFSIZE": 2048,
+            "VMEM_MAX": 4000,
+            "MEM_MAX": 4000,
+            "COMBINE_BUFSIZE": 2000,
             "IMAGEOUT_NAME": output_mosaic_path,
             "WEIGHTOUT_NAME": output_weight_path,
             "COMBINE": "Y",
@@ -187,6 +187,7 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: boo
             "RESCALE_WEIGHTS": "Y",
             "WEIGHT_IMAGE": " ".join([str(p) for p in weights]),
             "PROJECTION_TYPE": "SIN",
+            "RESAMPLE_DIR": field_path,
             "CENTER_TYPE": "MANUAL",
             "CENTER": image_geo.center_hmsdms,
             "IMAGE_SIZE": f"{image_geo.npix_x},{image_geo.npix_y}",
