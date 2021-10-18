@@ -318,25 +318,27 @@ def main(
     release_output_path.mkdir(parents=True, exist_ok=True)
     for _, obs_pair in vast_neighbours_df.iterrows():
         # create directories
-        field_output_path = release_output_path / obs_pair.field_a
-        field_output_path.mkdir(parents=True, exist_ok=True)
-        field_inputs_path = field_output_path / "inputs"
-        field_inputs_path.mkdir(parents=True, exist_ok=True)
+        field_inputs_path_a = release_output_path / obs_pair.field_a / "inputs"
+        field_inputs_path_a.mkdir(parents=True, exist_ok=True)
+        field_inputs_path_b = release_output_path / obs_pair.field_b / "inputs"
+        field_inputs_path_b.mkdir(parents=True, exist_ok=True)
 
-        # link input images
-        target_image_a = field_inputs_path / obs_pair.image_path_a.name
-        target_weights_a = field_inputs_path / obs_pair.weights_path_a.name
-        if not target_image_a.exists():
-            obs_pair.image_path_a.link_to(target_image_a)
-        if not target_weights_a.exists():
-            obs_pair.weights_path_a.link_to(target_weights_a)
+        # create a hard link for each field in the pair in both directions, e.g.
+        # A/inputs/A.fits, A/inputs/B.fits, B/inputs/A.fits, B/inputs/B.fits (plus weights)
+        for output_path in (field_inputs_path_a, field_inputs_path_b):
+            target_image_a = output_path / obs_pair.image_path_a.name
+            target_weights_a = output_path / obs_pair.weights_path_a.name
+            if not target_image_a.exists():
+                obs_pair.image_path_a.link_to(target_image_a)
+            if not target_weights_a.exists():
+                obs_pair.weights_path_a.link_to(target_weights_a)
 
-        target_image_b = field_inputs_path / obs_pair.image_path_b.name
-        target_weights_b = field_inputs_path / obs_pair.weights_path_b.name
-        if not target_image_b.exists():
-            obs_pair.image_path_b.link_to(target_image_b)
-        if not target_weights_b.exists():
-            obs_pair.weights_path_b.link_to(target_weights_b)
+            target_image_b = output_path / obs_pair.image_path_b.name
+            target_weights_b = output_path / obs_pair.weights_path_b.name
+            if not target_image_b.exists():
+                obs_pair.image_path_b.link_to(target_image_b)
+            if not target_weights_b.exists():
+                obs_pair.weights_path_b.link_to(target_weights_b)
 
 
 if __name__ == "__main__":
