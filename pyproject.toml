@@ -24,6 +24,7 @@ black = "^21.9b0"
 flake8 = "^3.9.2"
 rope = "^0.20.1"
 ipython = "^7.28.0"
+debugpy = "^1.5.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

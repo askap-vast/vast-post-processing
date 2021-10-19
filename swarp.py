@@ -10,20 +10,16 @@ from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
 import subprocess
-import sys
 from typing import Any, Dict
 import warnings
 
 from astropy.io import fits
 from astropy import wcs
 from loguru import logger
+from mpi4py import MPI
 import numpy as np
 import schwimmbad
 import typer
-
-
-logger.remove()
-logger.add(sys.stderr, level=5)
 
 
 @dataclass(frozen=True)
@@ -109,22 +105,36 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
 
 
 def mask_weightless_pixels(image_path: Path, weights_path: Path):
-    with fits.open(image_path, mode="update") as hdul, fits.open(weights_path) as hdul_weights:
+    with fits.open(image_path, mode="update") as hdul, fits.open(
+        weights_path
+    ) as hdul_weights:
         hdu = hdul[0]
         hdu_weights = hdul_weights[0]
         hdu.data[hdu_weights.data == 0] = np.nan
         logger.success(f"Masked weightless pixels in {image_path}.")
 
 
-def worker(args: tuple[list[str], str, Path, Path, Path]):
+def worker(args: tuple[bool, list[str], str, Path, Path, Path]):
+    mpi: bool
     swarp_cmd: list[str]
     field_name: str
     output_mosaic_path: Path
     output_weight_path: Path
     central_image_path: Path
 
-    logger.debug(f"worker args: {args}")
-    swarp_cmd, field_name, output_mosaic_path, output_weight_path, central_image_path = args
+    (
+        mpi,
+        swarp_cmd,
+        field_name,
+        output_mosaic_path,
+        output_weight_path,
+        central_image_path,
+    ) = args
+    mpi_rank = None
+    if mpi:
+        mpi_rank = MPI.COMM_WORLD.Get_rank()
+    logger.debug(f"MPI rank: {mpi_rank}. worker args: {args}")
+
     config_path = Path(swarp_cmd[2])
     field_name = config_path.parent.name
     try:
@@ -132,8 +142,7 @@ def worker(args: tuple[list[str], str, Path, Path, Path]):
         _ = subprocess.run(swarp_cmd, check=True)
     except subprocess.CalledProcessError as e:
         logger.error(
-            f"Error while calling SWarp for {field_name}. Return code:"
-            f" {e.returncode}"
+            f"Error while calling SWarp for {field_name}. Return code: {e.returncode}"
         )
         logger.debug(e.cmd)
         raise e
@@ -143,17 +152,17 @@ def worker(args: tuple[list[str], str, Path, Path, Path]):
     logger.success(f"SWarp completed for {field_name}.")
 
 
-def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: bool = False):
+def main(
+    neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: bool = False
+):
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field> contain the smoothed images to combine.
     # <neighbour_data_dir>/<field>/inputs contain the original images and weights.
     pool = schwimmbad.choose_pool(mpi=mpi, processes=n_proc)
-    if mpi:
-        if not pool.is_master():
-            pool.wait()
-            sys.exit(0)
+
+    # if using MPI, the following is executed only on the main process
     epoch_name = neighbour_data_dir.name
-    arg_list: list[tuple[list[str], str, Path, Path, Path]] = []
+    arg_list: list[tuple[bool, list[str], str, Path, Path, Path]] = []
     for field_path in neighbour_data_dir.glob("VAST_*"):
         field_name = field_path.name
         output_mosaic_path = field_path / f"{field_name}.{epoch_name}.I.conv.fits"
@@ -161,7 +170,9 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: boo
             field_path / f"{field_name}.{epoch_name}.I.conv.weight.fits"
         )
         if output_mosaic_path.exists():
-            logger.debug(f"COMBINED image {output_mosaic_path} already exists, skipping")
+            logger.debug(
+                f"COMBINED image {output_mosaic_path} already exists, skipping"
+            )
             continue
         images = list(field_path.glob("*.sm.fits"))
         # get the central image
@@ -217,12 +228,21 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: boo
         ]
         swarp_cmd.extend([str(p) for p in images])
         arg_list.append(
-            (swarp_cmd, field_name, output_mosaic_path, output_weight_path, central_image)
+            (
+                mpi,
+                swarp_cmd,
+                field_name,
+                output_mosaic_path,
+                output_weight_path,
+                central_image,
+            )
         )
         logger.info(f"Added SWarp command for {field_path.name}.")
         logger.debug(swarp_cmd)
         if test:
             break
+
+    # distribute tasks
     pool.map(worker, arg_list)
     pool.close()
 

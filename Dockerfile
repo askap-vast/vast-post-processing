@@ -15,7 +15,13 @@ RUN pip install "poetry==${POETRY_VERSION}" && \
     rm -rf /var/lib/apt/lists/*
 ENV DEBIAN_FRONTEND=noninteractive
 COPY pyproject.toml poetry.lock ./
-RUN poetry export -f requirements.txt --without-hashes | pip install -r /dev/stdin
+
+FROM builder as dev
+# install python deps, include dev deps
+RUN poetry export -f requirements.txt --dev --without-hashes | pip install -r /dev/stdin
+COPY link_neighbours.py correct_vast.py convolve_neighbours.py swarp.py ./
 
 FROM builder as final
+# install python deps
+RUN poetry export -f requirements.txt --without-hashes | pip install -r /dev/stdin
 COPY link_neighbours.py correct_vast.py convolve_neighbours.py swarp.py ./
