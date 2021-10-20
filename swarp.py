@@ -195,7 +195,7 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
                 hdu.header[keyword] = hdu_ref.header[keyword]
             hdu.header["NAXIS"] = 4
             hdu.writeto(image_path, overwrite=True)
-            logger.success(f"Added degenerate axes to {image_path}.")
+            logger.info(f"Added degenerate axes to {image_path}.")
 
 
 def mask_weightless_pixels(image_path: Path, weights_path: Path):
@@ -206,7 +206,7 @@ def mask_weightless_pixels(image_path: Path, weights_path: Path):
         hdu = hdul[0]
         hdu_weights = hdul_weights[0]
         hdu.data[hdu_weights.data == 0] = np.nan
-        logger.success(f"Masked weightless pixels in {image_path}.")
+        logger.info(f"Masked weightless pixels in {image_path}.")
 
 
 def worker(args: tuple[list[str], str, Path, Path, Path]):
