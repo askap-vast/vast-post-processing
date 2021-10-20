@@ -725,6 +725,19 @@ novis = ["zarr", "fsspec", "distributed", "pvextractor", "regions", "reproject",
 test = ["pytest-astropy", "pytest-cov"]
 
 [[package]]
+name = "structlog"
+version = "21.2.0"
+description = "Structured Logging for Python"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.extras]
+dev = ["coverage", "freezegun (>=0.2.8)", "pretend", "pytest-asyncio", "pytest (>=6.0)", "simplejson", "furo", "sphinx", "twisted", "pre-commit", "rich"]
+docs = ["furo", "sphinx", "twisted"]
+tests = ["coverage", "freezegun (>=0.2.8)", "pretend", "pytest-asyncio", "pytest (>=6.0)", "simplejson"]
+
+[[package]]
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
@@ -822,7 +835,7 @@ dev = ["pytest (>=4.6.2)", "black (>=19.3b0)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "3.9.x"
-content-hash = "0f46fdb7aa09248843217b126ad59d1fe88bda5ff22c7b94d6825bc82e648a7b"
+content-hash = "1cced85878e87d55f01a1776d2b1d781775df954d469165c4180e27fc4938231"
 
 [metadata.files]
 appnope = [
@@ -1430,6 +1443,10 @@ six = [
 spectral-cube = [
     {file = "spectral-cube-0.6.0.tar.gz", hash = "sha256:5d8a0d4528e0f1904c5b8593a371f803796dc8cf9972b60507c8d0c705ba17b0"},
     {file = "spectral_cube-0.6.0-py3-none-any.whl", hash = "sha256:061bf8ea2f21e72b4bf9e2234a8894922303cd5ddb732ef7001cdefc7ed5feda"},
+]
+structlog = [
+    {file = "structlog-21.2.0-py2.py3-none-any.whl", hash = "sha256:63a7111a32e5b615671536bb745692ea02cebfea2b39dcb7d2617eed19437cfe"},
+    {file = "structlog-21.2.0.tar.gz", hash = "sha256:7ac42b565e1295712313f91edbcb64e0840a9037d888c8954f11fa6c43270e99"},
 ]
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},

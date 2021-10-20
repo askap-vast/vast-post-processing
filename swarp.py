@@ -8,18 +8,111 @@ Assumes convolved files are named *.sm.fits and are organized:
 """
 from dataclasses import dataclass
 from itertools import product
+import logging
 from pathlib import Path
+import socket
 import subprocess
 from typing import Any, Dict
 import warnings
 
 from astropy.io import fits
 from astropy import wcs
-from loguru import logger
 from mpi4py import MPI
 import numpy as np
 import schwimmbad
+import structlog
 import typer
+
+
+LOGGING_COMMON_PROCESSORS = [
+    structlog.stdlib.add_log_level,
+    structlog.processors.TimeStamper(fmt="ISO"),
+    structlog.processors.StackInfoRenderer(),
+    structlog.processors.format_exc_info,
+    structlog.processors.JSONRenderer(sort_keys=True),
+]
+
+
+class MPIIOStream:
+    """
+    A very basic MPI stream handler for synchronised I/O.
+    """
+
+    def __init__(self, filename, comm, mode):
+
+        self._file = MPI.File.Open(comm, filename, mode)
+        self._file.Set_atomicity(True)
+
+    def write(self, msg):
+        # if for some reason we don't have a unicode string...
+        try:
+            msg = msg.encode()
+        except AttributeError:
+            pass
+        self._file.Write_shared(msg)
+
+    def sync(self):
+        """
+        Synchronise the processes
+        """
+        self._file.Sync()
+
+    def close(self):
+        self.sync()
+        self._file.Close()
+
+
+class MPIFileHandler(logging.StreamHandler):
+    """
+    A basic MPI file handler for writing log files.
+    Internally opens a synchronised MPI I/O stream via MPIIOStream.
+    Ideas and some code from:
+    * https://groups.google.com/forum/#!topic/mpi4py/SaNzc8bdj6U
+    * https://gist.github.com/JohnCEarls/8172807
+    * https://stackoverflow.com/questions/45680050/cannot-write-to-shared-mpi-file-with-mpi4py
+    """
+
+    def __init__(self, filename, mode=MPI.MODE_WRONLY | MPI.MODE_CREATE, comm=MPI.COMM_WORLD):
+        self.filename = filename
+        self.mode = mode
+        self.comm = comm
+
+        super(MPIFileHandler, self).__init__(self._open())
+
+    def _open(self):
+        stream = MPIIOStream(self.filename, self.comm, self.mode)
+        return stream
+
+    def close(self):
+        if self.stream:
+            self.stream.close()  # type: ignore
+            self.stream = None  # type: ignore
+
+    def emit(self, record):
+        """
+        Emit a record.
+        We have to override emit, as the logging.StreamHandler has 2 calls
+        to 'write'. The first for the message, and the second for the
+        terminator. This posed a problem for mpi, where a second process
+        could call 'write' in between these two calls and create a
+        conjoined log message.
+        """
+        msg = self.format(record)
+        self.stream.write('{}{}'.format(msg, self.terminator))
+        self.flush()
+
+
+structlog.configure(
+    processors=LOGGING_COMMON_PROCESSORS,  # type: ignore
+    logger_factory=structlog.stdlib.LoggerFactory(),
+)
+HANDLER = MPIFileHandler("swarp.log")
+FORMATTER = logging.Formatter('%(message)s')
+HANDLER.setFormatter(FORMATTER)
+
+LOGGER = logging.getLogger("swarp")
+LOGGER.setLevel(logging.DEBUG)
+LOGGER.addHandler(HANDLER)
 
 
 @dataclass(frozen=True)
@@ -85,6 +178,7 @@ def write_swarp_config(config_dict: Dict[str, Any], output_path: Path) -> Path:
 
 
 def add_degenerate_axes(image_path: Path, reference_image_path: Path):
+    logger = structlog.get_logger("swarp")
     with fits.open(image_path, mode="update") as hdul, fits.open(
         reference_image_path
     ) as hdul_ref:
@@ -105,6 +199,7 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
 
 
 def mask_weightless_pixels(image_path: Path, weights_path: Path):
+    logger = structlog.get_logger("swarp")
     with fits.open(image_path, mode="update") as hdul, fits.open(
         weights_path
     ) as hdul_weights:
@@ -114,26 +209,24 @@ def mask_weightless_pixels(image_path: Path, weights_path: Path):
         logger.success(f"Masked weightless pixels in {image_path}.")
 
 
-def worker(args: tuple[bool, list[str], str, Path, Path, Path]):
-    mpi: bool
+def worker(args: tuple[list[str], str, Path, Path, Path]):
     swarp_cmd: list[str]
     field_name: str
     output_mosaic_path: Path
     output_weight_path: Path
     central_image_path: Path
 
+    _logger = structlog.get_logger("swarp")
+    logger = _logger.bind(rank=MPI.COMM_WORLD.Get_rank(), hostname=socket.gethostname())
+
     (
-        mpi,
         swarp_cmd,
         field_name,
         output_mosaic_path,
         output_weight_path,
         central_image_path,
     ) = args
-    mpi_rank = None
-    if mpi:
-        mpi_rank = MPI.COMM_WORLD.Get_rank()
-    logger.debug(f"MPI rank: {mpi_rank}. worker args: {args}")
+    logger.debug(f"worker args: {args}")
 
     config_path = Path(swarp_cmd[2])
     field_name = config_path.parent.name
@@ -149,7 +242,31 @@ def worker(args: tuple[bool, list[str], str, Path, Path, Path]):
     add_degenerate_axes(output_mosaic_path, central_image_path)
     add_degenerate_axes(output_weight_path, central_image_path)
     mask_weightless_pixels(output_mosaic_path, output_weight_path)
-    logger.success(f"SWarp completed for {field_name}.")
+    logger.info(f"SWarp completed for {field_name}.")
+
+
+def test_worker(args: tuple[list[str], str, Path, Path, Path]):
+    swarp_cmd: list[str]
+    field_name: str
+    output_mosaic_path: Path
+    output_weight_path: Path
+    central_image_path: Path
+
+    logger = structlog.get_logger("swarp")
+    log = logger.bind(rank=MPI.COMM_WORLD.Get_rank())
+
+    (
+        swarp_cmd,
+        field_name,
+        output_mosaic_path,
+        output_weight_path,
+        central_image_path,
+    ) = args
+    log.debug(f"worker args: {args}")
+
+    config_path = Path(swarp_cmd[2])
+    field_name = config_path.parent.name
+    log.debug(f"Would SWarp {field_name}")
 
 
 def main(
@@ -158,11 +275,16 @@ def main(
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field> contain the smoothed images to combine.
     # <neighbour_data_dir>/<field>/inputs contain the original images and weights.
+    logger = structlog.get_logger("swarp").bind(
+        rank=MPI.COMM_WORLD.Get_rank(),
+        size=MPI.COMM_WORLD.Get_size(),
+    )
+    logger.info("checking rank and size")
     pool = schwimmbad.choose_pool(mpi=mpi, processes=n_proc)
 
     # if using MPI, the following is executed only on the main process
     epoch_name = neighbour_data_dir.name
-    arg_list: list[tuple[bool, list[str], str, Path, Path, Path]] = []
+    arg_list: list[tuple[list[str], str, Path, Path, Path]] = []
     for field_path in neighbour_data_dir.glob("VAST_*"):
         field_name = field_path.name
         output_mosaic_path = field_path / f"{field_name}.{epoch_name}.I.conv.fits"
@@ -229,7 +351,6 @@ def main(
         swarp_cmd.extend([str(p) for p in images])
         arg_list.append(
             (
-                mpi,
                 swarp_cmd,
                 field_name,
                 output_mosaic_path,
@@ -243,7 +364,7 @@ def main(
             break
 
     # distribute tasks
-    pool.map(worker, arg_list)
+    pool.map(test_worker, arg_list)
     pool.close()
 
 
