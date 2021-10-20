@@ -317,10 +317,13 @@ def main(
             for image in images
         ]
         image_geo = get_image_geometry(central_image)
+        tmp_dir = field_path / "tmp"
+        tmp_dir.mkdir(exist_ok=True)
         swarp_config_dict = {
             "VMEM_MAX": 4000,
             "MEM_MAX": 4000,
             "COMBINE_BUFSIZE": 2000,
+            "VMEM_DIR": tmp_dir,
             "IMAGEOUT_NAME": output_mosaic_path,
             "WEIGHTOUT_NAME": output_weight_path,
             "COMBINE": "Y",
@@ -364,7 +367,7 @@ def main(
             break
 
     # distribute tasks
-    pool.map(test_worker, arg_list)
+    pool.map(worker, arg_list)
     pool.close()
 
 
