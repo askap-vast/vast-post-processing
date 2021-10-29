@@ -17,6 +17,7 @@ numpy = "^1.21.2"
 schwimmbad = "^0.3.2"
 radio-beam = "^0.3.3"
 racs-tools = {url = "https://github.com/marxide/RACS-tools/archive/refs/heads/master.zip"}
+structlog = "^21.2.0"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.910"
@@ -24,6 +25,7 @@ black = "^21.9b0"
 flake8 = "^3.9.2"
 rope = "^0.20.1"
 ipython = "^7.28.0"
+debugpy = "^1.5.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

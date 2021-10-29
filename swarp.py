@@ -8,22 +8,38 @@ Assumes convolved files are named *.sm.fits and are organized:
 """
 from dataclasses import dataclass
 from itertools import product
+import logging
+import os
 from pathlib import Path
+import socket
 import subprocess
-import sys
 from typing import Any, Dict
 import warnings
 
 from astropy.io import fits
 from astropy import wcs
-from loguru import logger
+from mpi4py import MPI
 import numpy as np
 import schwimmbad
+import structlog
 import typer
 
+import mpi_logger
 
-logger.remove()
-logger.add(sys.stderr, level=5)
+slurm_job_id = os.environ.get("SLURM_JOB_ID", "no-slurm")
+
+# configure root logger to use structlog
+structlog.configure(
+    processors=mpi_logger.LOGGING_COMMON_PROCESSORS,  # type: ignore
+    logger_factory=structlog.stdlib.LoggerFactory(),
+)
+HANDLER = mpi_logger.MPIFileHandler(f"swarp-{slurm_job_id}.log")
+FORMATTER = logging.Formatter('%(message)s')
+HANDLER.setFormatter(FORMATTER)
+
+LOGGER = logging.getLogger("swarp")
+LOGGER.setLevel(logging.DEBUG)
+LOGGER.addHandler(HANDLER)
 
 
 @dataclass(frozen=True)
@@ -89,6 +105,7 @@ def write_swarp_config(config_dict: Dict[str, Any], output_path: Path) -> Path:
 
 
 def add_degenerate_axes(image_path: Path, reference_image_path: Path):
+    logger = structlog.get_logger("swarp")
     with fits.open(image_path, mode="update") as hdul, fits.open(
         reference_image_path
     ) as hdul_ref:
@@ -105,15 +122,18 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
                 hdu.header[keyword] = hdu_ref.header[keyword]
             hdu.header["NAXIS"] = 4
             hdu.writeto(image_path, overwrite=True)
-            logger.success(f"Added degenerate axes to {image_path}.")
+            logger.info(f"Added degenerate axes to {image_path}.")
 
 
 def mask_weightless_pixels(image_path: Path, weights_path: Path):
-    with fits.open(image_path, mode="update") as hdul, fits.open(weights_path) as hdul_weights:
+    logger = structlog.get_logger("swarp")
+    with fits.open(image_path, mode="update") as hdul, fits.open(
+        weights_path
+    ) as hdul_weights:
         hdu = hdul[0]
         hdu_weights = hdul_weights[0]
         hdu.data[hdu_weights.data == 0] = np.nan
-        logger.success(f"Masked weightless pixels in {image_path}.")
+        logger.info(f"Masked weightless pixels in {image_path}.")
 
 
 def worker(args: tuple[list[str], str, Path, Path, Path]):
@@ -123,8 +143,18 @@ def worker(args: tuple[list[str], str, Path, Path, Path]):
     output_weight_path: Path
     central_image_path: Path
 
+    _logger = structlog.get_logger("swarp")
+    logger = _logger.bind(rank=MPI.COMM_WORLD.Get_rank(), hostname=socket.gethostname())
+
+    (
+        swarp_cmd,
+        field_name,
+        output_mosaic_path,
+        output_weight_path,
+        central_image_path,
+    ) = args
     logger.debug(f"worker args: {args}")
-    swarp_cmd, field_name, output_mosaic_path, output_weight_path, central_image_path = args
+
     config_path = Path(swarp_cmd[2])
     field_name = config_path.parent.name
     try:
@@ -132,26 +162,54 @@ def worker(args: tuple[list[str], str, Path, Path, Path]):
         _ = subprocess.run(swarp_cmd, check=True)
     except subprocess.CalledProcessError as e:
         logger.error(
-            f"Error while calling SWarp for {field_name}. Return code:"
-            f" {e.returncode}"
+            f"Error while calling SWarp for {field_name}. Return code: {e.returncode}"
         )
         logger.debug(e.cmd)
         raise e
     add_degenerate_axes(output_mosaic_path, central_image_path)
     add_degenerate_axes(output_weight_path, central_image_path)
     mask_weightless_pixels(output_mosaic_path, output_weight_path)
-    logger.success(f"SWarp completed for {field_name}.")
+    logger.info(f"SWarp completed for {field_name}.")
 
 
-def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: bool = False):
+def test_worker(args: tuple[list[str], str, Path, Path, Path]):
+    swarp_cmd: list[str]
+    field_name: str
+    output_mosaic_path: Path
+    output_weight_path: Path
+    central_image_path: Path
+
+    logger = structlog.get_logger("swarp")
+    log = logger.bind(rank=MPI.COMM_WORLD.Get_rank())
+
+    (
+        swarp_cmd,
+        field_name,
+        output_mosaic_path,
+        output_weight_path,
+        central_image_path,
+    ) = args
+    log.debug(f"worker args: {args}")
+
+    config_path = Path(swarp_cmd[2])
+    field_name = config_path.parent.name
+    log.debug(f"Would SWarp {field_name}")
+
+
+def main(
+    neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: bool = False
+):
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field> contain the smoothed images to combine.
     # <neighbour_data_dir>/<field>/inputs contain the original images and weights.
+    logger = structlog.get_logger("swarp").bind(
+        rank=MPI.COMM_WORLD.Get_rank(),
+        size=MPI.COMM_WORLD.Get_size(),
+    )
+    logger.info("checking rank and size")
     pool = schwimmbad.choose_pool(mpi=mpi, processes=n_proc)
-    if mpi:
-        if not pool.is_master():
-            pool.wait()
-            sys.exit(0)
+
+    # if using MPI, the following is executed only on the main process
     epoch_name = neighbour_data_dir.name
     arg_list: list[tuple[list[str], str, Path, Path, Path]] = []
     for field_path in neighbour_data_dir.glob("VAST_*"):
@@ -161,7 +219,9 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: boo
             field_path / f"{field_name}.{epoch_name}.I.conv.weight.fits"
         )
         if output_mosaic_path.exists():
-            logger.debug(f"COMBINED image {output_mosaic_path} already exists, skipping")
+            logger.debug(
+                f"COMBINED image {output_mosaic_path} already exists, skipping"
+            )
             continue
         images = list(field_path.glob("*.sm.fits"))
         # get the central image
@@ -184,10 +244,13 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: boo
             for image in images
         ]
         image_geo = get_image_geometry(central_image)
+        tmp_dir = field_path / "tmp"
+        tmp_dir.mkdir(exist_ok=True)
         swarp_config_dict = {
             "VMEM_MAX": 4000,
             "MEM_MAX": 4000,
             "COMBINE_BUFSIZE": 2000,
+            "VMEM_DIR": tmp_dir,
             "IMAGEOUT_NAME": output_mosaic_path,
             "WEIGHTOUT_NAME": output_weight_path,
             "COMBINE": "Y",
@@ -217,12 +280,20 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: boo
         ]
         swarp_cmd.extend([str(p) for p in images])
         arg_list.append(
-            (swarp_cmd, field_name, output_mosaic_path, output_weight_path, central_image)
+            (
+                swarp_cmd,
+                field_name,
+                output_mosaic_path,
+                output_weight_path,
+                central_image,
+            )
         )
         logger.info(f"Added SWarp command for {field_path.name}.")
         logger.debug(swarp_cmd)
         if test:
             break
+
+    # distribute tasks
     pool.map(worker, arg_list)
     pool.close()
 
