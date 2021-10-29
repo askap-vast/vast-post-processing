@@ -19,9 +19,9 @@ COPY pyproject.toml poetry.lock ./
 FROM builder as dev
 # install python deps, include dev deps
 RUN poetry export -f requirements.txt --dev --without-hashes | pip install -r /dev/stdin
-COPY link_neighbours.py correct_vast.py convolve_neighbours.py swarp.py ./
+COPY link_neighbours.py correct_vast.py convolve_neighbours.py swarp.py selavy_combined.py cleanup.py ./
 
 FROM builder as final
 # install python deps
 RUN poetry export -f requirements.txt --without-hashes | pip install -r /dev/stdin
-COPY link_neighbours.py correct_vast.py convolve_neighbours.py swarp.py ./
+COPY link_neighbours.py correct_vast.py convolve_neighbours.py swarp.py selavy_combined.py cleanup.py ./
