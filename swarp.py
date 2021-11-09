@@ -119,7 +119,7 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
                 (3, 4), ("NAXIS", "CTYPE", "CRVAL", "CDELT", "CRPIX", "CUNIT")
             ):
                 keyword = f"{header_card}{n}"
-                hdu.header[keyword] = hdu_ref.header[keyword]
+                hdu.header[keyword] = hdu_ref.header.get(keyword, "")
             hdu.header["NAXIS"] = 4
             hdu.writeto(image_path, overwrite=True)
             logger.info(f"Added degenerate axes to {image_path}.")
