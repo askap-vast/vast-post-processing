@@ -14,6 +14,7 @@ import numpy as np
 import schwimmbad
 from racs_tools import beamcon_2D
 from radio_beam import Beam
+from radio_beam.utils import BeamError
 import typer
 
 
@@ -97,11 +98,19 @@ def worker(args):
     datadict["image"][nan_mask] = 0
 
     logger.debug(f"Determining convolving beam for {file} ...")
-    conbeam, sfactor = beamcon_2D.getbeam(
-        datadict,
-        new_beam,
-        cutoff=clargs.cutoff,
-    )
+    try:
+        conbeam, sfactor = beamcon_2D.getbeam(
+            datadict,
+            new_beam,
+            cutoff=clargs.cutoff,
+        )
+    except BeamError:
+        logger.warning(
+            f"Beam deconvolution failed for {file}. Setting convolving beam to"
+            f" point-like. Old beam: {datadict['oldbeam']}, new beam: {new_beam}."
+        )
+        conbeam = Beam(major=0 * u.deg, minor=0 * u.deg, pa=0 * u.deg)
+        sfactor = 1
     datadict.update({"conbeam": conbeam, "final_beam": new_beam, "sfactor": sfactor})
     if not clargs.dryrun:
         if (
@@ -142,7 +151,10 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False):
         main_args = Beamcon2D_MainArgs(infile=image_str_list, outdir=str(field_dir))
         # find the smallest common beam
         common_beam, _ = beamcon_2D.getmaxbeam(image_str_list)
-        logger.debug(f"{field_dir} common beam major {common_beam.major} type {type(common_beam)}")
+        logger.debug(
+            f"{field_dir} common beam major {common_beam.major} type"
+            f" {type(common_beam)}"
+        )
         worker_args_list.extend(
             [
                 Beamcon2D_WorkerArgs(
