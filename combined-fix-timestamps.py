@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from astropy.io import fits
-from astropy.time import Time, TimeDelta
+from astropy.time import Time
 import astropy.units as u
 import pandas as pd
 from tqdm import tqdm
@@ -62,19 +62,10 @@ for field_dir_path in Path("/data/.staging/convolved/").glob("EPOCH*/VAST_*"):
     for input_field_path in (field_dir_path / "inputs").glob("image.i.VAST_*.fits"):
         _, _, field, sbid_str, *_ = input_field_path.name.split(".")
         sbid = int(sbid_str[2:])
-        # with fits.open(input_field_path) as hdul:
-        #     date_start_header = Time(hdul[0].header["DATE-OBS"])
-        #     try:
-        #         date_end_header = Time(hdul[0].header["DATE-END"])
-        #     except KeyError:
-        #         date_end_header = Time(date_start_header) + TimeDelta(hdul[0].header["DURATION"] * u.second)
-
         # use the metadata instead of the imager header, some of the image headers appeared incorrect
         # e.g. duplicate field observation had the same DATE-OBS which is impossible!
         date_start_meta = Time(vast_df.loc[(field, sbid), "DATE-BEG"].isoformat())
         date_end_meta = Time(vast_df.loc[(field, sbid), "DATE-END"].isoformat())
-        # if date_start_header != date_start_meta:
-        #     print(combined_field, combined_release_epoch, field, sbid, date_start_header, date_start_meta)
         neighbours_list.append(
             VastNeighbour(
                 field=field,
