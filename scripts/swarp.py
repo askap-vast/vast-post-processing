@@ -24,7 +24,7 @@ import schwimmbad
 import structlog
 import typer
 
-import mpi_logger
+import vast_combine.mpi_logger as mpi_logger
 
 slurm_job_id = os.environ.get("SLURM_JOB_ID", "no-slurm")
 
