@@ -1,8 +1,13 @@
 from pathlib import Path
+from typing import Optional
 
 import typer
 
-from vast_combine.neighbours import read_release_epochs, find_vast_neighbours_by_release_epoch
+from vast_combine.neighbours import (
+    get_release_epochs_from_api,
+    read_release_epochs,
+    find_vast_neighbours_by_release_epoch,
+)
 
 
 def main(
@@ -31,20 +36,21 @@ def main(
         file_okay=False,
         dir_okay=True,
     ),
-    release_epochs_csv: Path = typer.Argument(
+    output_root: Path = typer.Argument(
         ...,
+        help="Directory to write output links organized by release epoch and field.",
+    ),
+    release_epochs_csv: Optional[Path] = typer.Option(
+        None,
         help=(
             "Path to CSV file containing the release epoch for each VAST image. Each"
             " row must contain at least the observation epoch, field name, SBID, and"
-            " release epoch."
+            " release epoch. If not provided, attempt to get the release epochs from"
+            " the validation API."
         ),
         exists=True,
         file_okay=True,
         dir_okay=False,
-    ),
-    output_root: Path = typer.Argument(
-        ...,
-        help="Directory to write output links organized by release epoch and field.",
     ),
     overlap_frac_thresh: float = typer.Option(
         0.05,
@@ -57,9 +63,18 @@ def main(
     use_corrected: bool = typer.Option(
         True, help="Use the corrected versions of images."
     ),
+    neighbours_output: Optional[Path] = typer.Option(
+        None,
+        help="Write a parquet file of the neighbours to the given path.",
+        file_okay=True,
+        dir_okay=False,
+    ),
 ):
     # get the release epochs
-    release_epochs = read_release_epochs(release_epochs_csv)
+    if release_epochs_csv is None:
+        release_epochs = get_release_epochs_from_api()
+    else:
+        release_epochs = read_release_epochs(release_epochs_csv)
     # get the neighbours DataFrame and filter for the requested release epoch and
     # overlap area threshold
     vast_neighbours_df = find_vast_neighbours_by_release_epoch(
@@ -68,7 +83,11 @@ def main(
         vast_db_repo,
         release_epochs,
         racs_db_repo=racs_db_repo,
-    ).query(
+    )
+    if neighbours_output is not None:
+        vast_neighbours_df.to_parquet(neighbours_output, index=True)
+
+    vast_neighbours_df = vast_neighbours_df.query(
         "release_epoch_a == @release_epoch and overlap_frac >= @overlap_frac_thresh"
     )
 

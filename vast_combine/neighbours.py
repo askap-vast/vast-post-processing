@@ -7,6 +7,7 @@ from astropy.time import Time
 from loguru import logger
 import mocpy
 import pandas as pd
+import requests
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,17 @@ def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFram
     return fields_df
 
 
+def _df_to_vast_obs_ids(
+    df: pd.DataFrame, release_epoch_col: str = "Release Epoch"
+) -> dict[VastObservationId, str]:
+    return {
+        VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid): row[
+            release_epoch_col
+        ]
+        for (obs_epoch, field, sbid), row in df.iterrows()
+    }
+
+
 def read_release_epochs(
     epochs_csv_path: Path,
     obs_epoch_col: str = "Obs Epoch",
@@ -69,12 +81,27 @@ def read_release_epochs(
         .sort_index()
     )
     logger.debug("Read release epochs.")
-    return {
-        VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid): row[
-            release_epoch_col
-        ]
-        for (obs_epoch, field, sbid), row in release_df.iterrows()
-    }
+    return _df_to_vast_obs_ids(release_df, release_epoch_col=release_epoch_col)
+
+
+def get_release_epochs_from_api(
+    api_url: str = "https://validation.vast-survey.org/api/observations/",
+    page_limit: int = 100,
+) -> dict[VastObservationId, str]:
+    logger.info(f"Getting observations from the validation API: {api_url}")
+    results = []
+    r = requests.get(api_url, params={"limit": page_limit})
+    data = r.json()
+    results.extend(data["results"])
+    while data["next"] is not None:
+        data = requests.get(data["next"]).json()
+        results.extend(data["results"])
+    obs_df = (
+        pd.DataFrame(results)
+        .set_index(["observation_epoch", "field_name", "sbid"])
+        .sort_index()
+    )
+    return _df_to_vast_obs_ids(obs_df, release_epoch_col="release_epoch")
 
 
 def get_observation_from_moc_path(

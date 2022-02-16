@@ -20,6 +20,7 @@ racs-tools = {url = "https://github.com/marxide/RACS-tools/archive/refs/heads/ma
 structlog = "^21.2.0"
 tqdm = "^4.62.3"
 mpi4py = "^3.1.3"
+requests = "^2.27.1"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.910"
