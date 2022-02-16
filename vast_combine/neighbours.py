@@ -176,7 +176,7 @@ def get_observation_from_moc_path(
         return None
 
 
-def find_vast_neighbours_by_release_epoch(
+def find_vast_observations_by_release_epoch(
     release_epoch: str,
     data_root: Path,
     vast_db_repo: Path,
@@ -220,7 +220,10 @@ def find_vast_neighbours_by_release_epoch(
         ),
         on=["obs_epoch", "field", "sbid"],
     )
+    return observations_df
 
+
+def find_vast_neighbours(observations_df: pd.DataFrame) -> pd.DataFrame:
     # find all observation pairs that spatially overlap
     # make neighbour search more efficient by doing a quick astropy search first
     observation_coords = SkyCoord(
