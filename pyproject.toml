@@ -11,13 +11,13 @@ pandas = "^1.3.3"
 MOCPy = "^0.8.5"
 loguru = "^0.5.3"
 typer = "^0.4.0"
-astropy = "^4.3.1"
+astropy = "^5.0.4"
 scipy = "^1.7.1"
 numpy = "^1.21.2"
 schwimmbad = "^0.3.2"
 radio-beam = "^0.3.3"
-racs-tools = {url = "https://github.com/marxide/RACS-tools/archive/refs/heads/master.zip"}
 structlog = "^21.2.0"
+racs-tools = {git = "https://github.com/marxide/RACS-tools.git", rev = "v2.0.1"}
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.910"
