@@ -1,6 +1,7 @@
 from dataclasses import dataclass, astuple
 from pathlib import Path
-from typing import Optional
+import re
+from typing import Optional, Tuple
 
 from astropy.coordinates import SkyCoord, Angle
 from astropy.time import Time
@@ -8,6 +9,14 @@ from loguru import logger
 import mocpy
 import pandas as pd
 import typer
+
+
+RE_SBID = re.compile(r"\.SB(\d+)\.")
+RE_FIELD = re.compile(r"\.((?:RACS|VAST)_\d{4}[+-]\d{2}.?)\.")
+
+
+class UnknownFilenameConvention(Exception):
+    pass
 
 
 @dataclass(frozen=True)
@@ -39,6 +48,38 @@ class VastOverlap:
     idx_b: int
     overlap_frac: float
     delta_t_days: float
+
+
+def get_sbid_and_field_from_filename(filename: str) -> Tuple[int, str]:
+    """Search the filename for the SBID and field name using regular expressions. The
+    SBID is searched by looking for ".SBn." where n can be any number of digits.
+    The field name is searched by looking for ".VAST_XXXX±XXY." where X can be any digit
+    and Y is an optional character. "VAST" may also be substituted for "RACS".
+
+    Args:
+        filename (str): the filename to search.
+
+    Raises:
+        UnknownFilenameConvention: when the regular expression match fails.
+
+    Returns:
+        Tuple[int, str]: the SBID and field name.
+    """
+    m_sbid = RE_SBID.search(filename)
+    m_field = RE_FIELD.search(filename)
+    if m_sbid is None and m_field is None:
+        raise UnknownFilenameConvention(
+            f"Could not determine SBID and field from filename {filename}"
+        )
+    elif m_sbid is None:
+        raise UnknownFilenameConvention(
+            f"Could not determine SBID from filename {filename}"
+        )
+    elif m_field is None:
+        raise UnknownFilenameConvention(
+            f"Could not determine field from filename {filename}"
+        )
+    return int(m_sbid.group(1)), m_field.group(1)
 
 
 def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFrame:
@@ -88,8 +129,7 @@ def get_observation_from_moc_path(
     moc = mocpy.MOC.from_fits(
         moc_path.with_name(moc_path.name.replace(".stmoc", ".moc"))
     )
-    _, _, field, sbid, *_ = moc_path.name.split(".")
-    sbid = int(sbid[2:])
+    sbid, field = get_sbid_and_field_from_filename(moc_path.name)
     centre_approx = SkyCoord(
         ra=f"{field[5:7]}:{field[7:9]}:00",
         dec=f"{field[9:12]}:00:00",
@@ -174,8 +214,8 @@ def find_vast_neighbours_by_release_epoch(
     moc_root = data_root / "vast-data/TILES/STOKESI_MOCS"
     for moc_path in moc_root.glob("epoch_*/*.moc.fits"):
         obs_epoch = int(moc_path.parent.name.split("_")[-1])
-        _, _, field, sbid, *_ = moc_path.name.split(".")
-        sbid = int(sbid[2:])
+        logger.debug(f"Processing {moc_path.name}")
+        sbid, field = get_sbid_and_field_from_filename(moc_path.name)
         vast_obs_id = VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid)
         obs_release_epoch = release_epochs_dict.get(vast_obs_id, None)
         if obs_release_epoch == release_epoch:
