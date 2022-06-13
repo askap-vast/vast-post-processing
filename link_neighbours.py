@@ -251,20 +251,6 @@ def find_vast_neighbours_by_release_epoch(
 
 def main(
     release_epoch: str,
-    vast_db_repo: Path = typer.Argument(
-        ...,
-        help="Path to VAST ASKAP Surveys database repository.",
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-    ),
-    racs_db_repo: Path = typer.Argument(
-        ...,
-        help="Path to RACS ASKAP Surveys database repository.",
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-    ),
     vast_data_root: Path = typer.Argument(
         ...,
         help=(
@@ -289,6 +275,20 @@ def main(
     output_root: Path = typer.Argument(
         ...,
         help="Directory to write output links organized by release epoch and field.",
+    ),
+    vast_db_repo: Path = typer.Argument(
+        ...,
+        help="Path to VAST ASKAP Surveys database repository.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    racs_db_repo: Optional[Path] = typer.Argument(
+        None,
+        help="Path to RACS ASKAP Surveys database repository.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
     ),
     overlap_frac_thresh: float = typer.Option(
         0.05,
