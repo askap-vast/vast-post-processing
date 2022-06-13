@@ -156,6 +156,7 @@ def find_vast_neighbours_by_release_epoch(
     vast_db_repo: Path,
     release_epochs_dict: dict[VastObservationId, str],
     racs_db_repo: Optional[Path] = None,
+    use_corrected: bool = True,
 ) -> pd.DataFrame:
     surveys_db_df = read_surveys_repo(vast_db_repo)
     if racs_db_repo is not None:
@@ -178,7 +179,9 @@ def find_vast_neighbours_by_release_epoch(
         vast_obs_id = VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid)
         obs_release_epoch = release_epochs_dict.get(vast_obs_id, None)
         if obs_release_epoch == release_epoch:
-            obs = get_observation_from_moc_path(moc_path, surveys_db_df)
+            obs = get_observation_from_moc_path(
+                moc_path, surveys_db_df, use_corrected=use_corrected
+            )
             if obs is not None:
                 observation_data.append(obs)
                 logger.debug(
@@ -309,6 +312,7 @@ def main(
         vast_db_repo,
         release_epochs,
         racs_db_repo=racs_db_repo,
+        use_corrected=use_corrected,
     ).query(
         "release_epoch_a == @release_epoch and overlap_frac >= @overlap_frac_thresh"
     )
