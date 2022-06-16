@@ -133,7 +133,12 @@ def worker(args):
         logger.success(f"Wrote smoothed image for {file}.")
 
 
-def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False):
+def main(
+    neighbour_data_dir: Path,
+    n_proc: int = 1,
+    mpi: bool = False,
+    max_images: Optional[int] = None,
+):
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field>/inputs contains the input FITS images
     # to be convolved to a common resolution and their weights FITS images.
@@ -143,6 +148,7 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False):
             pool.wait()
             sys.exit(0)
     worker_args_list: list[Beamcon2D_WorkerArgs] = []
+    n_images: int = 0
     for field_dir in neighbour_data_dir.glob("VAST_*"):
         if len(list(field_dir.glob("*.sm.fits"))) > 0:
             logger.warning(f"Smoothed images already exist in {field_dir}. Skipping.")
@@ -155,18 +161,19 @@ def main(neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False):
             f"{field_dir} common beam major {common_beam.major} type"
             f" {type(common_beam)}"
         )
-        worker_args_list.extend(
-            [
-                Beamcon2D_WorkerArgs(
-                    file=f,
-                    outdir=str(field_dir),
-                    new_beam=common_beam,
-                    conv_mode=main_args.conv_mode,
-                    clargs=main_args,
-                )
-                for f in image_str_list
-            ]
-        )
+        for f in image_str_list:
+            worker_args = Beamcon2D_WorkerArgs(
+                file=f,
+                outdir=str(field_dir),
+                new_beam=common_beam,
+                conv_mode=main_args.conv_mode,
+                clargs=main_args,
+            )
+            worker_args_list.append(worker_args)
+            n_images += 1
+            if max_images is not None and n_images >= max_images:
+                break
+
     # start convolutions
     pool.map(worker, (tuple(args) for args in worker_args_list))
     pool.close()
