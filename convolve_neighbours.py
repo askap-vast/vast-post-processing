@@ -138,6 +138,7 @@ def main(
     n_proc: int = 1,
     mpi: bool = False,
     max_images: Optional[int] = None,
+    racs: bool = False,
 ):
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field>/inputs contains the input FITS images
@@ -147,9 +148,10 @@ def main(
         if not pool.is_master():
             pool.wait()
             sys.exit(0)
+    glob_expr = "RACS_*" if racs else "VAST_*"
     worker_args_list: list[Beamcon2D_WorkerArgs] = []
     n_images: int = 0
-    for field_dir in neighbour_data_dir.glob("VAST_*"):
+    for field_dir in neighbour_data_dir.glob(glob_expr):
         if len(list(field_dir.glob("*.sm.fits"))) > 0:
             logger.warning(f"Smoothed images already exist in {field_dir}. Skipping.")
             continue
