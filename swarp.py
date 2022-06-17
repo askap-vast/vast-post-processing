@@ -34,7 +34,7 @@ structlog.configure(
     logger_factory=structlog.stdlib.LoggerFactory(),
 )
 HANDLER = mpi_logger.MPIFileHandler(f"swarp-{slurm_job_id}.log")
-FORMATTER = logging.Formatter('%(message)s')
+FORMATTER = logging.Formatter("%(message)s")
 HANDLER.setFormatter(FORMATTER)
 
 LOGGER = logging.getLogger("swarp")
@@ -197,7 +197,11 @@ def test_worker(args: tuple[list[str], str, Path, Path, Path]):
 
 
 def main(
-    neighbour_data_dir: Path, n_proc: int = 1, mpi: bool = False, test: bool = False
+    neighbour_data_dir: Path,
+    n_proc: int = 1,
+    mpi: bool = False,
+    test: bool = False,
+    racs: bool = False,
 ):
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field> contain the smoothed images to combine.
@@ -212,7 +216,8 @@ def main(
     # if using MPI, the following is executed only on the main process
     epoch_name = neighbour_data_dir.name
     arg_list: list[tuple[list[str], str, Path, Path, Path]] = []
-    for field_path in neighbour_data_dir.glob("VAST_*"):
+    glob_expr = "RACS_*" if racs else "VAST_*"
+    for field_path in neighbour_data_dir.glob(glob_expr):
         field_name = field_path.name
         output_mosaic_path = field_path / f"{field_name}.{epoch_name}.I.conv.fits"
         output_weight_path = (
