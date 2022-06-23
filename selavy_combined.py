@@ -52,8 +52,10 @@ def main(
     parset_template_path: Path,
     sbatch_template_path: Path,
     stokes: str = "I",
+    racs: bool = False,
 ):
-    for field_path in neighbour_data_dir.glob("VAST_*"):
+    glob_expr = "RACS_*" if racs else "VAST_*"
+    for field_path in neighbour_data_dir.glob(glob_expr):
         field_name = field_path.name
         epoch_name = field_path.parent.name
         image_path = field_path / f"{field_name}.{epoch_name}.{stokes}.conv.fits"
