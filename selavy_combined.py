@@ -5,7 +5,7 @@ Selavy parset and SLURM sbatch script. Note that the sbatch scripts need to be s
 to the SLURM queue externally - this script may not have access to the SLURM executables.
 """
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from loguru import logger
 import typer
@@ -40,6 +40,7 @@ def write_selavy_files(
         job_name=f"selavy-{field_name}-{epoch_name}",
         parset_path=parset_path.relative_to(image_path.parent),
         log_path=parset_path.with_suffix(".log").relative_to(image_path.parent),
+        working_dir_path=parset_path.parent,
     )
     sbatch_path = image_path.with_name(f"selavy.{image_name}.sbatch")
     sbatch_path.write_text(sbatch_template)
@@ -53,15 +54,26 @@ def main(
     sbatch_template_path: Path,
     stokes: str = "I",
     racs: bool = False,
+    field_list: Optional[List[str]] = typer.Option(None, "--field"),
 ):
     glob_expr = "RACS_*" if racs else "VAST_*"
     for field_path in neighbour_data_dir.glob(glob_expr):
+        if field_list and field_path.name not in field_list:
+            logger.info(
+                f"Glob found field {field_path} but it was not given as a --field option."
+                " Skipping."
+            )
+            continue
         field_name = field_path.name
         epoch_name = field_path.parent.name
         image_path = field_path / f"{field_name}.{epoch_name}.{stokes}.conv.fits"
         try:
             _ = write_selavy_files(
-                field_name, epoch_name, image_path, parset_template_path, sbatch_template_path
+                field_name,
+                epoch_name,
+                image_path,
+                parset_template_path,
+                sbatch_template_path,
             )
         except FileNotFoundError as e:
             logger.error(e)

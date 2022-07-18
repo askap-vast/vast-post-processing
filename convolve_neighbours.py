@@ -139,6 +139,7 @@ def main(
     mpi: bool = False,
     max_images: Optional[int] = None,
     racs: bool = False,
+    field_list: Optional[List[str]] = typer.Option(None, "--field"),
 ):
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field>/inputs contains the input FITS images
@@ -152,6 +153,11 @@ def main(
     worker_args_list: list[Beamcon2D_WorkerArgs] = []
     n_images: int = 0
     for field_dir in neighbour_data_dir.glob(glob_expr):
+        if field_list and field_dir.name not in field_list:
+            logger.info(
+                f"Glob found field {field_dir} but it was not given as a --field option. Skipping."
+            )
+            continue
         if max_images is not None and n_images >= max_images:
             break
         if len(list(field_dir.glob("*.sm.fits"))) > 0:
