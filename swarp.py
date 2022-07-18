@@ -295,11 +295,10 @@ def main(
         )
         logger.info(f"Added SWarp command for {field_path.name}.")
         logger.debug(swarp_cmd)
-        if test:
-            break
 
     # distribute tasks
-    pool.map(worker, arg_list)
+
+    pool.map(worker if not test else test_worker, arg_list)
     pool.close()
 
 
