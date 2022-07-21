@@ -1,3 +1,4 @@
 .*/
 *.sif
 *.tar
+Dockerfile

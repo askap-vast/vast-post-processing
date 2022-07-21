@@ -10,6 +10,8 @@ from typing import Optional, List
 from loguru import logger
 import typer
 
+app = typer.Typer()
+
 
 def write_selavy_files(
     field_name: str,
@@ -48,6 +50,7 @@ def write_selavy_files(
     return sbatch_path
 
 
+@app.command()
 def main(
     neighbour_data_dir: Path,
     parset_template_path: Path,
@@ -78,7 +81,3 @@ def main(
         except FileNotFoundError as e:
             logger.error(e)
             continue
-
-
-if __name__ == "__main__":
-    typer.run(main)

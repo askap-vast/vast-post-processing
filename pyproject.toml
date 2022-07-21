@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "vast-combine"
+name = "vast-post-processing"
 version = "0.1.0"
 description = ""
 authors = ["Andrew O'Brien <obrienan@uwm.edu>"]
@@ -30,6 +30,12 @@ debugpy = "^1.5.1"
 
 [tool.poetry.extras]
 mpi = ["mpi4py"]
+
+[tool.poetry.scripts]
+link_neighbours = "vast_post_processing.cli.link_neighbours:app"
+convolve_neighbours = "vast_post_processing.cli.convolve_neighbours:app"
+swarp_neighbours = "vast_post_processing.cli.swarp:app"
+selavy_prepare = "vast_post_processing.cli.selavy_combined:app"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

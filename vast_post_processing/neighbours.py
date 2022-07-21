@@ -4,11 +4,17 @@ import re
 from typing import Optional, Tuple
 
 from astropy.coordinates import SkyCoord, Angle
+from astropy.io import fits
 from astropy.time import Time
+import astropy.units as u
+import astropy.wcs
 from loguru import logger
 import mocpy
+import numpy as np
 import pandas as pd
-import typer
+from racs_tools import beamcon_2D
+from radio_beam import Beam
+from radio_beam.utils import BeamError
 
 
 RE_SBID = re.compile(r"\.SB(\d+)\.")
@@ -90,7 +96,7 @@ def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFram
         df["obs_epoch"] = field_data.parent.name
         if rename_racs:
             df["FIELD_NAME"] = df.FIELD_NAME.str.replace("RACS_", "VAST_")
-        fields_df = fields_df.append(df)
+        fields_df = fields_df.append(df)  # TODO df.append deprecated, replace with pd.concat
     logger.debug("Read surveys repo.")
     return fields_df
 
@@ -229,6 +235,7 @@ def find_vast_neighbours_by_release_epoch(
                 )
 
     observations_df = pd.DataFrame(observation_data)
+    # TODO: handle AttributeError raised if the dataframe is empty
     observations_df["low_band"] = observations_df.field.str.endswith("A")
     # add the release epochs for each observation
     observations_df = observations_df.join(
@@ -289,101 +296,86 @@ def find_vast_neighbours_by_release_epoch(
     return obs_overlaps_df
 
 
-def main(
-    release_epoch: str,
-    vast_data_root: Path = typer.Argument(
-        ...,
-        help=(
-            "Path to VAST data. Must follow the VAST data organization and naming"
-            " scheme."
-        ),
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-    ),
-    release_epochs_csv: Path = typer.Argument(
-        ...,
-        help=(
-            "Path to CSV file containing the release epoch for each VAST image. Each"
-            " row must contain at least the observation epoch, field name, SBID, and"
-            " release epoch."
-        ),
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-    ),
-    output_root: Path = typer.Argument(
-        ...,
-        help="Directory to write output links organized by release epoch and field.",
-    ),
-    vast_db_repo: Path = typer.Argument(
-        ...,
-        help="Path to VAST ASKAP Surveys database repository.",
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-    ),
-    racs_db_repo: Optional[Path] = typer.Argument(
-        None,
-        help="Path to RACS ASKAP Surveys database repository.",
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-    ),
-    overlap_frac_thresh: float = typer.Option(
-        0.05,
-        help=(
-            "Exclude fields that overlap by less than the given fractional overlap."
-            " e.g. the default of 0.05 will exclude fields that overlap by less than 5%"
-            " of the area of the central field."
-        ),
-    ),
-    use_corrected: bool = typer.Option(
-        True, help="Use the corrected versions of images."
-    ),
-):
-    # get the release epochs
-    release_epochs = read_release_epochs(release_epochs_csv)
-    # get the neighbours DataFrame and filter for the requested release epoch and
-    # overlap area threshold
-    vast_neighbours_df = find_vast_neighbours_by_release_epoch(
-        release_epoch,
-        vast_data_root,
-        vast_db_repo,
-        release_epochs,
-        racs_db_repo=racs_db_repo,
-        use_corrected=use_corrected,
-    ).query(
-        "release_epoch_a == @release_epoch and overlap_frac >= @overlap_frac_thresh"
-    )
+def convolve_image(
+    image_path: Path,
+    output_dir_path: Path,
+    target_beam: Beam,
+    mode: str,
+    suffix: str = "sm",
+    prefix: Optional[str] = None,
+    cutoff: Optional[float] = None,
+    dry_run: bool = False,
+    **kwargs,
+) -> Optional[Path]:
+    output_filename: str = image_path.with_suffix(f".{suffix}.fits").name
+    if prefix is not None:
+        output_filename = prefix + output_filename
 
-    # create a directory for each field and create links to the neighbouring images
-    release_output_path = output_root / release_epoch
-    release_output_path.mkdir(parents=True, exist_ok=True)
-    for _, obs_pair in vast_neighbours_df.iterrows():
-        # create directories
-        field_inputs_path_a = release_output_path / obs_pair.field_a / "inputs"
-        field_inputs_path_a.mkdir(parents=True, exist_ok=True)
-        field_inputs_path_b = release_output_path / obs_pair.field_b / "inputs"
-        field_inputs_path_b.mkdir(parents=True, exist_ok=True)
+    with fits.open(image_path, memmap=True, mode="readonly") as hdu:
+        w = astropy.wcs.WCS(hdu[0])
+        pixelscales = astropy.wcs.utils.proj_plane_pixel_scales(w)
+        dxas = pixelscales[0] * u.deg
+        dyas = pixelscales[1] * u.deg
 
-        # create a hard link for each field in the pair in both directions, e.g.
-        # A/inputs/A.fits, A/inputs/B.fits, B/inputs/A.fits, B/inputs/B.fits (plus weights)
-        for output_path in (field_inputs_path_a, field_inputs_path_b):
-            target_image_a = output_path / obs_pair.image_path_a.name
-            target_weights_a = output_path / obs_pair.weights_path_a.name
-            if not target_image_a.exists():
-                obs_pair.image_path_a.link_to(target_image_a)
-            if not target_weights_a.exists():
-                obs_pair.weights_path_a.link_to(target_weights_a)
+        if len(hdu[0].data.shape) == 4:
+            # has spectral, polarization axes
+            data = hdu[0].data[0, 0]
+        else:
+            data = hdu[0].data
+        nx, ny = data.shape[-1], data.shape[-2]
 
-            target_image_b = output_path / obs_pair.image_path_b.name
-            target_weights_b = output_path / obs_pair.weights_path_b.name
-            if not target_image_b.exists():
-                obs_pair.image_path_b.link_to(target_image_b)
-            if not target_weights_b.exists():
-                obs_pair.weights_path_b.link_to(target_weights_b)
+        old_beam = Beam.from_fits_header(hdu[0].header)
 
+        datadict = {
+            "filename": image_path.name,
+            "image": data,
+            "4d": (len(hdu[0].data.shape) == 4),
+            "header": hdu[0].header,
+            "oldbeam": old_beam,
+            "nx": nx,
+            "ny": ny,
+            "dx": dxas,
+            "dy": dyas,
+        }
 
-if __name__ == "__main__":
-    typer.run(main)
+    logger.debug(f"Blanking NaNs in {image_path} ...")
+    nan_mask = np.isnan(datadict["image"])
+    datadict["image"][nan_mask] = 0
+
+    logger.debug(f"Determining convolving beam for {image_path} ...")
+    try:
+        conbeam, sfactor = beamcon_2D.getbeam(
+            datadict,
+            target_beam,
+            cutoff=cutoff,
+        )
+    except BeamError:
+        logger.warning(
+            f"Beam deconvolution failed for {image_path}. Setting convolving beam to"
+            f" point-like. Old beam: {datadict['oldbeam']}, new beam: {target_beam}."
+        )
+        conbeam = Beam(major=0 * u.deg, minor=0 * u.deg, pa=0 * u.deg)
+        sfactor = 1
+    datadict.update({"conbeam": conbeam, "final_beam": target_beam, "sfactor": sfactor})
+    if not dry_run:
+        if (
+            conbeam == Beam(major=0 * u.deg, minor=0 * u.deg, pa=0 * u.deg)
+            and sfactor == 1
+        ):
+            newim = datadict["image"]
+        else:
+            logger.debug(f"Smoothing {image_path} ...")
+            newim = beamcon_2D.smooth(datadict, conv_mode=mode)
+        if datadict["4d"]:
+            # make it back into a 4D image
+            newim = np.expand_dims(np.expand_dims(newim, axis=0), axis=0)
+            nan_mask = np.expand_dims(np.expand_dims(nan_mask, axis=0), axis=0)
+        datadict.update({"newimage": newim})
+
+        logger.debug(f"Restoring NaNs for {image_path} ...")
+        datadict["newimage"][nan_mask] = np.nan
+        beamcon_2D.savefile(datadict, output_filename, str(output_dir_path))
+        logger.success(f"Wrote smoothed image for {image_path}.")
+        return output_dir_path / output_filename
+    else:
+        return None
