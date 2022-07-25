@@ -1,21 +1,18 @@
 """Requires setup_neighbours.py to be run first.
 """
 from dataclasses import dataclass, fields
+from functools import partial
 from pathlib import Path
-import sys
 from typing import Optional, List
 
 from loguru import logger
-import schwimmbad
 from racs_tools import beamcon_2D
 from radio_beam import Beam
 import typer
 
+from vast_post_processing.cli._util import get_pool, _get_worker_name
 from vast_post_processing.neighbours import convolve_image
 
-
-logger.remove()
-logger.add(sys.stderr, level=5)
 
 app = typer.Typer()
 
@@ -37,8 +34,9 @@ class WorkerArgs:
         return (getattr(self, field.name) for field in fields(self))
 
 
-def worker(args: WorkerArgs):
-    return convolve_image(*args)
+def worker(args: WorkerArgs, mpi: bool = False, n_proc: int = 1):
+    with logger.contextualize(worker_name=_get_worker_name(mpi=mpi, n_proc=n_proc)):
+        return convolve_image(*args)
 
 
 @app.command()
@@ -53,11 +51,10 @@ def main(
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field>/inputs contains the input FITS images
     # to be convolved to a common resolution and their weights FITS images.
-    pool = schwimmbad.choose_pool(mpi=mpi, processes=n_proc)
-    if mpi:
-        if not pool.is_master():
-            pool.wait()
-            sys.exit(0)
+
+    pool = get_pool(mpi=mpi, n_proc=n_proc)
+    logger.debug(f"pool created, type: {type(pool)}")
+
     glob_expr = "RACS_*" if racs else "VAST_*"
     worker_args_list: list[WorkerArgs] = []
     n_images: int = 0
@@ -68,11 +65,17 @@ def main(
             )
             continue
         if max_images is not None and n_images >= max_images:
+            logger.warning(
+                f"Reached maximum image limit of {max_images}. Skipping remaining images."
+            )
             break
         if len(list(field_dir.glob("*.sm.fits"))) > 0:
             logger.warning(f"Smoothed images already exist in {field_dir}. Skipping.")
             continue
         image_path_list = list(field_dir.glob("inputs/image.*.fits"))
+        logger.debug(
+            f"Found {len(image_path_list)} images for {field_dir.name}"
+        )
         # find the smallest common beam
         common_beam, _ = beamcon_2D.getmaxbeam(image_path_list)
         logger.debug(
@@ -89,8 +92,11 @@ def main(
             worker_args_list.append(worker_args)
             n_images += 1
             if max_images is not None and n_images >= max_images:
+                logger.warning(
+                    f"Reached maximum image limit of {max_images}. Skipping remaining images."
+                )
                 break
 
     # start convolutions
-    pool.map(worker, worker_args_list)
+    _ = list(pool.map(partial(worker, mpi=mpi, n_proc=n_proc), worker_args_list))
     pool.close()

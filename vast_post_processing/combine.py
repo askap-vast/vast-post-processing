@@ -8,7 +8,6 @@ Assumes convolved files are named *.sm.fits and are organized:
 """
 from dataclasses import dataclass
 from itertools import product
-import logging
 import os
 from pathlib import Path
 from typing import Any, Dict
@@ -16,27 +15,11 @@ import warnings
 
 from astropy.io import fits
 from astropy import wcs
+from loguru import logger
 import numpy as np
-import structlog
 
-import vast_post_processing.mpi_logger as mpi_logger
 
 slurm_job_id = os.environ.get("SLURM_JOB_ID", "no-slurm")
-
-# configure root logger to use structlog
-structlog.configure(
-    processors=mpi_logger.LOGGING_COMMON_PROCESSORS,  # type: ignore
-    logger_factory=structlog.stdlib.LoggerFactory(),
-)
-HANDLER = mpi_logger.MPIFileHandler(f"swarp-{slurm_job_id}.log")
-FORMATTER = logging.Formatter("%(message)s")
-HANDLER.setFormatter(FORMATTER)
-
-LOGGER = logging.getLogger("swarp")
-LOGGER.setLevel(logging.DEBUG)
-LOGGER.addHandler(HANDLER)
-
-logger = structlog.get_logger("swarp")
 
 
 @dataclass(frozen=True)
@@ -72,6 +55,7 @@ COPY_FITS_KEYWORDS = [
     "TELAPSE",
     "DURATION",
     "TIMEUNIT",
+    "RESTFREQ",
 ]
 
 
@@ -122,7 +106,6 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
 
 
 def mask_weightless_pixels(image_path: Path, weights_path: Path):
-    logger = structlog.get_logger("swarp")
     with fits.open(image_path, mode="update") as hdul, fits.open(
         weights_path
     ) as hdul_weights:
