@@ -96,7 +96,7 @@ def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFram
         df["obs_epoch"] = field_data.parent.name
         if rename_racs:
             df["FIELD_NAME"] = df.FIELD_NAME.str.replace("RACS_", "VAST_")
-        fields_df = fields_df.append(df)  # TODO df.append deprecated, replace with pd.concat
+        fields_df = pd.concat((fields_df, df))
     logger.debug("Read surveys repo.")
     return fields_df
 
