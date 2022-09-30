@@ -64,6 +64,20 @@ def main(
     use_corrected: bool = typer.Option(
         True, help="Use the corrected versions of images."
     ),
+    neighbours_output: Optional[Path] = typer.Option(
+        None,
+        help="Write the fields and their neighbours out to a CSV file at the given path.",
+        file_okay=True,
+        dir_okay=False,
+        writable=True,
+    ),
+    make_links: bool = typer.Option(
+        True,
+        help=(
+            "Make symlinks to images in `output_root`. Default is to make the links."
+            " Turn it off with --no-make-links."
+        ),
+    ),
 ):
     # get the release epochs
     release_epochs = read_release_epochs(release_epochs_csv)
@@ -80,29 +94,46 @@ def main(
         "release_epoch_a == @release_epoch and overlap_frac >= @overlap_frac_thresh"
     )
 
+    if neighbours_output is not None:
+        vast_neighbours_df[
+            [
+                "field_a",
+                "sbid_a",
+                "obs_epoch_a",
+                "release_epoch_a",
+                "field_b",
+                "sbid_b",
+                "obs_epoch_b",
+                "release_epoch_b",
+                "overlap_frac",
+                "delta_t_days",
+            ]
+        ].to_csv(neighbours_output, index=False)
+
     # create a directory for each field and create links to the neighbouring images
-    release_output_path = output_root / release_epoch
-    release_output_path.mkdir(parents=True, exist_ok=True)
-    for _, obs_pair in vast_neighbours_df.iterrows():
-        # create directories
-        field_inputs_path_a = release_output_path / obs_pair.field_a / "inputs"
-        field_inputs_path_a.mkdir(parents=True, exist_ok=True)
-        field_inputs_path_b = release_output_path / obs_pair.field_b / "inputs"
-        field_inputs_path_b.mkdir(parents=True, exist_ok=True)
+    if make_links:
+        release_output_path = output_root / release_epoch
+        release_output_path.mkdir(parents=True, exist_ok=True)
+        for _, obs_pair in vast_neighbours_df.iterrows():
+            # create directories
+            field_inputs_path_a = release_output_path / obs_pair.field_a / "inputs"
+            field_inputs_path_a.mkdir(parents=True, exist_ok=True)
+            field_inputs_path_b = release_output_path / obs_pair.field_b / "inputs"
+            field_inputs_path_b.mkdir(parents=True, exist_ok=True)
 
-        # create a hard link for each field in the pair in both directions, e.g.
-        # A/inputs/A.fits, A/inputs/B.fits, B/inputs/A.fits, B/inputs/B.fits (plus weights)
-        for output_path in (field_inputs_path_a, field_inputs_path_b):
-            target_image_a = output_path / obs_pair.image_path_a.name
-            target_weights_a = output_path / obs_pair.weights_path_a.name
-            if not target_image_a.exists():
-                obs_pair.image_path_a.link_to(target_image_a)
-            if not target_weights_a.exists():
-                obs_pair.weights_path_a.link_to(target_weights_a)
+            # create a hard link for each field in the pair in both directions, e.g.
+            # A/inputs/A.fits, A/inputs/B.fits, B/inputs/A.fits, B/inputs/B.fits (plus weights)
+            for output_path in (field_inputs_path_a, field_inputs_path_b):
+                target_image_a = output_path / obs_pair.image_path_a.name
+                target_weights_a = output_path / obs_pair.weights_path_a.name
+                if not target_image_a.exists():
+                    obs_pair.image_path_a.link_to(target_image_a)
+                if not target_weights_a.exists():
+                    obs_pair.weights_path_a.link_to(target_weights_a)
 
-            target_image_b = output_path / obs_pair.image_path_b.name
-            target_weights_b = output_path / obs_pair.weights_path_b.name
-            if not target_image_b.exists():
-                obs_pair.image_path_b.link_to(target_image_b)
-            if not target_weights_b.exists():
-                obs_pair.weights_path_b.link_to(target_weights_b)
+                target_image_b = output_path / obs_pair.image_path_b.name
+                target_weights_b = output_path / obs_pair.weights_path_b.name
+                if not target_image_b.exists():
+                    obs_pair.image_path_b.link_to(target_image_b)
+                if not target_weights_b.exists():
+                    obs_pair.weights_path_b.link_to(target_weights_b)
