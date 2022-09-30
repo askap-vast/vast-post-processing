@@ -2,3 +2,4 @@
 *.sif
 *.tar
 __pycache__
+test-data/

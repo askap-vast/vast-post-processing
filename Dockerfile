@@ -49,35 +49,12 @@ RUN poetry config virtualenvs.create false
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root -E mpi
 COPY . .
-RUN poetry build
 
 FROM base_mortimer as dev
 ARG VIRTUAL_ENV
 ENV VIRTUAL_ENV=${VIRTUAL_ENV} \
     PATH="${VIRTUAL_ENV}/bin:$PATH"
 COPY --from=builder_mortimer ${VIRTUAL_ENV} ${VIRTUAL_ENV}
-COPY --from=builder_mortimer /app/dist .
-RUN pip install *.whl
 
-
-# FROM pawsey/hpc-python:2021.09 as base_pawsey
-# ENV PYTHONUNBUFFERED=1 \
-#     DEBIAN_FRONTEND=noninteractive \
-#     POETRY_VERSION=1.1.8 \
-#     PIP_NO_CACHE_DIR=1
-# WORKDIR /app
-# RUN pip install "poetry==${POETRY_VERSION}" && \
-#     apt-get update && \
-#     apt-get -y install git swarp && \
-#     rm -rf /var/lib/apt/lists/*
-# COPY pyproject.toml poetry.lock ./
-
-# FROM base_pawsey as final
-# # install python deps
-# RUN poetry export -f requirements.txt --without-hashes | pip install -r /dev/stdin
-# COPY link_neighbours.py correct_vast.py convolve_neighbours.py mpi_logger.py swarp.py selavy_combined.py cleanup.py mpi_test.py ./
-
-# FROM base_mortimer as mortimer
-# RUN poetry export -f requirements.txt -E mpi --without-hashes | pip install -r /dev/stdin
-# COPY vast_post_processing scripts ./
-# RUN pip install .
+COPY . .
+RUN pip install --no-deps .
