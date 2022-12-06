@@ -1,0 +1,51 @@
+Selavy.image                                    = {image_name}.fits
+Selavy.imageHistory                             = ["Produced with Yandasoft v1.6.0"]
+Selavy.imagetype                                = fits
+#
+# These parameters define the measurement of spectral indices
+Selavy.spectralTerms.thresholdSNR               = 50.
+Selavy.spectralTermsFromTaylor                  = true
+Selavy.findSpectralTerms                        = [false, false]
+Selavy.nsubx                                    = 6
+Selavy.nsuby                                    = 6
+Selavy.overlapx                                 = 0
+Selavy.overlapy                                 = 0
+#
+Selavy.resultsFile                              = selavy-{image_name}.txt
+Selavy.writeDuchampFiles                        = false
+#
+# Detection threshold
+Selavy.snrCut                                   = 5
+Selavy.flagGrowth                               = true
+Selavy.growthCut                                = 3
+#
+Selavy.VariableThreshold                        = true
+Selavy.VariableThreshold.reuse                  = true
+Selavy.VariableThreshold.boxSize                = 50
+Selavy.VariableThreshold.NoiseImageName         = noiseMap.{image_name}
+Selavy.VariableThreshold.AverageImageName       = meanMap.{image_name}
+Selavy.VariableThreshold.imagetype              = fits
+Selavy.Weights.weightsImage                     = {weights_name}.fits
+Selavy.Weights.weightsCutoff                    = 0.01
+#
+Selavy.Fitter.doFit                             = true
+Selavy.Fitter.fitTypes                          = [full]
+Selavy.Fitter.numGaussFromGuess                 = true
+Selavy.Fitter.maxReducedChisq                   = 10.
+Selavy.Fitter.imagetype                         = fits
+Selavy.Fitter.writeComponentMap                 = false
+#
+Selavy.threshSpatial                            = 5
+Selavy.flagAdjacent                             = true
+#
+Selavy.minPix                                   = 3
+Selavy.minVoxels                                = 3
+Selavy.minChannels                              = 1
+Selavy.sortingParam                             = -pflux
+#
+# Not performing RM Synthesis for this case
+Selavy.RMSynthesis                              = false
+#
+# No spectral extraction being performed
+Selavy.Components.extractSpectra                = false
+Selavy.Components.extractNoiseSpectra           = false
