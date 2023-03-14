@@ -5,13 +5,15 @@ import astropy.units as u
 from astropy.wcs import WCS
 from astropy.nddata.utils import Cutout2D
 import matplotlib.pyplot as plt
+from loguru import logger
 
 def get_image_centre(header):
+    logger.debug("Finding field centre")
     w = WCS(header, naxis=2)
     size_x = header["NAXIS1"]
     size_y = header["NAXIS2"]
     field_centre = w.pixel_to_world(size_x/2, size_y/2)
-    
+    logger.debug(f"Image
     return field_centre
 
 def crop_hdu(hdu, size=6.3*u.deg):
@@ -22,7 +24,7 @@ def crop_hdu(hdu, size=6.3*u.deg):
     if data.ndim == 4:
         data = data[0,0,:,:]
         
-    image_centre = get_image_centre()
+    field_centre = get_field_centre()
     
     cutout = Cutout2D(data,
                       position=image_centre,
@@ -34,8 +36,10 @@ def crop_hdu(hdu, size=6.3*u.deg):
 
     return hdu
     
-def crop_catalogue(vot, cropped_wcs):
+def crop_catalogue(vot, cropped_hdu):
     votable = vot.get_first_table()
+    
+    cropped_wcs = WCS(cropped_hdu.header, naxis=2)
     
     ra_deg = votable.array["col_ra_deg_cont"] * u.deg
     dec_deg = votable.array["col_dec_deg_cont"] * u.deg
