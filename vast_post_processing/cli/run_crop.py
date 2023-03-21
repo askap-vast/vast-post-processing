@@ -178,10 +178,15 @@ def main(
         if not output_dir.exists():
             output_dir.mkdir(parents=True)
         moc = vpc.wcs_to_moc(cropped_hdu)
-        logger.debug(f"Wrote {moc_outfile}")
         moc.write(moc_outfile, overwrite=overwrite)
+        logger.debug(f"Wrote {moc_outfile}")
         
+        stmoc_filename = image_path.name.replace('.fits','.stmoc.fits')
+        stmoc_outfile = output_dir / stmoc_filename
         
+        stmoc = vpc.moc_to_stmoc(moc, cropped_hdu)
+        stmoc.write(stmoc_outfile, overwrite=overwrite)
+        logger.debug("Wrote {stmoc_outfile}")
 
 if __name__ == "__main__":
     typer.run(main)
