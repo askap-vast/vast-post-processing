@@ -3,9 +3,11 @@ from astropy.coordinates import SkyCoord
 from astropy.io.votable import parse
 import astropy.units as u
 from astropy.wcs import WCS
+import astropy.wcs as wcs
 from astropy.nddata.utils import Cutout2D
 import matplotlib.pyplot as plt
 from loguru import logger
+from mocpy import MOC
 
 def get_field_centre(header):
     logger.debug("Finding field centre")

@@ -59,7 +59,11 @@ def main(
             exists = True,
             file_okay = False,
             dir_okay = True
-        )            
+        ),
+        create_moc: Optional[bool] = typer.Option(
+            False,
+            help=("Create MOC files based on cropped images")
+        )
     ):
     
     # configure logger
@@ -120,13 +124,15 @@ def main(
             / selavy_name
         )
         
-        exists = rms_path.exists() and bkg_path.exists() and components_path.exists()
-        if exists and not overwrite:
+        #exists = rms_path.exists() and bkg_path.exists() and components_path.exists()
+        exists = components_path.exists()
+        if not exists:
             logger.warning(f"Skipping {image_path}.")
             continue
         
         
-        for path in (rms_path, bkg_path, image_path):
+        #for path in (rms_path, bkg_path, image_path):
+        for path in (image_path, ):
             stokes_dir = f"{path.parent.parent.name}_CROPPED"
             output_dir = out_root / stokes_dir / epoch_dir
             
@@ -137,6 +143,7 @@ def main(
             hdu = fits.open(path)[0]
             cropped_hdu = vpc.crop_hdu(hdu)
             cropped_hdu.writeto(outfile, overwrite=overwrite)
+            logger.debug(f"Wrote {outfile}")
         
         
         # Crop the catalogues
@@ -152,10 +159,31 @@ def main(
         # This uses the last cropped hdu from the above for loop
         # which should be the image file, but doesn't actually matter
         votable_cropped = vpc.crop_catalogue(vot, cropped_hdu)
-        vot.to_xml(str(components_outfile))
+        if components_outfile.exists() and not overwrite:
+            logger.critical(f"{components_outfile} exists, not overwriting")
+        else:
+            vot.to_xml(str(components_outfile))
+            logger.debug(f"Wrote {components_outfile}")
         
         # Create the MOC
+        if not create_moc:
+            return
+
         moc_dir = f"STOKES{stokes}_MOC_CROPPED"
+        output_dir = out_root / moc_dir / epoch_dir
+        
+        field_name = image_path.name.split('.')[2]
+        sbid = image_path.name.split('.')[3]
+        moc_filename = f"{field_name}.{sbid}.{stokes}.conv.moc.fits"
+        
+        moc_outfile = output_dir / moc_filename
+        
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True)
+        moc = vpc.wcs_to_moc(cropped_hdu)
+        logger.debug(f"Wrote {moc_outfile}")
+        moc.write(moc_outfile, overwrite=overwrite)
+        
         
 
 if __name__ == "__main__":
