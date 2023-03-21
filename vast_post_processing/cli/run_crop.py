@@ -172,10 +172,7 @@ def main(
         moc_dir = f"STOKES{stokes}_MOC_CROPPED"
         output_dir = out_root / moc_dir / epoch_dir
         
-        field_name = image_path.name.split('.')[2]
-        sbid = image_path.name.split('.')[3]
-        moc_filename = f"{field_name}.{sbid}.{stokes}.conv.moc.fits"
-        
+        moc_filename = image_path.name.replace('.fits','.moc.fits')
         moc_outfile = output_dir / moc_filename
         
         if not output_dir.exists():
