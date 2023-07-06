@@ -35,6 +35,7 @@ link_neighbours = "vast_post_processing.cli.link_neighbours:app"
 convolve_neighbours = "vast_post_processing.cli.convolve_neighbours:app"
 swarp_neighbours = "vast_post_processing.cli.swarp:app"
 selavy_prepare = "vast_post_processing.cli.selavy_combined:app"
+crop_fields = "vast_post_processing.cli.run_crop:app"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
