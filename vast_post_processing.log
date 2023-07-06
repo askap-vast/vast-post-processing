@@ -1,0 +1,4 @@
+2023-09-27T20:01:36  INFO     Working on /home/hansen/projects/vast/projects/vast-post-processing/tests/test-data/TILES/STOKESI_IMAGES/epoch_38/image.i.VAST_0345-31.SB50802.cont.taylor.0.restored.conv.fits... [root]
+2023-09-27T20:01:36  WARNING  Field correction was skipped for /home/hansen/projects/vast/projects/vast-post-processing/tests/test-data/TILES/STOKESI_IMAGES/epoch_38/image.i.VAST_0345-31.SB50802.cont.taylor.0.restored.conv.fits. Skipping remaining steps [root]
+2023-09-27T20:01:36  INFO     Working on /home/hansen/projects/vast/projects/vast-post-processing/tests/test-data/TILES/STOKESI_IMAGES/epoch_38/image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.fits... [root]
+2023-09-27T20:01:36  WARNING  Field correction was skipped for /home/hansen/projects/vast/projects/vast-post-processing/tests/test-data/TILES/STOKESI_IMAGES/epoch_38/image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.fits. Skipping remaining steps [root]
