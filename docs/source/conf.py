@@ -15,6 +15,10 @@ author = "Andrew O'Brien, Dougal Dobie"
 
 extensions = ["sphinx.ext.napoleon", "sphinx.ext.autodoc", "sphinx.ext.autosummary"]
 
+# Autodoc extension parameters
+autodoc_typehints = "signature"
+autodoc_typehints_format = "short"
+
 templates_path = ["_templates"]
 exclude_patterns = []
 
@@ -23,4 +27,9 @@ exclude_patterns = []
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "pydata_sphinx_theme"
-html_static_path = ["_static"]
+
+html_theme_options = {
+    "show_nav_level": 1,
+}
+
+# html_static_path = ["_static"]
