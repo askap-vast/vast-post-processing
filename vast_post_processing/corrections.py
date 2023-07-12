@@ -1,13 +1,126 @@
 from pathlib import Path
 import warnings
-
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, Angle
 from astropy.io import fits
 from astropy.io.votable import parse
 import astropy.units as u
+from uncertainties import ufloat
 from astropy.wcs import WCS, FITSFixedWarning
 from loguru import logger
 import numpy as np
+from typing import Tuple, Optional
+from vast_post_processing.catalogs import Catalog
+from vast_post_processing.crossmatch import (
+    crossmatch_qtables,
+    calculate_positional_offsets,
+    calculate_flux_offsets,
+)
+
+
+def vast_xmatch_qc(
+    reference_catalog_path: str,
+    catalog_path: str,
+    radius: Angle = Angle("10arcsec"),
+    condon: bool = False,
+    psf_reference: Optional[Tuple[float, float]] = None,
+    psf: Optional[Tuple[float, float]] = None,
+    fix_m: bool = False,
+    fix_b: bool = False,
+    positional_unit: u.Unit = u.Unit("arcsec"),
+    flux_unit: u.Unit = u.Unit("mJy"),
+    crossmatch_output: Optional[str] = None,
+    csv_output: Optional[str] = None,
+):
+    # convert catalog path strings to Path objects
+    reference_catalog_path = Path(reference_catalog_path)
+    catalog_path = Path(catalog_path)
+    flux_unit /= u.beam  # add beam divisor as we currently only work with peak fluxes
+
+    reference_catalog = Catalog(
+        reference_catalog_path,
+        psf=psf_reference,
+        condon=condon,
+        input_format="selavy",
+    )
+    catalog = Catalog(
+        catalog_path,
+        psf=psf,
+        condon=condon,
+        input_format="selavy",
+    )
+
+    # perform the crossmatch
+    xmatch_qt = crossmatch_qtables(catalog, reference_catalog, radius=radius)
+    # select xmatches with non-zero flux errors and no siblings
+    logger.info("Removing crossmatched sources with siblings or flux peak errors = 0.")
+    mask = xmatch_qt["flux_peak_err"] > 0
+    mask &= xmatch_qt["flux_peak_err_reference"] > 0
+    mask &= xmatch_qt["has_siblings"] == 0
+    mask &= xmatch_qt["has_siblings_reference"] == 0
+    data = xmatch_qt[mask]
+    logger.info(
+        f"{len(data):.2f} crossmatched sources remaining ({(len(data) / len(xmatch_qt)) * 100:.2f}%).",
+    )
+
+    # Write the cross-match data into csv
+    if crossmatch_output is not None:
+        data.write("crossmatch.csv", overwrite=True)
+    # calculate positional offsets and flux ratio
+    dra_median, ddec_median, dra_madfm, ddec_madfm = calculate_positional_offsets(data)
+    dra_median_value = dra_median.to(positional_unit).value
+    dra_madfm_value = dra_madfm.to(positional_unit).value
+    ddec_median_value = ddec_median.to(positional_unit).value
+    ddec_madfm_value = ddec_madfm.to(positional_unit).value
+    logger.info(
+        f"dRA median: {dra_median_value:.2f} MADFM: {dra_madfm_value:.2f} {positional_unit}. dDec median: {ddec_median_value:.2f} MADFM: {ddec_madfm_value:.2f} {positional_unit}.",
+    )
+
+    gradient, offset, gradient_err, offset_err = calculate_flux_offsets(
+        data, fix_m=fix_m, fix_b=fix_b
+    )
+    ugradient = ufloat(gradient, gradient_err)
+    uoffset = ufloat(offset.to(flux_unit).value, offset_err.to(flux_unit).value)
+    logger.info(
+        f"ODR fit parameters: Sp = Sp,ref * {ugradient} + {uoffset} {flux_unit}.",
+    )
+
+    flux_corr_mult = 1 / ugradient
+    flux_corr_add = -1 * uoffset
+
+    if csv_output is not None:
+        # output has been requested
+
+        if True:  # csv_output is not None:
+            csv_output_path = Path(csv_output)  # ensure Path object
+            sbid = catalog.sbid if catalog.sbid is not None else ""
+            if not csv_output_path.exists():
+                f = open(csv_output_path, "w")
+                print(
+                    "field,release_epoch,sbid,ra_correction,dec_correction,ra_madfm,"
+                    "dec_madfm,flux_peak_correction_multiplicative,flux_peak_correction_additive,"
+                    "flux_peak_correction_multiplicative_err,flux_peak_correction_additive_err,"
+                    "n_sources",
+                    file=f,
+                )
+            else:
+                f = open(csv_output_path, "a")
+            logger.info(
+                "Writing corrections CSV. To correct positions, add the corrections to"
+                " the original source positions i.e. RA' = RA + ra_correction /"
+                " cos(Dec). To correct fluxes, add the additive correction and multiply"
+                " the result by the multiplicative correction i.e. S' ="
+                " flux_peak_correction_multiplicative(S +"
+                " flux_peak_correction_additive)."
+            )
+            print(
+                f"{catalog.field},{catalog.epoch},{sbid},{dra_median_value * -1},"
+                f"{ddec_median_value * -1},{dra_madfm_value},{ddec_madfm_value},"
+                f"{flux_corr_mult.nominal_value},{flux_corr_add.nominal_value},"
+                f"{flux_corr_mult.std_dev},{flux_corr_add.std_dev},{len(data)}",
+                file=f,
+            )
+            f.close()
+    return dra_median_value, ddec_median_value, flux_corr_mult, flux_corr_add
 
 
 def shift_and_scale_image(
