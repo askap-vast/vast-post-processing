@@ -64,7 +64,7 @@ def vast_xmatch_qc(
 
     # Write the cross-match data into csv
     if crossmatch_output is not None:
-        data.write("crossmatch.csv", overwrite=True)
+        data.write(crossmatch_output, overwrite=True)
     # calculate positional offsets and flux ratio
     dra_median, ddec_median, dra_madfm, ddec_madfm = calculate_positional_offsets(data)
     dra_median_value = dra_median.to(positional_unit).value
