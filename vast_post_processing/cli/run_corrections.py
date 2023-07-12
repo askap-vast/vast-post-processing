@@ -71,9 +71,9 @@ def get_correct_correction_file(correction_files_list, img_field):
         filename = f.name
         _, _, field, *_ = filename.split(".")
         field = field.replace("RACS", "VAST")
-        if field in img_field:
+        if (field in img_field) and ("components" in filename):
             count += 1
-            return f
+            return f.as_posix()
         else:
             continue
     if count == 0:
@@ -95,10 +95,12 @@ def get_psf_from_image(image_path: str):
     Tuple(psf_major, psf_minor)
         Major and minor axes of the PSF.
     """
-
+    image_path = image_path.replace("SELAVY", "IMAGES")
+    image_path = image_path.replace("selavy-", "")
+    image_path = image_path.replace(".components.xml", ".fits")
     hdu = fits.open(image_path)
-    psf_maj = hdu["BMAJ"] * u.degree
-    psf_min = hdu["BMIN"] * u.degree
+    psf_maj = hdu[0].header["BMAJ"] * u.degree
+    psf_min = hdu[0].header["BMIN"] * u.degree
     hdu.close()
     return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
 
@@ -133,8 +135,8 @@ def main(
             " correct all available epochs."
         ),
     ),
-    radius: Optional[ANGLE_QUANTITY_TYPE] = typer.Option(
-        "10 arcsec",
+    radius: Optional[float] = typer.Option(
+        10,
         help=(
             "Maximum separation limit for nearest-neighbour crossmatch. Accepts any "
             "string understood by astropy.coordinates.Angle."
@@ -164,7 +166,7 @@ def main(
         None,
         help=(
             "If using --condon but want to give the psfs manually, use this specified PSF size in "
-            "arcsec for `catalof`. First argument is major axis followed by nimor axis."
+            "arcsec for `catalog`. First argument is major axis followed by nimor axis."
         ),
     ),
     overwrite: bool = False,
@@ -228,7 +230,7 @@ def main(
         )
 
         # construct output path to store corrections for each epoch
-        epoch_corr_dir = vast_tile_data_root / "corr_db" / epoch_dir
+        epoch_corr_dir = corr_dir / epoch_dir
 
         if not os.path.isdir(epoch_corr_dir):
             os.mkdir(epoch_corr_dir)
@@ -243,8 +245,37 @@ def main(
             logger.warning(f"RMS image not found for {image_path}.")
         if not bkg_path.exists():
             logger.warning(f"Background image not found for {image_path}.")
+
+        # Look for any component and island files correspnding to this image
+        comp_files = []
+        for p in list(components_path_glob_list[0]):
+            comp_file_name = p.name
+            comp_file_epoch = p.parent.name
+            if (
+                (epoch_dir in comp_file_epoch)
+                and (field in comp_file_name)
+                and (f"SB{sbid}" in comp_file_name)
+            ):
+                comp_files.append(p)
+
+        component_file = None
+        island_file = None
+        if len(comp_files) == 0:
+            logger.warning(f"Selavy catalogue not found for the image {image_path}")
+        else:
+            for i in comp_files:
+                if "components" in i.as_posix():
+                    component_file = i
+                elif "islands" in i.as_posix():
+                    island_file = i
+
         skip = (
-            not ((rms_path.exists()) and (bkg_path.exists()) and (ref_file is not None))
+            not (
+                (rms_path.exists())
+                and (bkg_path.exists())
+                and (ref_file is not None)
+                and (component_file is not None)
+            )
             or skip
         )
         if skip:
@@ -254,10 +285,9 @@ def main(
                 logger.warning(f"Skipping {image_path}, no reference field found.")
             continue
         else:
-            crossmatch_file = epoch_corr_dir / image_path.replace(
-                "components.xml", "corrections.csv"
-            )
-            csv_file = epoch_corr_dir / "corrections.csv"
+            fname = image_path.name.replace(".fits", "corrections.csv")
+            crossmatch_file = epoch_corr_dir / fname
+            csv_file = epoch_corr_dir / "all_fields_corrections.csv"
 
             # Get the psf measurements to estimate errors follwoing Condon 1997
             if psf_ref is not None:
@@ -268,7 +298,7 @@ def main(
             if psf is not None:
                 psf_image = psf
             else:
-                psf_image = get_psf_from_image(image_path)
+                psf_image = get_psf_from_image(image_path.as_posix())
             (
                 dra_median_value,
                 ddec_median_value,
@@ -276,8 +306,8 @@ def main(
                 flux_corr_add,
             ) = vast_xmatch_qc(
                 reference_catalog_path=ref_file,
-                catalog_path=image_path,
-                radius=Angle(radius),
+                catalog_path=component_file.as_posix(),
+                radius=Angle(radius * u.arcsec),
                 condon=condon,
                 psf_reference=psf_reference,
                 psf=psf_image,
@@ -302,32 +332,8 @@ def main(
                     overwrite=overwrite,
                 )
 
-        # Do the same for catalog files
-        # Look for any component and island files correspnding to this image
-        comp_files = []
-        for p in list(components_path_glob_list[0]):
-            comp_file_name = p.name
-            comp_file_epoch = p.parent.name
-            if (
-                (epoch_dir in comp_file_epoch)
-                and (field in comp_file_name)
-                and (f"SB{sbid}" in comp_file_name)
-            ):
-                comp_files.append(p)
-
-        if len(comp_files) == 0:
-            logger.warning(f"Selavy catalogue not found for the image {image_path}")
-        elif len(comp_files) == 1:
-            if ".components" in comp_files[0].name:
-                logger.warning(
-                    f"Islannd catalogue not found for the image {image_path}"
-                )
-            else:
-                logger.warning(
-                    f"Islannd catalogue not found for the image {image_path}"
-                )
-        else:
-            for path in comp_files:
+            # Do the same for catalog files
+            for path in (component_file, island_file):
                 stokes_dir = f"{path.parent.parent.name}_CORRECTED"
                 output_dir = vast_tile_data_root / stokes_dir / epoch_dir
                 output_dir.mkdir(parents=True, exist_ok=True)
