@@ -67,7 +67,7 @@ ANGLE_QUANTITY_TYPE = AngleQuantityType()
 
 def get_correct_correction_file(correction_files_list, img_field):
     count = 0
-    for f in chain.from_iterable(correction_files_list):
+    for f in correction_files_list:
         filename = f.name
         _, _, field, *_ = filename.split(".")
         field = field.replace("RACS", "VAST")
@@ -187,13 +187,14 @@ def main(
     correction_files_path_glob_list: list[Generator[Path, None, None]] = []
 
     correction_files_path_glob_list.append(vast_corrections_root.glob("*.xml"))
+    correction_files_path_glob_list = list(correction_files_path_glob_list[0])
 
     if epoch is None or len(epoch) == 0:
         image_path_glob_list.append(
             vast_tile_data_root.glob("STOKESI_IMAGES/epoch_*/*.fits")
         )
         components_path_glob_list.append(
-            vast_tile_data_root.glob("STOKESI_SELAVY/epoch_*/*.components.xml")
+            vast_tile_data_root.glob("STOKESI_SELAVY/epoch_*/*.xml")
         )
     else:
         for n in epoch:
@@ -201,7 +202,7 @@ def main(
                 vast_tile_data_root.glob(f"STOKESI_IMAGES/epoch_{n}/*.fits")
             )
             components_path_glob_list.append(
-                vast_tile_data_root.glob(f"STOKESI_SELAVY/epoch_{n}/*.components.xml")
+                vast_tile_data_root.glob(f"STOKESI_SELAVY/epoch_{n}/*.xml")
             )
 
     # construct output path to store corrections
@@ -247,27 +248,9 @@ def main(
             logger.warning(f"Background image not found for {image_path}.")
 
         # Look for any component and island files correspnding to this image
-        comp_files = []
-        for p in list(components_path_glob_list[0]):
-            comp_file_name = p.name
-            comp_file_epoch = p.parent.name
-            if (
-                (epoch_dir in comp_file_epoch)
-                and (field in comp_file_name)
-                and (f"SB{sbid}" in comp_file_name)
-            ):
-                comp_files.append(p)
 
-        component_file = None
-        island_file = None
-        if len(comp_files) == 0:
-            logger.warning(f"Selavy catalogue not found for the image {image_path}")
-        else:
-            for i in comp_files:
-                if "components" in i.as_posix():
-                    component_file = i
-                elif "islands" in i.as_posix():
-                    island_file = i
+        component_file = Path(ref_file)
+        island_file = Path(ref_file.replace("components", "islands"))
 
         skip = (
             not (
@@ -290,12 +273,12 @@ def main(
             csv_file = epoch_corr_dir / "all_fields_corrections.csv"
 
             # Get the psf measurements to estimate errors follwoing Condon 1997
-            if psf_ref is not None:
+            if len(psf_ref) > 0:
                 psf_reference = psf_ref
             else:
                 psf_reference = get_psf_from_image(ref_file)
 
-            if psf is not None:
+            if len(psf) > 0:
                 psf_image = psf
             else:
                 psf_image = get_psf_from_image(image_path.as_posix())
@@ -325,10 +308,10 @@ def main(
                 _ = shift_and_scale_image(
                     path,
                     output_dir,
-                    flux_scale=flux_corr_mult,
-                    flux_offset_mJy=flux_corr_add,
-                    ra_offset_arcsec=dra_median_value,
-                    dec_offset_arcsec=ddec_median_value,
+                    flux_scale=flux_corr_mult.n,
+                    flux_offset_mJy=flux_corr_add.n,
+                    ra_offset_arcsec=dra_median_value.item(),
+                    dec_offset_arcsec=ddec_median_value.item(),
                     overwrite=overwrite,
                 )
 
@@ -340,10 +323,10 @@ def main(
                 _ = shift_and_scale_catalog(
                     path,
                     output_dir,
-                    flux_scale=flux_corr_mult,
-                    flux_offset_mJy=flux_corr_add,
-                    ra_offset_arcsec=dra_median_value,
-                    dec_offset_arcsec=ddec_median_value,
+                    flux_scale=flux_corr_mult.n,
+                    flux_offset_mJy=flux_corr_add.n,
+                    ra_offset_arcsec=dra_median_value.item(),
+                    dec_offset_arcsec=ddec_median_value.item(),
                     overwrite=overwrite,
                 )
 
