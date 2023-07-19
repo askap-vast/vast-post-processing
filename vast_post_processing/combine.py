@@ -129,17 +129,19 @@ def write_swarp_config(config_dict: Dict[str, Any], output_path: Path) -> Path:
     config_dict : Dict[str, Any]
         Configuration settings for this SWarp run.
     output_path : Path
-        Path to file in which configuration is written, including the file
-        itself.
+        Path to file in which configuration is written.
 
     Returns
     -------
     output_path : Path
         Path to written configuration file.
     """
+    # Write file specified by output_path to disk
     with output_path.open(mode="w") as f:
+        # Iterate over configuration settings and write to file
         for key, value in config_dict.items():
             print(f"{key:20} {value}", file=f)
+
     return output_path
 
 
@@ -157,16 +159,20 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
     reference_image_path : Path
         Path to reference FITS image containing correct headers.
     """
+    # Open image so that changes are written to disk and open reference image
     with fits.open(image_path, mode="update") as hdul, fits.open(
         reference_image_path
     ) as hdul_ref:
+        # Set variables as PrimaryHDU for both image and reference
         hdu = hdul[0]
         hdu_ref = hdul_ref[0]
+
+        # Only add degenerate axes if they aren't already added
         if hdu.data.ndim == 2:
-            # add the degenerate axes
+            # Add degenerate axes to HDU
             hdu.data = np.expand_dims(hdu.data, axis=(0, 1))
 
-            # update the header
+            # Update the headers to include new axes
             for n, header_card in product(
                 (3, 4), ("NAXIS", "CTYPE", "CRVAL", "CDELT", "CRPIX", "CUNIT")
             ):
@@ -187,10 +193,16 @@ def mask_weightless_pixels(image_path: Path, weights_path: Path):
     weights_path : Path
         Path to image weights data.
     """
+    # Open image so that changes are written to disk and open weights data
     with fits.open(image_path, mode="update") as hdul, fits.open(
         weights_path
     ) as hdul_weights:
+        # Set variables as PrimaryHDU for both image and weight
         hdu = hdul[0]
         hdu_weights = hdul_weights[0]
+
+        # Replace pixels that have zero weight with NaN
         hdu.data[hdu_weights.data == 0] = np.nan
+
+        # Output operation to log
         logger.info(f"Masked weightless pixels in {image_path}.")
