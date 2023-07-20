@@ -45,7 +45,7 @@ class UnknownFilenameConvention(Exception):
 class VastObservationId:
     """Data class representing a VAST observation.
 
-    Attributes
+    Parameters
     ----------
     obs_epoch : int
         The observation epoch of this observation.
@@ -69,7 +69,7 @@ class VastObservationId:
 class VastObservation:
     """Data class representing a VAST observation.
 
-    Attributes
+    Parameters
     ----------
     field : str
         TODO descriptions
@@ -105,7 +105,7 @@ class VastObservation:
 class VastOverlap:
     """Data class representing overlap in a VAST observation.
 
-    Attributes
+    Parameters
     ----------
     idx_a : int
         TODO descriptions
