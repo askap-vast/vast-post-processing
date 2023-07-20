@@ -1815,32 +1815,28 @@ files = [
 
 [[package]]
 name = "racs-tools"
-version = "2.0.1"
-description = ""
+version = "2.2.4"
+description = "Useful scripts for RACS."
 category = "main"
 optional = false
-python-versions = ">=3.9,<3.11"
-files = []
-develop = false
+python-versions = ">=3.8.0"
+files = [
+    {file = "RACS-tools-2.2.4.tar.gz", hash = "sha256:093ff49836610163de1e396c7f48ac998c0a9d1ffdd9afd3de0ff09c9a43b8a5"},
+    {file = "RACS_tools-2.2.4-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:9b7615ff2ac155b74ba93c1e2a2f690fae26759e82d30693720b9334839c9da7"},
+]
 
 [package.dependencies]
-astropy = "^5.0.1"
-numpy = "^1.21.2"
-psutil = "^5.8.0"
-radio-beam = "^0.3.3"
-schwimmbad = "^0.3.2"
-scipy = "^1.7.1"
-spectral-cube = "^0.6.0"
-tqdm = "^4.62.3"
+astropy = "*"
+numpy = "*"
+psutil = "*"
+radio-beam = "*"
+schwimmbad = "*"
+scipy = "*"
+spectral-cube = "*"
+tqdm = "*"
 
 [package.extras]
-mpi = ["mpi4py (>=3.1.1,<4.0.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/marxide/RACS-tools.git"
-reference = "v2.0.1"
-resolved_reference = "82edce8dbd198924d42f70ed489dfa77c7fd1e61"
+mpi = ["mpi4py"]
 
 [[package]]
 name = "radio-beam"
@@ -2339,4 +2335,4 @@ mpi = ["mpi4py"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.x"
-content-hash = "171f02afc937aaedd16461db6b36063888f363a1b1a844402bc216670f3dd988"
+content-hash = "a3e0b448af826e603b475c7b455c972b5d097c65cb26cb6856852f4b3cd34455"
