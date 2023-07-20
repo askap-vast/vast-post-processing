@@ -33,7 +33,7 @@ Defaults to "no-slurm" if not running in SLURM.
 class ImageGeometry:
     """Relevant geometric information for an image.
 
-    Attributes
+    Parameters
     ----------
     center_hmsdms : str
         The 'hour-minute-second degree-minute-second' coordinates of the center
