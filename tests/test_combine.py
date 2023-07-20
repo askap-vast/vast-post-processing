@@ -46,11 +46,11 @@ def test_get_image_geometry():
     """Tests combine.get_image_geometry() by running it on IMAGE_PATH.
 
     The function generates an ImageGeometry object from the provided image. This
-    function tests for type correctness for each of the object's attributes.
+    function tests for type correctness for each of the object's parameters.
     """
     image_geometry = combine.get_image_geometry(IMAGE_PATH)
 
-    # Boolean evaluating type correctness for each attribute
+    # Boolean evaluating type correctness for each parameter
     correct_types = (
         (isinstance(image_geometry.center_hmsdms, str))
         and (isinstance(image_geometry.npix_x, int))
