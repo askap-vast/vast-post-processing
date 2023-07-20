@@ -1,8 +1,4 @@
 test-data:
-  COMBINED:
-    - VAST_0021+00.EPOCH20.I.conv.fits
-    - VAST_0021-04.EPOCH20.I.conv.fits
-    - VAST_0021+00.EPOCH20.I.conv.weight.fits
-    - VAST_0021-04.EPOCH20.I.conv.weight.fits
-    - VAST_0021-04.EPOCH20.I.conv.moc.fits
-    - VAST_0021+00.EPOCH20.I.conv.moc.fits
+  TILES:
+    - image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.fits
+    - weights.i.VAST_0334-37.SB50801.cont.taylor.0.fits
