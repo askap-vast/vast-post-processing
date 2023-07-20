@@ -1,0 +1,7 @@
+test-data:
+  TILES:
+    STOKESI_IMAGES:
+    - image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.fits
+    - image.i.VAST_0345-31.SB50802.cont.taylor.0.restored.conv.fits
+    STOKESI_WEIGHTS:
+    - weights.i.VAST_0334-37.SB50801.cont.taylor.0.fits
