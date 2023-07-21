@@ -34,6 +34,11 @@ REFERENCE_PATH = (
 the function add_degenerate_axes().
 """
 
+BROKEN_REFERENCE_PATH = DATA_PATH / "STOKESI_IMAGES" / "image.fits"
+"""Path: Path to random VAST epoch 38 image with missing header information for
+testing the function add_degenerate_axes().
+"""
+
 WEIGHTS_PATH = (
     DATA_PATH / "STOKESI_WEIGHTS" / "weights.i.VAST_0334-37.SB50801.cont.taylor.0.fits"
 )
@@ -52,7 +57,7 @@ image for testing the function get_image_geometry().
 
 
 def test_get_image_geometry():
-    """Tests combine.get_image_geometry() by running it on IMAGE_PATH.
+    """Test combine.get_image_geometry() by running it on IMAGE_PATH.
 
     The function generates an ImageGeometry object from the provided image. This
     function tests for type correctness for each of the object's parameters.
@@ -74,7 +79,7 @@ def test_get_image_geometry():
     strict=True,
 )
 def test_get_image_geometry_fail():
-    """Tests combine.get_image_geometry() for false positives by running it on
+    """Test combine.get_image_geometry() for false positives by running it on
     SELAVY_PATH and expecting an error upon trying to open it as a FITS image.
 
     Note this test is expected to fail because it does not provide a valid image
@@ -87,7 +92,7 @@ def test_get_image_geometry_fail():
 
 
 def test_add_degenerate_axes():
-    """Tests combine.add_degenerate_axes() by running it on IMAGE_PATH and using
+    """Test combine.add_degenerate_axes() by running it on IMAGE_PATH and using
     REFERENCE_PATH as a reference image.
 
     The function changes various headers and data in the image. This function
@@ -109,19 +114,27 @@ def test_add_degenerate_axes():
 
 
 @pytest.mark.xfail(
-    reason="",
+    reason="Should not be able to update missing headers.",
     strict=True,
 )
 def test_add_degenerate_axes_fail():
-    """Tests combine.add_generate_axes() for false positives by .
+    """Test combine.add_generate_axes() for false positives by using a reference
+    image with missing headers.
 
-    Note this test is expected to fail because .
+    Note this test is expected to fail because the function should not be able
+    to set a header from a reference if it is missing.
     """
-    pass
+    # Open an image separate from that of IMAGE_PATH to clear expected headers
+    with fits.open(BROKEN_REFERENCE_PATH, mode="update") as hdu:
+        hdu[0].header.pop("CDELT")
+        hdu[0].header.pop("CRPIX")
+
+    # Run the function with the modified image as reference
+    combine.add_degenerate_axes(IMAGE_PATH, BROKEN_REFERENCE_PATH)
 
 
 def test_mask_weightless_pixels():
-    """Tests combine.mask_weightless_pixels() by running it on IMAGE_PATH and
+    """Test combine.mask_weightless_pixels() by running it on IMAGE_PATH and
     using WEIGHTS_PATH as weighting data.
 
     The function replaces image pixels which correspond to zero weight data
@@ -147,24 +160,50 @@ def test_mask_weightless_pixels():
     assert correctly_masked
 
 
-@pytest.mark.xfail(
-    reason="",
-    strict=True,
-)
-def test_mask_weightless_pixels_fail():
-    """Tests combine.mask_weightless_pixels() for false positives by .
+def count_nan(image: Path, weights: Path) -> int:
+    """Helper function for test_mask_weightless_pixels_fail() to count the
+    number of pixels in image with nonzero weighting that are NaN.
 
-    Note this test is expected to fail because .
+    Parameters
+    ----------
+    image : Path
+        Path to image with pixels.
+    weights : Path
+        Path to weight data corresponding to image.
+
+    Returns
+    -------
+    int
+        The number of NaN pixels with nonzero weight.
     """
     # Open the FITS and weights image to test for correctness
-    with fits.open(IMAGE_PATH) as hdu, fits.open(WEIGHTS_PATH) as hduw:
+    with fits.open(image) as hdu, fits.open(weights) as hduw:
         # Pixels with nonzero weight
         weighted_image = hdu[0].data[hduw[0].data != 0]
 
         # Number of NaN pixels
         nan_count = len(where(isnan(weighted_image)))
+    return nan_count
 
-        # Increase count if pixel is NaN
-        # nan_count += 1 if isnan(pixel) else 0
-    print(nan_count)
-    assert nan_count > 0
+
+@pytest.mark.xfail(
+    reason="Only weightless pixels should be masked.",
+    strict=True,
+)
+def test_mask_weightless_pixels_fail():
+    """Test combine.mask_weightless_pixels() for false positives by checking
+    for any pixels with nonzero weighting which were masked.
+
+    Note this test is expected to fail because no nonzero weighted pixels should
+    be changed by the function.
+    """
+    # Count the number of NaN pixels before masking
+    nan_count_before = count_nan(IMAGE_PATH, WEIGHTS_PATH)
+
+    # Mask zero weighted pixels with NaN
+    combine.mask_weightless_pixels(IMAGE_PATH, WEIGHTS_PATH)
+
+    # Count the number of NaN pixels after masking
+    nan_count_after = count_nan(IMAGE_PATH, WEIGHTS_PATH)
+
+    assert nan_count_after > nan_count_before
