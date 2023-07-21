@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 from importlib import resources
 
-from numpy import isnan
+from numpy import isnan, where
 from astropy.io import fits
 
 from vast_post_processing import combine
@@ -41,6 +41,15 @@ WEIGHTS_PATH = (
 for testing the function mask_weightless_pixels().
 """
 
+SELAVY_PATH = (
+    DATA_PATH
+    / "STOKESI_SELAVY"
+    / "selavy-image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.components.xml"
+)
+"""Path: Path to VAST epoch 38 selavy .xml data corresponding to IMAGE_PATH
+image for testing the function get_image_geometry(). 
+"""
+
 
 def test_get_image_geometry():
     """Tests combine.get_image_geometry() by running it on IMAGE_PATH.
@@ -58,6 +67,23 @@ def test_get_image_geometry():
         and (isinstance(image_geometry.pixel_arcsec, float))
     )
     assert correct_types
+
+
+@pytest.mark.xfail(
+    reason="Should not be able to make ImageGeometry object from non-image file",
+    strict=True,
+)
+def test_get_image_geometry_fail():
+    """Tests combine.get_image_geometry() for false positives by running it on
+    SELAVY_PATH and expecting an error upon trying to open it as a FITS image.
+
+    Note this test is expected to fail because it does not provide a valid image
+    to the function.
+    """
+    # Provide a non image to the function and expect an error so that no
+    # ImageGeometry object can be generated
+    image_geometry = combine.get_image_geometry(SELAVY_PATH)
+    assert isinstance(image_geometry, combine.ImageGeometry)
 
 
 def test_add_degenerate_axes():
@@ -80,6 +106,18 @@ def test_add_degenerate_axes():
         correct_dimensions = hdu[0].data.ndim == 4
         correct_headers = hdu[0].header["NAXIS"] == 4
     assert correct_dimensions and correct_headers
+
+
+@pytest.mark.xfail(
+    reason="",
+    strict=True,
+)
+def test_add_degenerate_axes_fail():
+    """Tests combine.add_generate_axes() for false positives by .
+
+    Note this test is expected to fail because .
+    """
+    pass
 
 
 def test_mask_weightless_pixels():
@@ -107,3 +145,26 @@ def test_mask_weightless_pixels():
             if not isnan(pixel):
                 correctly_masked = False
     assert correctly_masked
+
+
+@pytest.mark.xfail(
+    reason="",
+    strict=True,
+)
+def test_mask_weightless_pixels_fail():
+    """Tests combine.mask_weightless_pixels() for false positives by .
+
+    Note this test is expected to fail because .
+    """
+    # Open the FITS and weights image to test for correctness
+    with fits.open(IMAGE_PATH) as hdu, fits.open(WEIGHTS_PATH) as hduw:
+        # Pixels with nonzero weight
+        weighted_image = hdu[0].data[hduw[0].data != 0]
+
+        # Number of NaN pixels
+        nan_count = len(where(isnan(weighted_image)))
+
+        # Increase count if pixel is NaN
+        # nan_count += 1 if isnan(pixel) else 0
+    print(nan_count)
+    assert nan_count > 0
