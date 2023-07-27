@@ -11,6 +11,7 @@ from astropy.wcs import WCS
 from astropy.nddata.utils import Cutout2D
 from astropy.time import Time
 from astropy.wcs.wcs import FITSFixedWarning
+from astropy.io.votable.tree import Param
 
 from loguru import logger
 from mocpy import MOC, STMOC
@@ -33,7 +34,7 @@ def get_field_centre(header):
 
     return field_centre
 
-def crop_hdu(hdu, size=6.3*u.deg, rotation=0.0*u.deg):
+def crop_hdu(hdu, field_centre, size=6.3*u.deg, rotation=0.0*u.deg):
     if rotation != 0.0*u.deg:
         raise NotImplementedError("Rotation handling is not yet available")
     logger.debug("Cropping HDU")
@@ -43,8 +44,6 @@ def crop_hdu(hdu, size=6.3*u.deg, rotation=0.0*u.deg):
 
     if data.ndim == 4:
         data = data[0,0,:,:]
-        
-    field_centre = get_field_centre(hdu.header)
     
     cutout = Cutout2D(data,
                       position=field_centre,
@@ -60,7 +59,7 @@ def crop_hdu(hdu, size=6.3*u.deg, rotation=0.0*u.deg):
 
     return hdu
     
-def crop_catalogue(vot, cropped_hdu):
+def crop_catalogue(vot, cropped_hdu, field_centre, size):
     logger.debug("Cropping catalogue")
     votable = vot.get_first_table()
     
@@ -68,11 +67,9 @@ def crop_catalogue(vot, cropped_hdu):
     
     ra_deg = votable.array["col_ra_deg_cont"] * u.deg
     dec_deg = votable.array["col_dec_deg_cont"] * u.deg
-
     sc = SkyCoord(ra_deg, dec_deg)
     
     in_footprint = cropped_wcs.footprint_contains(sc)
-    
     votable.array = votable.array[in_footprint]
     
     return votable
@@ -191,7 +188,8 @@ def run_full_crop(data_root: Union[str, Path],
             
             outfile = fits_output_dir / path.name
             hdu = fits.open(path)[0]
-            cropped_hdu = crop_hdu(hdu)
+            field_centre = get_field_centre(hdu.header)
+            cropped_hdu = crop_hdu(hdu, field_centre, size=crop_size)
             cropped_hdu.writeto(outfile, overwrite=overwrite)
             logger.debug(f"Wrote {outfile}")
         
@@ -212,11 +210,15 @@ def run_full_crop(data_root: Union[str, Path],
         # This uses the last cropped hdu from the above for loop
         # which should be the image file, but doesn't actually matter
         cropped_components_vot = crop_catalogue(components_vot,
-                                                    cropped_hdu
-                                                    )
+                                                cropped_hdu,
+                                                field_centre,
+                                                size
+                                                )
         cropped_islands_vot = crop_catalogue(islands_vot,
-                                                 cropped_hdu
-                                                 )
+                                             cropped_hdu,
+                                             field_centre,
+                                             size
+                                             )
 
         if components_outfile.exists() and not overwrite:
             logger.critical(f"{components_outfile} exists, not overwriting")
