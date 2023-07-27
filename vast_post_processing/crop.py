@@ -205,16 +205,31 @@ def run_full_crop(data_root: Union[str, Path],
             output_dir.mkdir(parents=True)
         
         components_outfile = output_dir / components_path.name
-        vot = parse(str(components_path))
+        islands_outfile = output_dir / islands_path.name
+        
+        components_vot = parse(str(components_path))
+        islands_vot = parse(str(islands_path))
         
         # This uses the last cropped hdu from the above for loop
         # which should be the image file, but doesn't actually matter
-        votable_cropped = vpc.crop_catalogue(vot, cropped_hdu)
+        cropped_components_vot = vpc.crop_catalogue(components_vot,
+                                                    cropped_hdu
+                                                    )
+        cropped_islands_vot = vpc.crop_catalogue(islands_vot,
+                                                 cropped_hdu
+                                                 )
+
         if components_outfile.exists() and not overwrite:
             logger.critical(f"{components_outfile} exists, not overwriting")
         else:
             vot.to_xml(str(components_outfile))
             logger.debug(f"Wrote {components_outfile}")
+        
+        if islands_outfile.exists() and not overwrite:
+            logger.critical(f"{components_outfile} exists, not overwriting")
+        else:
+            vot.to_xml(str(islands_outfile))
+            logger.debug(f"Wrote {islands_outfile}")
         
         # Create the MOC
         if not create_moc:
