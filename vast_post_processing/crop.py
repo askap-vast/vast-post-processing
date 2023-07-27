@@ -23,7 +23,9 @@ def get_field_centre(header):
 
     return field_centre
 
-def crop_hdu(hdu, size=6.3*u.deg):
+def crop_hdu(hdu, size=6.3*u.deg, rotation=0.0*u.deg):
+    if rotation != 0.0*u.deg:
+        raise NotImplementedError("Rotation handling is not yet available")
     logger.debug("Cropping HDU")
     wcs = WCS(hdu.header, naxis=2)
 
