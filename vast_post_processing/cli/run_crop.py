@@ -1,18 +1,12 @@
 from pathlib import Path
-from itertools import chain
 import sys
 from typing import Optional, Generator
 
 from loguru import logger
-import pandas as pd
 import typer
-from astropy.io import fits
-from astropy.io.votable import parse
 import vast_post_processing.crop as vpc
-import warnings
-from astropy.wcs.wcs import FITSFixedWarning
+import astropy.units as u
 
-warnings.filterwarnings('ignore', category=FITSFixedWarning)
 
 app = typer.Typer()
 
@@ -86,7 +80,7 @@ def main(
                       epoch,
                       stokes,
                       out_root,
-                      create_moc
+                      create_moc,
                       overwrite
                       )
 

@@ -13,6 +13,13 @@ from astropy.time import Time
 from datetime import datetime
 from typing import Optional, Union
 from pathlib import Path
+import warnings
+
+from itertools import chain
+from astropy.wcs.wcs import FITSFixedWarning
+
+warnings.filterwarnings('ignore', category=FITSFixedWarning)
+
 
 def get_field_centre(header):
     logger.debug("Finding field centre")
@@ -48,8 +55,8 @@ def crop_hdu(hdu, size=6.3*u.deg, rotation=0.0*u.deg):
     
     coord_str = field_centre.to_string('hmsdms', sep=':')
     
-    header.add_history(f"Cropped to a {size.value.to(u.deg)}:.1f} deg square "
-                        "centered on {coord_str} on {datetime.now()}")
+    header.add_history(f"Cropped to a {size.value.to(u.deg):.1f} deg square "
+                       f"centered on {coord_str} on {datetime.now()}")
 
     return hdu
     
@@ -97,14 +104,20 @@ def run_full_crop(data_root: Union[str, Path],
                   crop_size: u.quantity.Quantity,
                   epoch: Union[str, int, list],
                   stokes: str,
-                  out_root: Union[str, Path],
+                  out_root: Optional[Union[str, Path]]=None,
                   create_moc: Optional[bool]=False,
-                  overwrite: Optional[bool]=False,):
+                  overwrite: Optional[bool]=False,
+                  ):
+
+    if out_root is None:
+        out_root = data_root
 
     image_path_glob_list: list[Generator[Path, None, None]] = []
     
     image_root = data_root / f"STOKES{stokes}_IMAGES"
     logger.debug(image_root)
+    
+    
     
     if type(epoch) is int:
         epoch = list(epoch)
