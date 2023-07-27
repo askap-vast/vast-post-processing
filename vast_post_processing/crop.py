@@ -144,27 +144,44 @@ def run_full_crop(data_root: Union[str, Path],
             / epoch_dir
             / f"noiseMap.{image_path.name}"
         )
+        
         bkg_path = (
             data_root
             / f"STOKES{stokes}_RMSMAPS"
             / epoch_dir
             / f"meanMap.{image_path.name}"
         )
-        selavy_name = f"selavy-{image_path.name}".replace(".fits",
+        
+        # get selavy files
+        components_name = f"selavy-{image_path.name}".replace(".fits",
                                                           ".components.xml"
                                                           )           
-        components_path = (
+        islands_name = components_name.replace("components", "islands")
+        
+        selavy_dir = (
             data_root
             / f"STOKES{stokes}_SELAVY"
             / epoch_dir
-            / selavy_name
         )
+        components_path = selavy_dir / components_name
+        islands_path = selavy_dir / islands_name
         
-        exists = rms_path.exists() and bkg_path.exists() and components_path.exists()
+        exists = True
+        if not rms_path.exists():
+            exists = False
+            logger.warning(f"noisemap file ({rms_path}) is missing.")
+        
+        if not bkg_path.exists():
+            exists = False
+            logger.warning(f"meanmap file ({bkg_path}) is missing.")
+        if not components_path.exists():
+            exists = False
+            logger.warning(f"selavy components file ({components_path}) is missing.")
+        if not islands_path.exists():
+            exists = False
+            logger.warning(f"selavy islands file ({islands_path}) is missing.")
         if not exists:
-            logger.warning(f"Other files missing. Skipping {image_path}.")
-            continue
-        
+            logger.warning(f"Skipping {image_path} due to missing files."
         
         for path in (rms_path, bkg_path, image_path):
             stokes_dir = f"{path.parent.parent.name}_CROPPED"
