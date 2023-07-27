@@ -1,22 +1,23 @@
+import warnings
+
+import astropy.units as u
+import astropy.wcs as wcs
+import matplotlib.pyplot as plt
+
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.io.votable import parse
-import astropy.units as u
 from astropy.wcs import WCS
-import astropy.wcs as wcs
 from astropy.nddata.utils import Cutout2D
-import matplotlib.pyplot as plt
-from loguru import logger
-from mocpy import MOC
-from mocpy import STMOC
 from astropy.time import Time
+from astropy.wcs.wcs import FITSFixedWarning
+
+from loguru import logger
+from mocpy import MOC, STMOC
 from datetime import datetime
 from typing import Optional, Union
 from pathlib import Path
-import warnings
-
 from itertools import chain
-from astropy.wcs.wcs import FITSFixedWarning
 
 warnings.filterwarnings('ignore', category=FITSFixedWarning)
 

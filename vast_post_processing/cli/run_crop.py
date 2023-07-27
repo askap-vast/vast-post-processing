@@ -1,11 +1,12 @@
-from pathlib import Path
 import sys
-from typing import Optional, Generator
-
-from loguru import logger
 import typer
+
 import vast_post_processing.crop as vpc
 import astropy.units as u
+
+from typing import Optional, Generator
+from pathlib import Path
+from loguru import logger
 
 
 app = typer.Typer()
