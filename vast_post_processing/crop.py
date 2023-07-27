@@ -55,9 +55,8 @@ def crop_hdu(hdu, size=6.3*u.deg, rotation=0.0*u.deg):
     hdu.header.update(cutout.wcs.to_header())
     
     coord_str = field_centre.to_string('hmsdms', sep=':')
-    
-    header.add_history(f"Cropped to a {size.value.to(u.deg):.1f} deg square "
-                       f"centered on {coord_str} on {datetime.now()}")
+    hdu.header.add_history(f"Cropped to a {size.to(u.deg):.1f} deg square "
+                           f"centered on {coord_str} on {datetime.now()}")
 
     return hdu
     
@@ -181,74 +180,74 @@ def run_full_crop(data_root: Union[str, Path],
             exists = False
             logger.warning(f"selavy islands file ({islands_path}) is missing.")
         if not exists:
-            logger.warning(f"Skipping {image_path} due to missing files."
+            logger.warning(f"Skipping {image_path} due to missing files.")
         
         for path in (rms_path, bkg_path, image_path):
             stokes_dir = f"{path.parent.parent.name}_CROPPED"
-            output_dir = out_root / stokes_dir / epoch_dir
+            fits_output_dir = out_root / stokes_dir / epoch_dir
             
-            if not output_dir.exists():
-                output_dir.mkdir(parents=True)
+            if not fits_output_dir.exists():
+                fits_output_dir.mkdir(parents=True)
             
-            outfile = output_dir / path.name
+            outfile = fits_output_dir / path.name
             hdu = fits.open(path)[0]
-            cropped_hdu = vpc.crop_hdu(hdu)
+            cropped_hdu = crop_hdu(hdu)
             cropped_hdu.writeto(outfile, overwrite=overwrite)
             logger.debug(f"Wrote {outfile}")
         
         
         # Crop the catalogues
         stokes_dir = f"{components_path.parent.parent.name}_CROPPED"
-        output_dir = out_root / stokes_dir / epoch_dir
+        cat_output_dir = out_root / stokes_dir / epoch_dir
         
-        if not output_dir.exists():
-            output_dir.mkdir(parents=True)
+        if not cat_output_dir.exists():
+            cat_output_dir.mkdir(parents=True)
         
-        components_outfile = output_dir / components_path.name
-        islands_outfile = output_dir / islands_path.name
+        components_outfile = cat_output_dir / components_path.name
+        islands_outfile = cat_output_dir / islands_path.name
         
         components_vot = parse(str(components_path))
         islands_vot = parse(str(islands_path))
         
         # This uses the last cropped hdu from the above for loop
         # which should be the image file, but doesn't actually matter
-        cropped_components_vot = vpc.crop_catalogue(components_vot,
+        cropped_components_vot = crop_catalogue(components_vot,
                                                     cropped_hdu
                                                     )
-        cropped_islands_vot = vpc.crop_catalogue(islands_vot,
+        cropped_islands_vot = crop_catalogue(islands_vot,
                                                  cropped_hdu
                                                  )
 
         if components_outfile.exists() and not overwrite:
             logger.critical(f"{components_outfile} exists, not overwriting")
         else:
-            vot.to_xml(str(components_outfile))
+            components_vot.to_xml(str(components_outfile))
             logger.debug(f"Wrote {components_outfile}")
         
         if islands_outfile.exists() and not overwrite:
             logger.critical(f"{components_outfile} exists, not overwriting")
         else:
-            vot.to_xml(str(islands_outfile))
+            components_vot.to_xml(str(islands_outfile))
             logger.debug(f"Wrote {islands_outfile}")
         
         # Create the MOC
         if not create_moc:
-            return
+            continue
 
         moc_dir = f"STOKES{stokes}_MOC_CROPPED"
-        output_dir = out_root / moc_dir / epoch_dir
+        moc_output_dir = out_root / moc_dir / epoch_dir
         
         moc_filename = image_path.name.replace('.fits','.moc.fits')
-        moc_outfile = output_dir / moc_filename
+        moc_outfile = moc_output_dir / moc_filename
         
-        if not output_dir.exists():
-            output_dir.mkdir(parents=True)
+        if not moc_output_dir.exists():
+            moc_output_dir.mkdir(parents=True)
         moc = vpc.wcs_to_moc(cropped_hdu)
         moc.write(moc_outfile, overwrite=overwrite)
         logger.debug(f"Wrote {moc_outfile}")
         
         stmoc_filename = image_path.name.replace('.fits','.stmoc.fits')
-        stmoc_outfile = output_dir / stmoc_filename
+        stmoc_outfile = moc_output_dir / stmoc_filename
         
         stmoc = vpc.moc_to_stmoc(moc, cropped_hdu)
         stmoc.write(stmoc_outfile, overwrite=overwrite)
