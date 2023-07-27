@@ -8,6 +8,9 @@ from astropy.nddata.utils import Cutout2D
 import matplotlib.pyplot as plt
 from loguru import logger
 from mocpy import MOC
+from mocpy import STMOC
+from astropy.time import Time
+from datetime import datetime
 
 def get_field_centre(header):
     logger.debug("Finding field centre")
@@ -38,6 +41,11 @@ def crop_hdu(hdu, size=6.3*u.deg):
                       )
     hdu.data = cutout.data
     hdu.header.update(cutout.wcs.to_header())
+    
+    coord_str = field_centre.to_string('hmsdms', sep=':')
+    
+    header.add_history(f"Cropped to a {size.value.to(u.deg)}:.1f} deg square "
+                        "centered on {coord_str} on {datetime.now()}")
 
     return hdu
     
@@ -72,3 +80,11 @@ def wcs_to_moc(cropped_hdu):
     sc = SkyCoord([sc1,sc2,sc3,sc4])
     
     return MOC.from_polygon_skycoord(sc)
+
+def moc_to_stmoc(moc, hdu):
+    start = Time([hdu.header['DATE-BEG']])
+    end = Time([hdu.header['DATE-END']])
+    
+    stmoc = STMOC.from_spatial_coverages(start, end, [moc])
+    
+    return stmoc
