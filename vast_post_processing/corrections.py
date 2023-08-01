@@ -40,7 +40,7 @@ def shift_and_scale_image(
     dec_offset_arcsec : float, optional
         Declination offset in arcsec, by default 0.0
     replace_nan : bool, optional
-        Whether to replace NaN pixels with 0, by default False
+        Whether to replace `NaN` pixels with 0, by default False
     overwrite : bool, optional
         Whether to write over existing image, by default False
 
