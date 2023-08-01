@@ -192,14 +192,26 @@ def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFram
     pd.DataFrame
         `DataFrame` representing the survey information.
     """
+    # Record function action to logger
     logger.debug(f"Reading surveys repo at path {repo_path} ...")
     fields_df = pd.DataFrame()
+
+    # Iterate over each data table in each epoch in the specified database
     for field_data in repo_path.glob("db/epoch_*/field_data.csv"):
+        # Load field data table
         df = pd.read_csv(field_data)
+
+        # Add entry representing epoch from directory of field data file
         df["obs_epoch"] = field_data.parent.name
+
+        # Rename field to RACS from VAST, by default False
         if rename_racs:
             df["FIELD_NAME"] = df.FIELD_NAME.str.replace("RACS_", "VAST_")
+
+        # Add current data table to master field `DataFrame`
         fields_df = pd.concat((fields_df, df))
+
+    # Record completed status to logger and return completed `DataFrame`
     logger.debug("Read surveys repo.")
     return fields_df
 
@@ -241,12 +253,17 @@ def read_release_epochs(
     # Convert information to dict to ensure input column names don't matter,
     # despite eventual reconversion to DataFrame
     logger.debug("Reading release epochs ...")
+
+    # Read release epochs from .csv format as DataFrame and sort by epoch
     release_df = (
         pd.read_csv(epochs_csv_path)
         .set_index([obs_epoch_col, field_col, sbid_col])
         .sort_index()
     )
     logger.debug("Read release epochs.")
+
+    # Create and return VastObserationId objects representing each epoch (row in
+    # the read-in DataFrame)
     return {
         VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid): row[
             release_epoch_col
@@ -285,7 +302,7 @@ def get_observation_from_moc_path(
     # Get observation epoch from MOC directory
     obs_epoch = int(moc_path.parent.name.split("_")[-1])
 
-    # Open MOC, with support for both .moc and .stmoc extensions
+    # Open MOC file, with support for both .moc and .stmoc extensions
     moc = mocpy.MOC.from_fits(
         moc_path.with_name(moc_path.name.replace(".stmoc", ".moc"))
     )
