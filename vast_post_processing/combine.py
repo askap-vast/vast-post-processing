@@ -23,7 +23,7 @@ import numpy as np
 
 
 slurm_job_id = os.environ.get("SLURM_JOB_ID", "no-slurm")
-"""str: The job ID of this program in SLURM.
+"""str : The job ID of this program in SLURM.
 
 Defaults to "no-slurm" if not running in SLURM. 
 """
@@ -79,13 +79,13 @@ COPY_FITS_KEYWORDS = [
     "TIMEUNIT",
     "RESTFREQ",
 ]
-"""list of str: FITS header cards to be copied from the first input image to
+"""list of str : FITS header cards to be copied from the first input image to
 the output mosaic. 
 """
 
 
 def get_image_geometry(image: Path) -> ImageGeometry:
-    """Return the ImageGeometry object for an image specified by path.
+    """Return the `ImageGeometry` object for an image specified by path.
 
     Parameters
     ----------
@@ -121,12 +121,12 @@ def get_image_geometry(image: Path) -> ImageGeometry:
     return ImageGeometry(dir_str, nx, ny, pixel_size)
 
 
-def write_swarp_config(config_dict: Dict[str, Any], output_path: Path) -> Path:
+def write_swarp_config(config_dict: dict[str, Any], output_path: Path) -> Path:
     """Write SWarp configuration to file.
 
     Parameters
     ----------
-    config_dict : Dict[str, Any]
+    config_dict : dict[str, Any]
         Configuration settings for this SWarp run.
     output_path : Path
         Path to file in which configuration is written.
@@ -148,9 +148,9 @@ def write_swarp_config(config_dict: Dict[str, Any], output_path: Path) -> Path:
 def add_degenerate_axes(image_path: Path, reference_image_path: Path):
     """Add degenerate axes to a FITS image.
 
-    If an image has 2 dimensions, np.expand_dims is run to add dimensions along
-    the (0, 1) axis. The headers are updated by comparison with a reference
-    image. These changes are written to file and logged.
+    If an image has 2 dimensions, `np.expand_dims()` is run to add dimensions
+    along the `(0, 1)` axis. The headers are updated by comparison with a
+    reference image. These changes are written to file and logged.
 
     Parameters
     ----------
@@ -184,7 +184,7 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
 
 
 def mask_weightless_pixels(image_path: Path, weights_path: Path):
-    """Replace weightless pixels in FITS image with NaN and logs change.
+    """Replace weightless pixels in FITS image with `NaN` and log the change.
 
     Parameters
     ----------

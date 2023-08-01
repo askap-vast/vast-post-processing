@@ -4,8 +4,6 @@
 
 This repository holds the code of VAST Post Processing.
 
-If using this tool in your research, please cite Murphy, et al. (2021).
-
 ## Features
 
 * Code base in `Python 3.8+`
@@ -35,4 +33,4 @@ load the index page by opening `index.html` in a browser.
 
 The VAST Post Processing development was supported by:
 
-* TODO - Populate
+* Someone

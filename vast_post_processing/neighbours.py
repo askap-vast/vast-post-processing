@@ -23,15 +23,15 @@ from radio_beam.utils import BeamError
 RE_SBID = re.compile(r"\.SB(\d+)\.")
 """Pattern of str : Regular expression representing SBID.
 
-SBID is searched by looking for ".SBn.", where n can be any number of digits.
+SBID is searched by looking for `.SBn.`, where `n` can be any number of digits.
 """
 
 RE_FIELD = re.compile(r"\.((?:RACS|VAST)_\d{4}[+-]\d{2}.?)\.")
 """Pattern of str : Regular expression representing field name. 
 
-Field name is searched by looking for ".VAST_XXXX±XXY.", where X can be any
-digit, and Y is an optional character. "VAST" may also be substituted for
-"RACS".
+Field name is searched by looking for `.VAST_XXXX±XXY.`, where `X` can be any
+digit, and `Y` is an optional character. `VAST` may also be substituted for
+`RACS`.
 """
 
 
@@ -50,7 +50,7 @@ class VastObservationId:
     obs_epoch : int
         The observation epoch of this observation.
     field : str
-        The field name of this observation.
+        The name of the field of this obsrvation.
     sbid : int
         The SBID of this observation.
 
@@ -72,21 +72,32 @@ class VastObservation:
     Parameters
     ----------
     field : str
-        TODO descriptions
+        The name of the field of this observation.
     sbid : int
+        The SBID of this observation.
     obs_epoch : int
+        The observation epoch of this observation.
     ra_approx_deg : float
+        The approximate right ascension of this observation, in degrees.
     dec_approx_deg : float
+        The approximate declination of this observation, in degrees.
     moc : mocpy.MOC
+        The Multi-Order Coverage map representing the coverage of the
+        observation.
     obs_start_mjd : float
+        The datetime at which the observation began, in Modified Julian Days.
     duration_sec : float
+        The length of the observation, in seconds.
     image_path : Path
+        The path to the image data of this observation.
     weights_path : Path
+        The path to the weights data image corresponding to the image data of
+        this observation.
 
     Notes
     -----
-    VastObservationId is not used in this data class so that upon conversion to
-    a DataFrame, column information is not lost.
+    `VastObservationId` is not used in this data class so that upon conversion to
+    a `DataFrame`, column information is not lost.
     """
 
     field: str
@@ -105,10 +116,11 @@ class VastObservation:
 class VastOverlap:
     """Data class representing overlap in a VAST observation.
 
+    TODO write parameter descriptions
+
     Parameters
     ----------
     idx_a : int
-        TODO descriptions
     idx_b : int
     overlap_frac : float
     delta_t_days : float
@@ -138,15 +150,16 @@ def get_sbid_and_field_from_filename(filename: str) -> Tuple[int, str]:
     UnknownFilenameConvention
         If there is a failure to match the regular expression.
 
-    Notes
-    -----
-    SBID is searched by looking for ".SBn." where n can be any number of digits.
-    The field name is searched by looking for ".VAST_XXXX±XXY." where X can be
-    any digit and Y is an optional character. "VAST" may also be substituted for
-    "RACS".
+    See Also
+    --------
+    RE_SBID : Regular expression representing SBID pattern.
+    RE_FIELD : Regular expression representing field name pattern.
     """
+    # Search for SBID and field by regex
     m_sbid = RE_SBID.search(filename)
     m_field = RE_FIELD.search(filename)
+
+    # Raise errors if either SBID or field name are not found from the filename
     if m_sbid is None and m_field is None:
         raise UnknownFilenameConvention(
             f"Could not determine SBID and field from filename {filename}"
@@ -159,11 +172,13 @@ def get_sbid_and_field_from_filename(filename: str) -> Tuple[int, str]:
         raise UnknownFilenameConvention(
             f"Could not determine field from filename {filename}"
         )
+
+    # Return SBID and field if they are both found
     return int(m_sbid.group(1)), m_field.group(1)
 
 
 def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFrame:
-    """Read a survey repository and return as a pd.DataFrame.
+    """Read a survey repository and return as a `DataFrame`.
 
     Parameters
     ----------
@@ -175,7 +190,7 @@ def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFram
     Returns
     -------
     pd.DataFrame
-        DataFrame representing the survey information.
+        `DataFrame` representing the survey information.
     """
     logger.debug(f"Reading surveys repo at path {repo_path} ...")
     fields_df = pd.DataFrame()
@@ -196,8 +211,8 @@ def read_release_epochs(
     sbid_col: str = "SBID",
     release_epoch_col: str = "Release Epoch",
 ) -> dict[VastObservationId, str]:
-    """Read release epochs and return a dict containing VastObservationId data
-    class objects corresponding to the epochs.
+    """Read release epochs and return a `dict` containing `VastObservationId`
+    objects corresponding to the epochs.
 
     Parameters
     ----------
