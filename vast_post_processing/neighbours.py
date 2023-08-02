@@ -1,3 +1,6 @@
+"""Finds neighbouring observations.
+"""
+
 from dataclasses import dataclass, astuple
 from pathlib import Path
 import re
@@ -18,24 +21,85 @@ from radio_beam.utils import BeamError
 
 
 RE_SBID = re.compile(r"\.SB(\d+)\.")
+"""Pattern of str : Regular expression representing SBID.
+
+SBID is searched by looking for `.SBn.`, where `n` can be any number of digits.
+"""
+
 RE_FIELD = re.compile(r"\.((?:RACS|VAST)_\d{4}[+-]\d{2}.?)\.")
+"""Pattern of str : Regular expression representing field name. 
+
+Field name is searched by looking for `.VAST_XXXX±XXY.`, where `X` can be any
+digit, and `Y` is an optional character. `VAST` may also be substituted for
+`RACS`.
+"""
 
 
 class UnknownFilenameConvention(Exception):
+    """Error representing an unknown filename convention."""
+
     pass
 
 
 @dataclass(frozen=True)
 class VastObservationId:
+    """Data class representing a VAST observation.
+
+    Parameters
+    ----------
+    obs_epoch : int
+        The observation epoch of this observation.
+    field : str
+        The name of the field of this obsrvation.
+    sbid : int
+        The SBID of this observation.
+
+    See Also
+    --------
+    VastObservation : Data class with expanded information not lost when
+    converted to a DataFrame.
+    """
+
     obs_epoch: int
     field: str
     sbid: int
 
 
-# note we don't use VastObservationId in the dataclass below so that when it's converted
-# to a DataFrame we don't lose the columns
 @dataclass
 class VastObservation:
+    """Data class representing a VAST observation.
+
+    Parameters
+    ----------
+    field : str
+        The name of the field of this observation.
+    sbid : int
+        The SBID of this observation.
+    obs_epoch : int
+        The observation epoch of this observation.
+    ra_approx_deg : float
+        The approximate right ascension of this observation, in degrees.
+    dec_approx_deg : float
+        The approximate declination of this observation, in degrees.
+    moc : mocpy.MOC
+        The Multi-Order Coverage map representing the coverage of the
+        observation.
+    obs_start_mjd : float
+        The datetime at which the observation began, in Modified Julian Days.
+    duration_sec : float
+        The length of the observation, in seconds.
+    image_path : Path
+        The path to the image data of this observation.
+    weights_path : Path
+        The path to the weights data image corresponding to the image data of
+        this observation.
+
+    Notes
+    -----
+    `VastObservationId` is not used in this data class so that upon conversion to
+    a `DataFrame`, column information is not lost.
+    """
+
     field: str
     sbid: int
     obs_epoch: int
@@ -50,6 +114,18 @@ class VastObservation:
 
 @dataclass
 class VastOverlap:
+    """Data class representing overlap in a VAST observation.
+
+    TODO write parameter descriptions
+
+    Parameters
+    ----------
+    idx_a : int
+    idx_b : int
+    overlap_frac : float
+    delta_t_days : float
+    """
+
     idx_a: int
     idx_b: int
     overlap_frac: float
@@ -57,22 +133,33 @@ class VastOverlap:
 
 
 def get_sbid_and_field_from_filename(filename: str) -> Tuple[int, str]:
-    """Search the filename for the SBID and field name using regular expressions. The
-    SBID is searched by looking for ".SBn." where n can be any number of digits.
-    The field name is searched by looking for ".VAST_XXXX±XXY." where X can be any digit
-    and Y is an optional character. "VAST" may also be substituted for "RACS".
+    """Search a filename of an observation for its SBID and field name.
 
-    Args:
-        filename (str): the filename to search.
+    Parameters
+    ----------
+    filename : str
+        Filename to search.
 
-    Raises:
-        UnknownFilenameConvention: when the regular expression match fails.
+    Returns
+    -------
+    Tuple[int, str]
+        SBID and field name found by this method.
 
-    Returns:
-        Tuple[int, str]: the SBID and field name.
+    Raises
+    ------
+    UnknownFilenameConvention
+        If there is a failure to match the regular expression.
+
+    See Also
+    --------
+    RE_SBID : Regular expression representing SBID pattern.
+    RE_FIELD : Regular expression representing field name pattern.
     """
+    # Search for SBID and field by regex
     m_sbid = RE_SBID.search(filename)
     m_field = RE_FIELD.search(filename)
+
+    # Raise errors if either SBID or field name are not found from the filename
     if m_sbid is None and m_field is None:
         raise UnknownFilenameConvention(
             f"Could not determine SBID and field from filename {filename}"
@@ -85,18 +172,46 @@ def get_sbid_and_field_from_filename(filename: str) -> Tuple[int, str]:
         raise UnknownFilenameConvention(
             f"Could not determine field from filename {filename}"
         )
+
+    # Return SBID and field if they are both found
     return int(m_sbid.group(1)), m_field.group(1)
 
 
 def read_surveys_repo(repo_path: Path, rename_racs: bool = False) -> pd.DataFrame:
+    """Read a survey repository and return as a `DataFrame`.
+
+    Parameters
+    ----------
+    repo_path : Path
+        Path to repository to be read.
+    rename_racs : bool, optional
+        Whether to rename RACS to VAST, by default False
+
+    Returns
+    -------
+    pd.DataFrame
+        `DataFrame` representing the survey information.
+    """
+    # Record function action to logger
     logger.debug(f"Reading surveys repo at path {repo_path} ...")
     fields_df = pd.DataFrame()
+
+    # Iterate over each data table in each epoch in the specified database
     for field_data in repo_path.glob("db/epoch_*/field_data.csv"):
+        # Load field data table
         df = pd.read_csv(field_data)
+
+        # Add entry representing epoch from directory of field data file
         df["obs_epoch"] = field_data.parent.name
+
+        # Rename field to RACS from VAST, by default False
         if rename_racs:
             df["FIELD_NAME"] = df.FIELD_NAME.str.replace("RACS_", "VAST_")
+
+        # Add current data table to master field `DataFrame`
         fields_df = pd.concat((fields_df, df))
+
+    # Record completed status to logger and return completed `DataFrame`
     logger.debug("Read surveys repo.")
     return fields_df
 
@@ -108,15 +223,47 @@ def read_release_epochs(
     sbid_col: str = "SBID",
     release_epoch_col: str = "Release Epoch",
 ) -> dict[VastObservationId, str]:
-    # although these end up being converted back to a DataFrame, we convert it to a dict
-    # here to ensure the input column names don't matter
+    """Read release epochs and return a `dict` containing `VastObservationId`
+    objects corresponding to the epochs.
+
+    Parameters
+    ----------
+    epochs_csv_path : Path
+        Path to the released epochs .csv file to be read.
+    obs_epoch_col : str, optional
+        Header for the observation epoch column, by default "Obs Epoch"
+    field_col : str, optional
+        Header for the field column, by default "Field"
+    sbid_col : str, optional
+        Header for the SBID column, by default "SBID"
+    release_epoch_col : str, optional
+        Header for the release epoch column, by default "Release Epoch"
+
+    Returns
+    -------
+    dict[VastObservationId, str]
+        Dictionary with keys representing observations corresponding to release
+        epoch column information from specified .csv file.
+
+    See Also
+    --------
+    VastObservationId
+        The keys in the returned dictionary representing an observation.
+    """
+    # Convert information to dict to ensure input column names don't matter,
+    # despite eventual reconversion to DataFrame
     logger.debug("Reading release epochs ...")
+
+    # Read release epochs from .csv format as DataFrame and sort by epoch
     release_df = (
         pd.read_csv(epochs_csv_path)
         .set_index([obs_epoch_col, field_col, sbid_col])
         .sort_index()
     )
     logger.debug("Read release epochs.")
+
+    # Create and return VastObserationId objects representing each epoch (row in
+    # the read-in DataFrame)
     return {
         VastObservationId(obs_epoch=obs_epoch, field=field, sbid=sbid): row[
             release_epoch_col
@@ -130,17 +277,44 @@ def get_observation_from_moc_path(
     surveys_db_df: pd.DataFrame,
     use_corrected: bool = True,
 ) -> Optional[VastObservation]:
+    """Get a VASTObservation data class object from a MOC.
+
+    Parameters
+    ----------
+    moc_path : Path
+        Path to a MOC.
+    surveys_db_df : pd.DataFrame
+        DataFrame representing the survey database.
+    use_corrected : bool, optional
+        Whether to use a corrected image, by default True
+
+    Returns
+    -------
+    Optional[VastObservation]
+        VastObservation data class object representing this MOC, if it exists
+        and has weight data.
+
+    See Also
+    --------
+    VastObservation
+        The data class representing the returned VAST observation.
+    """
+    # Get observation epoch from MOC directory
     obs_epoch = int(moc_path.parent.name.split("_")[-1])
-    # always use the MOC, but support being given the STMOC path
+
+    # Open MOC file, with support for both .moc and .stmoc extensions
     moc = mocpy.MOC.from_fits(
         moc_path.with_name(moc_path.name.replace(".stmoc", ".moc"))
     )
+
+    #
     sbid, field = get_sbid_and_field_from_filename(moc_path.name)
     centre_approx = SkyCoord(
         ra=f"{field[5:7]}:{field[7:9]}:00",
         dec=f"{field[9:12]}:00:00",
         unit="hourangle,deg",
     )
+
     # surveys db times are in MJD seconds, convert to MJD days
     obs_start = Time(
         surveys_db_df.loc[(field, sbid), "SCAN_START"] / (60 * 60 * 24), format="mjd"
