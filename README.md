@@ -10,20 +10,6 @@ This repository holds the code of VAST Post Processing.
 
 ## Screenshots and Previews
 
-## Documentation
-
-To view `sphinx` documentation for this project, navigate to the root of the package, and
-enter the following commands - 
-```
-poetry install
-poetry shell
-cd docs
-make html
-```
-The pages will be built in `vast-post-processing/docs/build/html`, and you can
-load the index page by opening `index.html` in a browser.
-
-
 ## Contributors
 
 * Andrew O'Brien – [Department of Physics, University of Wisconsin-Milwaukee](https://uwm.edu/physics/research/astronomy-gravitation-cosmology/)
