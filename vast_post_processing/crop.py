@@ -4,6 +4,8 @@ import astropy.units as u
 import astropy.wcs as wcs
 import matplotlib.pyplot as plt
 
+import vast_post_processing.compress as vpcompress
+
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.io.votable import parse
@@ -104,6 +106,7 @@ def run_full_crop(data_root: Union[str, Path],
                   out_root: Optional[Union[str, Path]]=None,
                   create_moc: Optional[bool]=False,
                   overwrite: Optional[bool]=False,
+                  compress: Optional[bool]=False,
                   ):
 
     if out_root is None:
@@ -190,6 +193,11 @@ def run_full_crop(data_root: Union[str, Path],
             hdu = fits.open(path)[0]
             field_centre = get_field_centre(hdu.header)
             cropped_hdu = crop_hdu(hdu, field_centre, size=crop_size)
+            
+            if compress:
+                cropped_hdu = vpcompress.compress_hdu(cropped_hdu)
+                outfile = outfile.with_suffix('.fits.fz')
+            
             cropped_hdu.writeto(outfile, overwrite=overwrite)
             logger.debug(f"Wrote {outfile}")
         
@@ -212,12 +220,12 @@ def run_full_crop(data_root: Union[str, Path],
         cropped_components_vot = crop_catalogue(components_vot,
                                                 cropped_hdu,
                                                 field_centre,
-                                                size
+                                                crop_size
                                                 )
         cropped_islands_vot = crop_catalogue(islands_vot,
                                              cropped_hdu,
                                              field_centre,
-                                             size
+                                             crop_size
                                              )
 
         if components_outfile.exists() and not overwrite:

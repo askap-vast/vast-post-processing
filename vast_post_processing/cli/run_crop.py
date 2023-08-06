@@ -58,6 +58,10 @@ def main(
         create_moc: Optional[bool] = typer.Option(
             False,
             help=("Create MOC files based on cropped images")
+        ),
+        compress: Optional[bool] = typer.Option(
+            False,
+            help=("Compress all fits files")
         )
     ):
     
@@ -82,7 +86,8 @@ def main(
                       stokes,
                       out_root,
                       create_moc,
-                      overwrite
+                      overwrite,
+                      compress
                       )
 
 if __name__ == "__main__":
