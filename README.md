@@ -28,6 +28,7 @@ load the index page by opening `index.html` in a browser.
 
 * Andrew O'Brien – [Department of Physics, University of Wisconsin-Milwaukee](https://uwm.edu/physics/research/astronomy-gravitation-cosmology/)
 * Dougal Dobie – [Centre for Astrophysics and Supercomputing, Swinburne University of Technology](https://www.swinburne.edu.au/research/our-research/access-our-research/find-a-researcher-or-supervisor/researcher-profile/?id=ddobie)
+* Hansen Jiang - [Sidrat Research](https://www.sidratresearch.com/)
 
 ## Acknowledgements
 
