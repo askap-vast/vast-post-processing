@@ -6,7 +6,6 @@ passed to this script along with all contents are indiscriminately deleted recur
 """
 
 from pathlib import Path
-from shutil import rmtree
 
 import typer
 
@@ -14,11 +13,7 @@ from vast_post_processing.utils import fileutils
 
 
 def main(neighbour_data_dir: Path, delete_all: bool = False):
-    if delete_all:
-        rmtree(neighbour_data_dir)
-    else:
-        for field_path in neighbour_data_dir.glob("VAST_*"):
-            fileutils.cleanup_directory(field_path)
+    fileutils.cleanup(neighbour_data_dir, delete_all)
 
 
 if __name__ == "__main__":
