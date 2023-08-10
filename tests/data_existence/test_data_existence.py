@@ -12,7 +12,7 @@ DIRECTORY_NAME = "test-data"
 """str: Name of the directory containing test data.
 """
 
-MODULE_PATH = (resources.files(__package__) / "..").resolve()
+MODULE_PATH = (Path(__file__) / ".." / "..").resolve()
 """Path: Absolute path to the testing module.
 """
 
