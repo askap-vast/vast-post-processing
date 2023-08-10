@@ -248,22 +248,31 @@ def main(
             logger.warning(f"Background image not found for {image_path}.")
 
         # Look for any component and island files correspnding to this image
+        image_root = image_path.parent.as_posix()
+        catalog_root = image_root.replace("IMAGES", "SELAVY")
 
-        component_file = Path(ref_file)
-        island_file = Path(ref_file.replace("components", "islands"))
+        catalog_filename = image_path.name.replace("image", "selavy-image")
+        catalog_filename = catalog_filename.replace(".fits", ".components.xml")
+
+        catalog_filepath = f"{catalog_root}/{catalog_filename}"
+
+        component_file = Path(catalog_filepath)
+        island_file = Path(catalog_filepath.replace("components", "islands"))
 
         skip = (
             not (
                 (rms_path.exists())
                 and (bkg_path.exists())
                 and (ref_file is not None)
-                and (component_file is not None)
+                and (component_file.exists())
             )
             or skip
         )
         if skip:
             if not ((rms_path.exists()) and (bkg_path.exists())):
                 logger.warning(f"Skipping {image_path}, RMS/BKG maps do not exist")
+            elif not (component_file.exists()):
+                logger.warning(f"Skipping {image_path}, catalog files do not exist")
             elif ref_file is None:
                 logger.warning(f"Skipping {image_path}, no reference field found.")
             continue
