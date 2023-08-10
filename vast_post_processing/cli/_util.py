@@ -1,3 +1,9 @@
+"""
+
+Utilities used by other modules in this `cli` subpackage. 
+
+"""
+
 import multiprocessing
 import sys
 from typing import Union
