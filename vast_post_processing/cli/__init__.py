@@ -2,11 +2,11 @@
 # The CLI bindings for VAST Post-processing
 #
 
-import _util
-import cleanup
-import convolve_neighbours
-import correct_vast
-import link_neighbours
-import run_crop
-import selavy_combined
-import swarp
+from . import _util
+from . import cleanup
+from . import convolve_neighbours
+from . import correct_vast
+from . import link_neighbours
+from . import run_crop
+from . import selavy_combined
+from . import swarp
