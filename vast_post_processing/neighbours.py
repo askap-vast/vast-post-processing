@@ -553,3 +553,174 @@ def convolve_image(
         return output_dir_path / output_filename
     else:
         return None
+
+
+# Separated logic
+
+"""Requires setup_neighbours.py to be run first.
+"""
+from dataclasses import dataclass, fields
+from functools import partial
+from pathlib import Path
+from typing import Optional, List
+
+from loguru import logger
+from racs_tools import beamcon_2D
+from radio_beam import Beam
+import typer
+
+from vast_post_processing.cli._util import get_pool, _get_worker_name
+
+
+@dataclass
+class WorkerArgs:
+    image_path: Path
+    output_dir_path: Path
+    target_beam: Beam
+    mode: str
+    suffix: str = "sm"
+    prefix: Optional[str] = None
+    cutoff: Optional[float] = None
+    dry_run: bool = False
+
+    def __iter__(self):
+        # Makes the class fields iterable so they can be unpacked
+        # e.g. func(*args) where args is a WorkerArgs object.
+        return (getattr(self, field.name) for field in fields(self))
+
+
+def worker(args: WorkerArgs, mpi: bool = False, n_proc: int = 1):
+    with logger.contextualize(worker_name=_get_worker_name(mpi=mpi, n_proc=n_proc)):
+        return convolve_image(*args)
+
+
+def convolve_neighbours(
+    neighbour_data_dir: Path,
+    n_proc: int = 1,
+    mpi: bool = False,
+    max_images: Optional[int] = None,
+    racs: bool = False,
+    field_list: Optional[List[str]] = typer.Option(None, "--field"),
+):
+    # neighbour_data_dir has the structure:
+    # <neighbour_data_dir>/<field>/inputs contains the input FITS images
+    # to be convolved to a common resolution and their weights FITS images.
+
+    pool = get_pool(mpi=mpi, n_proc=n_proc)
+    logger.debug(f"pool created, type: {type(pool)}")
+
+    glob_expr = "RACS_*" if racs else "VAST_*"
+    worker_args_list: list[WorkerArgs] = []
+    n_images: int = 0
+    for field_dir in neighbour_data_dir.glob(glob_expr):
+        if field_list and field_dir.name not in field_list:
+            logger.info(
+                f"Glob found field {field_dir} but it was not given as a --field option. Skipping."
+            )
+            continue
+        if max_images is not None and n_images >= max_images:
+            logger.warning(
+                f"Reached maximum image limit of {max_images}. Skipping remaining images."
+            )
+            break
+        if len(list(field_dir.glob("*.sm.fits"))) > 0:
+            logger.warning(f"Smoothed images already exist in {field_dir}. Skipping.")
+            continue
+        image_path_list = list(field_dir.glob("inputs/image.*.fits"))
+        logger.debug(f"Found {len(image_path_list)} images for {field_dir.name}")
+        # find the smallest common beam
+        common_beam, _ = beamcon_2D.getmaxbeam(image_path_list)
+        logger.debug(
+            f"{field_dir} common beam major {common_beam.major} type"
+            f" {type(common_beam)}"
+        )
+        for image_path in image_path_list:
+            worker_args = WorkerArgs(
+                image_path=image_path,
+                output_dir_path=field_dir,
+                target_beam=common_beam,
+                mode="robust",
+            )
+            worker_args_list.append(worker_args)
+            n_images += 1
+            if max_images is not None and n_images >= max_images:
+                logger.warning(
+                    f"Reached maximum image limit of {max_images}. Skipping remaining images."
+                )
+                break
+
+    # start convolutions
+    _ = list(pool.map(partial(worker, mpi=mpi, n_proc=n_proc), worker_args_list))
+    pool.close()
+
+
+def link_neighbours(
+    release_epoch: str,
+    vast_data_root: Path,
+    release_epochs_csv: Path,
+    output_root: Path,
+    vast_db_repo: Path,
+    racs_db_repo: Optional[Path],
+    overlap_frac_thresh: float,
+    use_corrected: bool,
+    neighbours_output: Optional[Path],
+    make_links: bool,
+):
+    # get the release epochs
+    release_epochs = read_release_epochs(release_epochs_csv)
+    # get the neighbours DataFrame and filter for the requested release epoch and
+    # overlap area threshold
+    vast_neighbours_df = find_vast_neighbours_by_release_epoch(
+        release_epoch,
+        vast_data_root,
+        vast_db_repo,
+        release_epochs,
+        racs_db_repo=racs_db_repo,
+        use_corrected=use_corrected,
+    ).query(
+        "release_epoch_a == @release_epoch and overlap_frac >= @overlap_frac_thresh"
+    )
+
+    if neighbours_output is not None:
+        vast_neighbours_df[
+            [
+                "field_a",
+                "sbid_a",
+                "obs_epoch_a",
+                "release_epoch_a",
+                "field_b",
+                "sbid_b",
+                "obs_epoch_b",
+                "release_epoch_b",
+                "overlap_frac",
+                "delta_t_days",
+            ]
+        ].to_csv(neighbours_output, index=False)
+
+    # create a directory for each field and create links to the neighbouring images
+    if make_links:
+        release_output_path = output_root / release_epoch
+        release_output_path.mkdir(parents=True, exist_ok=True)
+        for _, obs_pair in vast_neighbours_df.iterrows():
+            # create directories
+            field_inputs_path_a = release_output_path / obs_pair.field_a / "inputs"
+            field_inputs_path_a.mkdir(parents=True, exist_ok=True)
+            field_inputs_path_b = release_output_path / obs_pair.field_b / "inputs"
+            field_inputs_path_b.mkdir(parents=True, exist_ok=True)
+
+            # create a hard link for each field in the pair in both directions, e.g.
+            # A/inputs/A.fits, A/inputs/B.fits, B/inputs/A.fits, B/inputs/B.fits (plus weights)
+            for output_path in (field_inputs_path_a, field_inputs_path_b):
+                target_image_a = output_path / obs_pair.image_path_a.name
+                target_weights_a = output_path / obs_pair.weights_path_a.name
+                if not target_image_a.exists():
+                    obs_pair.image_path_a.link_to(target_image_a)
+                if not target_weights_a.exists():
+                    obs_pair.weights_path_a.link_to(target_weights_a)
+
+                target_image_b = output_path / obs_pair.image_path_b.name
+                target_weights_b = output_path / obs_pair.weights_path_b.name
+                if not target_image_b.exists():
+                    obs_pair.image_path_b.link_to(target_image_b)
+                if not target_weights_b.exists():
+                    obs_pair.weights_path_b.link_to(target_weights_b)
