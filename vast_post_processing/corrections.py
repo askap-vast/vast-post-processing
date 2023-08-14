@@ -333,12 +333,13 @@ def get_correct_file(correction_files_dir, img_field):
 def get_psf_from_image(image_path: str):
     """
     Funtion used to get the point spread function (PSF) extent in major and minor axis.
-    These will be in the header of the image file
+    These will be in the header of the image file. If a component file is give, it will
+    construct the image path from this and then gets the psf information
 
     Parameters
     ----------
     image_path: str
-        Path to the image file
+        Path to the image file or a component file
 
     Returns
     -------

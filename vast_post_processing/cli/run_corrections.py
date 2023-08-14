@@ -22,7 +22,7 @@ def main(
         "/data/vast-survey/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY",
         help=(
             "Path to RACS data that is can be used to correct VAST data. Tries to use"
-            " EPOCH00 as the defualt epoch. If not the user can override this by"
+            " EPOCH00 as the default epoch. If not the user can override this by"
             " giving a path to a folder that contain the selavy output"
         ),
         exists=True,
@@ -54,7 +54,7 @@ def main(
             ".restored.conv.fits. Note that for TILE images, the epoch is determined "
             "from the full path. If the input catalogs do not follow this convention, then "
             "the PSF sizes must be supplied using --psf-reference and/or --psf. The "
-            "deafult behaviour is to lookup the PSF sizes from the header of the image"
+            "default behaviour is to lookup the PSF sizes from the header of the image"
         ),
     ),
     psf_ref: Optional[list[float]] = typer.Option(
