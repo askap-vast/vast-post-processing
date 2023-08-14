@@ -14,11 +14,28 @@ logger = logging.getLogger(__name__)
 
 
 def median_abs_deviation(data):
+    """helper function to calculate the median offset
+
+    Args:
+        data (list): List/array of offsets
+
+    Returns:
+        float: the median offset
+    """
     median = np.median(data)
     return np.median(np.abs(data - median))
 
 
 def straight_line(B, x):
+    """Helper function for fitting. Defines a straight line
+
+    Args:
+        B (list): (slope, intercept) of the line
+        x (list): input X-axis data
+
+    Returns:
+        list: the straight line
+    """
     m, b = B
     return m * x + b
 
@@ -26,6 +43,19 @@ def straight_line(B, x):
 def join_match_coordinates_sky(
     coords1: SkyCoord, coords2: SkyCoord, seplimit: u.arcsec
 ):
+    """Helper function to do the cross match
+
+    Args:
+        coords1 (SkyCoord): Input coordinates
+        coords2 (SkyCoord): Reference coordinates
+        seplimit (u.arcsec): cross-match radius
+
+    Returns:
+        numpy.ndarray: Array to see which of the input coordinates have a cross match
+        numpy.ndarray: Indices of the input catalog where there is source in reference
+            catlog within separation limit
+        numpy.ndarray: The separation distance for the cross matches
+    """
     idx, separation, dist_3d = match_coordinates_sky(coords1, coords2)
     mask = separation < seplimit
     return np.where(mask)[0], idx[mask], separation[mask], dist_3d[mask]
@@ -35,12 +65,17 @@ def crossmatch_qtables(
     catalog: Catalog,
     catalog_reference: Catalog,
     radius: Angle = Angle("10 arcsec"),
-    catalog_coord_cols: Tuple[str, str] = ("ra_deg_cont", "dec_deg_cont"),
-    catalog_reference_coord_cols: Tuple[str, str] = ("ra_deg_cont", "dec_deg_cont"),
 ) -> QTable:
-    catalog_ra, catalog_dec = catalog_coord_cols
-    catalog_reference_ra, catalog_reference_dec = catalog_reference_coord_cols
+    """Main function to filter cross-matched sources.
 
+    Args:
+        catalog (Catalog): Input catalog
+        catalog_reference (Catalog): Reference catalog
+        radius (Angle, optional): cross-match radius. Defaults to Angle("10 arcsec").
+
+    Returns:
+        QTable: filtered table that return the cross matches
+    """
     logger.debug("Using crossmatch radius: %s.", radius)
 
     xmatch = join(
