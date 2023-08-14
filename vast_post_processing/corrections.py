@@ -613,3 +613,6 @@ def correct_files(
             outdir=outdir,
             overwrite=overwrite,
         )
+        logger.info(
+            f"Successfully corrected the images and catalogs for {image_path.as_posix()}"
+        )
