@@ -1,6 +1,15 @@
-#
-# The CLI bindings for VAST Post-processing
-#
+"""
+Command-line scripts to run various operations from base modules on passed data.
+
+Modules
+-------
+cleanup
+
+Notes
+-----
+Only contain interfacing functionality, such as argument handling and usage.
+Program logic located in base modules. 
+"""
 
 from . import _util
 from . import cleanup

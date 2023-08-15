@@ -1,7 +1,5 @@
 """
-
-Utilities used by other modules in this `cli` subpackage. 
-
+Utilities specific in usage for modules of this subpackage.
 """
 
 import multiprocessing
