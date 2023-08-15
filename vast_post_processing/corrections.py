@@ -475,7 +475,6 @@ def correct_field(
         for path in (image_path, rms_path, bkg_path):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
             output_dir = outdir / stokes_dir / epoch_dir
-            output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / path.with_suffix(".corrected.fits").name
             if output_path.exists() and not overwrite:
                 logger.warning(f"Will not overwrite existing image: {output_path}.")
@@ -488,6 +487,7 @@ def correct_field(
                     dec_offset_arcsec=ddec_median_value.item(),
                 )
                 if write_output:
+                    output_dir.mkdir(parents=True, exist_ok=True)
                     if output_path.exists() and overwrite:
                         logger.warning(f"Overwriting existing image: {output_path}.")
                         corrected_hdu.writeto(str(output_path), overwrite=True)
@@ -503,7 +503,6 @@ def correct_field(
         for path in (component_file, island_file):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
             output_dir = outdir / stokes_dir / epoch_dir
-            output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / path.with_suffix(".corrected.xml").name
             if output_path.exists() and not overwrite:
                 logger.warning(f"Will not overwrite existing catalogue: {output_path}.")
@@ -516,6 +515,7 @@ def correct_field(
                     dec_offset_arcsec=ddec_median_value.item(),
                 )
                 if write_output:
+                    output_dir.mkdir(parents=True, exist_ok=True)
                     # write corrected VOTable
                     if output_path.exists() and overwrite:
                         logger.warning(
