@@ -3,14 +3,18 @@ from astropy.wcs import WCS
 from datetime import datetime
 
 def compress_hdu(hdu: fits.ImageHDU, quantize_level: float=1024.0):
-    """
-    Convert a given astropy HDU into a compressed HDU.
+    """Convert a given astropy HDU into a compressed HDU.
     
-    Args:
-        hdu: The HDU to compress
-        quantize_level: The quantization level to use for compression
+    Parameters
+    ----------
+        hdu : fits.ImageHDU
+            The HDU to compress
+        quantize_level : float
+            The quantization level to use for compression
     
-    Returns:
+    Returns
+    ----------
+    CompImageHDU
         The resulting CompImageHDU
     """
 
