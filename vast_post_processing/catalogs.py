@@ -266,20 +266,35 @@ class Catalog:
     def _filter_sources(self):
         """Helper function to filter sources that are used for cross-match;
         filter sources with bad sizes and optionally given flux limits"""
+
+        # Add a flux threshold flag
         if self.flux_flag:
             lim = self.flux_lim
             logger.info(
                 f"Filtering %d sources with fluxes <= {lim}",
                 (self.table["flux_peak"] <= lim).sum(),
             )
-            self.table = self.table[self.table["flux_peak"] > lim]
+            flux_mask = self.table["flux_peak"] > lim
+            # self.table = self.table[self.table["flux_peak"] > lim]
+        # Add good psf flag
         logger.info(
             "Filtering %d sources with fitted sizes <= 0.",
             ((self.table["maj_axis"] <= 0) | (self.table["min_axis"] <= 0)).sum(),
         )
-        self.table = self.table[
-            (self.table["maj_axis"] > 0) & (self.table["min_axis"] > 0)
-        ]
+        psf_mask = (self.table["maj_axis"] > 0) & (self.table["min_axis"] > 0)
+
+        # point source flag
+        ps_metric = self.table["flux_peak"] / self.table["flux_int"]
+        ps_mask = ps_metric < 1.5
+
+        # Add snr flag
+        snr_mask = self.table["flux_peak"] / self.table["rms_image"] > 20
+
+        # Select distant sources
+        dist_mask = self.table["nn_separation"].to(u.arcsec).value > 60
+
+        mask = (flux_mask) & (psf_mask) & (ps_mask) & (snr_mask) & (dist_mask)
+        self.table = self.table[mask]
 
     def calculate_condon_flux_errors(
         self,
