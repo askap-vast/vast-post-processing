@@ -3,7 +3,6 @@
 
 import pytest
 from pathlib import Path
-from importlib import resources
 
 from numpy import isnan, where
 from astropy.io import fits
