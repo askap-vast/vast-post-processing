@@ -2,7 +2,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from datetime import datetime
 
-def compress_hdu(hdu: fits.ImageHDU, quantize_level: float=1024.0):
+def compress_hdu(hdu: fits.ImageHDU, quantize_level: float=1024.0, **kwargs):
     """Convert a given astropy HDU into a compressed HDU.
     
     Parameters
@@ -11,6 +11,8 @@ def compress_hdu(hdu: fits.ImageHDU, quantize_level: float=1024.0):
             The HDU to compress
         quantize_level : float
             The quantization level to use for compression
+        **kwargs
+            Keyword arguments to be passed onto `astropy.io.fits.CompImageHDU`
     
     Returns
     ----------
@@ -28,7 +30,8 @@ def compress_hdu(hdu: fits.ImageHDU, quantize_level: float=1024.0):
 
     comp_hdu = fits.CompImageHDU(data=data,
                                  header=header,
-                                 quantize_level=quantize_level
+                                 quantize_level=quantize_level,
+                                 **kwargs
                                  )
     
     return comp_hdu
