@@ -570,39 +570,41 @@ def correct_files(
         logger.remove()
         logger.add(sys.stderr, level="INFO")
 
-    # read corrections
-    image_path_glob_list: list[Generator[Path, None, None]] = []
-    components_path_glob_list: list[Generator[Path, None, None]] = []
-
+    # Read all the epochs
     if epoch is None or len(epoch) == 0:
-        image_path_glob_list.append(
-            vast_tile_data_root.glob("STOKESI_IMAGES/epoch_*/*.fits")
-        )
-        components_path_glob_list.append(
-            vast_tile_data_root.glob("STOKESI_SELAVY/epoch_*/*.xml")
-        )
+        epoch_dirs = list(vast_tile_data_root.glob("STOKESI_IMAGES/epoch_*"))
     else:
-        for n in epoch:
-            image_path_glob_list.append(
-                vast_tile_data_root.glob(f"STOKESI_IMAGES/epoch_{n}/*.fits")
-            )
-            components_path_glob_list.append(
-                vast_tile_data_root.glob(f"STOKESI_SELAVY/epoch_{n}/*.xml")
-            )
+        epoch_dirs = []
+        epoch_dirs = [
+            vast_tile_data_root / "STOKESI_IMAGES" / f"epoch_{e}" for e in epoch
+        ]
 
-    # get corrections for an image and the correct it
-    for image_path in chain.from_iterable(image_path_glob_list):
-        correct_field(
-            image_path=image_path,
-            vast_corrections_root=vast_corrections_root,
-            radius=radius,
-            condon=condon,
-            psf_ref=psf_ref,
-            psf=psf,
-            write_output=write_output,
-            outdir=outdir,
-            overwrite=overwrite,
-        )
-        logger.info(
-            f"Successfully corrected the images and catalogs for {image_path.as_posix()}"
-        )
+    logger.info(
+        f"Corrections requested of these epochs: {[i.name for i in epoch_dirs]}"
+    )
+
+    # Work on individual epochs
+    for e in epoch_dirs:
+        # read fits/xml files
+        image_path_glob_list: list[Generator[Path, None, None]] = []
+        components_path_glob_list: list[Generator[Path, None, None]] = []
+
+        image_path_glob_list.append(e.glob("*.fits"))
+        components_path_glob_list.append(e.glob("*.xml"))
+
+        # get corrections for every image and the correct it
+        for image_path in chain.from_iterable(image_path_glob_list):
+            correct_field(
+                image_path=image_path,
+                vast_corrections_root=vast_corrections_root,
+                radius=radius,
+                condon=condon,
+                psf_ref=psf_ref,
+                psf=psf,
+                write_output=write_output,
+                outdir=outdir,
+                overwrite=overwrite,
+            )
+            logger.info(
+                f"Successfully corrected the images and catalogs for {image_path.as_posix()}"
+            )
