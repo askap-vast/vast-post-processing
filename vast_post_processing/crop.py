@@ -23,7 +23,19 @@ from itertools import chain
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
 
-def get_field_centre(header):
+def get_field_centre(header: fits.header.Header):
+    """Get the field centre given the FITS header
+    
+    Parameters
+    ----------
+    header : astropy.io.fits.header.Header
+        FITS image header
+    
+    Returns
+    -------
+    field_centre : astropy.coordinates.SkyCoord
+        Centre of the field
+    """
     logger.debug("Finding field centre")
     w = WCS(header, naxis=2)
     size_x = header["NAXIS1"]
@@ -35,7 +47,28 @@ def get_field_centre(header):
     return field_centre
 
 
-def crop_hdu(hdu, field_centre, size=6.3 * u.deg, rotation=0.0 * u.deg):
+def crop_hdu(hdu: fits.hdu.image.PrimaryHDU,
+            field_centre: SkyCoord,
+            size: Optional[u.quantity.Quantity] = 6.3 * u.deg,
+            rotation: Optional[u.quantity.Quantity] = 0.0 * u.deg):
+    """ Crop the data and update the header of a FITS image HDU
+    
+    Parameters
+    ----------
+    hdu : astropy.io.fits.hdu.image.PrimaryHDU
+        The HDU to crop
+    field_centre : astropy.coordinates.SkyCoord,
+        The corresponding field centre.
+    size : astropy.units.quantity.Quantity, optional
+        The size of each side of the square crop, by default 6.3 * u.deg.
+    rotation : astropy.units.quantity.Quantity
+        The rotation to apply, by default 0.0 * u.deg.
+    
+    Returns
+    -------
+    hdu : astropy.io.fits.hdu.image.PrimaryHDU
+        The cropped HDU.
+    """
     if rotation != 0.0 * u.deg:
         raise NotImplementedError("Rotation handling is not yet available")
     logger.debug("Cropping HDU")
@@ -59,7 +92,70 @@ def crop_hdu(hdu, field_centre, size=6.3 * u.deg, rotation=0.0 * u.deg):
     return hdu
 
 
-def crop_catalogue(vot, cropped_hdu, field_centre, size):
+def _add_votable_params(votable: astropy.io.votable,
+                        field_centre: SkyCoord,
+                        size: u.quantity.Quantity
+                        ):
+    """Add crop parameter information to a VOTable.
+    
+    Parameters
+    ----------
+    votable : astropy.io.votable
+        The VOTable to be added to.
+    field_centre : astropy.coordinates.SkyCoord
+        A SkyCoord with the coordinates of the field centre
+    size : astropy.units.quantity.Quantity
+        The size of the crop
+    
+    Returns
+    -------
+    None
+    """
+    crop_ra_param = Param(votable,
+                          value=field_centre.ra.deg,
+                          ID='CropCentreRA',
+                          name='CropCentreRA',
+                          datatype='float'
+                          )
+    crop_dec_param = Param(votable,
+                           value=field_centre.dec.deg,
+                           ID='CropCentreDec',
+                           name='CropCentreDec',
+                           datatype='float'
+                           )
+    crop_size = Param(votable,
+                      value=size.to(u.deg).value,
+                      ID='CropSize',
+                      name='CropSize',
+                      datatype='float',
+                      )
+    
+    votable.params.extend([crop_ra_param, crop_dec_param, crop_size])
+    
+    
+def crop_catalogue(vot: astropy.io.votable,
+                   cropped_hdu: io.fits.hdu.image.PrimaryHDU,
+                   field_centre: SkyCoord,
+                   size: u.quantity.Quantity
+                   ):
+    """Crop the catalogue based on the coverage of the cropped HDU
+    
+    Parameters
+    ----------
+    votable : astropy.io.votable
+        The VOTable to be cropped.
+    cropped_hdu : astropy.io.fits.hdu.image.PrimaryHDU
+        The cropped image HDU.
+    field_centre : astropy.coordinates.SkyCoord
+        A SkyCoord with the coordinates of the field centre.
+    size : astropy.units.quantity.Quantity
+        The size of the crop.
+    
+    Returns
+    -------
+    votable : astropy.io.votable
+        The cropped VOTable.
+    """
     logger.debug("Cropping catalogue")
     votable = vot.get_first_table()
 
@@ -71,11 +167,26 @@ def crop_catalogue(vot, cropped_hdu, field_centre, size):
 
     in_footprint = cropped_wcs.footprint_contains(sc)
     votable.array = votable.array[in_footprint]
+    
+    _add_votable_params(votable, field_centre, size)
+    
 
     return votable
 
 
-def wcs_to_moc(cropped_hdu):
+def wcs_to_moc(cropped_hdu: fits.hdu.image.PrimaryHDU):
+    """Generate a MOC object from a cropped HDU
+    
+    Parameters
+    ----------
+    cropped_hdu : astropy.io.fits.hdu.image.PrimaryHDU
+        The cropped image HDU.
+    
+    Returns
+    -------
+    moc : mocpy.moc.MOC
+        The MOC describing the coverage of the provided HDU.
+    """
     logger.debug("Creating MOC")
 
     cropped_wcs = WCS(cropped_hdu.header, naxis=2)
@@ -91,7 +202,22 @@ def wcs_to_moc(cropped_hdu):
     return MOC.from_polygon_skycoord(sc)
 
 
-def moc_to_stmoc(moc, hdu):
+def moc_to_stmoc(moc: mocpy.MOC,
+                 hdu: fits.hdu.image.PrimaryHDU):
+    """Generate a STMOC from a MOC and the observation information from a HDU
+    
+    Parameters
+    ----------
+    moc : mocpy.MOC
+        The relevant MOC.
+    hdu : astropy.io.fits.hdu.image.PrimaryHDU
+        The image HDU containing the datetime information.
+    
+    Returns
+    -------
+    stmoc : mocpy.moc.STMOC
+        The resulting STMOC.
+    """
     start = Time([hdu.header["DATE-BEG"]])
     end = Time([hdu.header["DATE-END"]])
 
@@ -109,6 +235,30 @@ def run_full_crop(
     create_moc: Optional[bool] = False,
     overwrite: Optional[bool] = False,
 ):
+    """Run the crop on all data that has been provided.
+    
+    Parameters
+    ----------
+    data_root : Union[str, Path]
+        The path to the root data directory.
+    crop_size : u.quantity.Quantity,
+        The size of each side of the square crop.
+    epoch : Union[str, int, list]
+        The epoch number/identifier(s) to include. 
+    stokes : str
+        The Stokes parameter to crop (I or V).
+    out_root : Union[str, Path], optional
+        The root output directory, by default None which results in 
+        using the data_root directory.
+    create_moc: bool, optional
+        Whether or not to create cropped MOC files, by default False.
+    overwrite: bool, optional
+        Whether or not to overwrite existing files, by default False.
+    
+    Returns
+    -------
+    None
+    """
     if out_root is None:
         out_root = data_root
 
