@@ -5,6 +5,7 @@ from itertools import chain
 from astropy.coordinates import SkyCoord, Angle
 from astropy.io import fits
 from astropy.io.votable import parse
+from astropy.io.votable.tree import Param
 import astropy.units as u
 from uncertainties import ufloat
 from astropy.wcs import WCS, FITSFixedWarning
@@ -184,10 +185,23 @@ def shift_and_scale_image(
     image_hdul = fits.open(image_path)
     image_hdu = image_hdul[0]
 
-    # do the flux scaling
-    image_hdu.data = flux_scale * (image_hdu.data + (flux_offset_mJy * 1e-3))
-    image_hdu.header["FLUXOFF"] = flux_offset_mJy * 1e-3
+    # do the flux scaling, but check that the data is in Jy
+    if image_hdu.header["BUNIT"] == "Jy/beam":
+        data_unit = u.Jy
+    else:
+        data_unit = u.mJy
+    image_hdu.data = flux_scale * (
+        image_hdu.data + (flux_offset_mJy * (u.mJy.to(data_unit)))
+    )
+    image_hdu.header["FLUXOFF"] = flux_offset_mJy * (u.mJy.to(data_unit))
     image_hdu.header["FLUXSCL"] = flux_scale
+
+    image_hdu[
+        "HISTORY"
+    ] = """
+    Image has been corrected for flux by a scaling factor and an offset given by 
+    FLUXSCL and FLUXOFF.
+    """
     # check for NaN
     if replace_nan:
         if np.any(np.isnan(image_hdu.data)):
@@ -213,6 +227,13 @@ def shift_and_scale_image(
 
     image_hdu.header["RAOFF"] = ra_offset_arcsec
     image_hdu.header["DECOFF"] = dec_offset_arcsec
+
+    image_hdu[
+        "HISTORY"
+    ] = """
+    Image has been corrected for astrometric position by a an offset in both directions 
+    given by RAOFF and DECOFF using a model RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF.
+    """
 
     return image_hdul
 
@@ -293,10 +314,50 @@ def shift_and_scale_catalog(
     for col in cols:
         votable.array[col] = flux_scale * (votable.array[col] + flux_offset_mJy)
 
+    # Add in the corrections to the votable
+    flux_scl_param = Param(
+        votable=votablefile,
+        ID="flux_scl",
+        name="flux_scl",
+        value=flux_scale,
+        datatype="float",
+        unit=None,
+    )
+    flux_off_param = Param(
+        votable=votablefile,
+        ID="flux_offset",
+        name="flux_offset",
+        value=flux_offset_mJy,
+        datatype="float",
+        unit=u.mJy,
+    )
+
+    ra_offset_param = Param(
+        votable=votablefile,
+        ID="ra_offset",
+        name="ra_offset",
+        value=ra_offset_arcsec,
+        datatype="float",
+        unit=u.arcsec,
+    )
+
+    dec_offset_param = Param(
+        votable=votablefile,
+        ID="dec_offset",
+        name="dec_offset",
+        value=dec_offset_arcsec,
+        datatype="float",
+        unit=u.arcsec,
+    )
+
+    votablefile.params.extend(
+        [ra_offset_param, dec_offset_param, flux_scl_param, flux_off_param]
+    )
+
     return votablefile
 
 
-def get_correct_file(correction_files_dir, img_field):
+def get_correct_file(correction_files_dir: list, img_field: str):
     """Helper function to get the file from the reference catalogs which
        observed the same field.
 
@@ -339,11 +400,55 @@ def get_psf_from_image(image_path: str):
     image_path = image_path.replace("SELAVY", "IMAGES")
     image_path = image_path.replace("selavy-", "")
     image_path = image_path.replace(".components.xml", ".fits")
-    hdu = fits.open(image_path)
+    hdu = fits.getheader(image_path)
     psf_maj = hdu[0].header["BMAJ"] * u.degree
     psf_min = hdu[0].header["BMIN"] * u.degree
-    hdu.close()
+    # hdu.close()
     return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
+
+
+def check_for_files(image_path: str):
+    """Helper function to cehck for bkg/noise maps and the component/island
+       catalogs given the image file
+
+    Args:
+        image_path (str): Path to the image file
+    """
+    # get rms and background images
+    rms_root = Path(
+        image_path.parent.as_posix().replace("STOKESI_IMAGES", "STOKESI_RMSMAPS")
+    )
+    rms_path = rms_root / f"noiseMap.{image_path.name}"
+    bkg_path = rms_root / f"meanMap.{image_path.name}"
+
+    skip = False
+    if not rms_path.exists():
+        logger.warning(f"RMS image not found for {image_path}.")
+    if not bkg_path.exists():
+        logger.warning(f"Background image not found for {image_path}.")
+
+    # Look for any component and island files correspnding to this image
+    image_root = image_path.parent.as_posix()
+    catalog_root = image_root.replace("IMAGES", "SELAVY")
+
+    catalog_filename = image_path.name.replace("image", "selavy-image")
+    catalog_filename = catalog_filename.replace(".fits", ".components.xml")
+
+    catalog_filepath = f"{catalog_root}/{catalog_filename}"
+
+    component_file = Path(catalog_filepath)
+    island_file = Path(catalog_filepath.replace("components", "islands"))
+
+    skip = (
+        not (
+            (rms_path.exists())
+            and (bkg_path.exists())
+            and (island_file.exists())
+            and (component_file.exists())
+        )
+        or skip
+    )
+    return skip, (bkg_path, rms_path, component_file, island_file)
 
 
 def correct_field(
@@ -376,13 +481,7 @@ def correct_field(
     epoch_dir = image_path.parent.name
     _, _, field, *_ = image_path.name.split(".")
 
-    # get rms and background images
-    rms_root = Path(
-        image_path.parent.as_posix().replace("STOKESI_IMAGES", "STOKESI_RMSMAPS")
-    )
-    rms_path = rms_root / f"noiseMap.{image_path.name}"
-    bkg_path = rms_root / f"meanMap.{image_path.name}"
-
+    # get the correction file
     correction_files_dir = Path(vast_corrections_root)
     ref_file = get_correct_file(
         correction_files_dir=correction_files_dir,
@@ -394,40 +493,17 @@ def correct_field(
 
     # construct output path to store corrections for each epoch
     corr_dir = outdir / "corr_db"
-    if not os.path.isdir(corr_dir):
-        os.mkdir(corr_dir)
+    if not corr_dir.isdir():
+        corr_dir.mkdir()
     epoch_corr_dir = corr_dir / epoch_dir
 
-    if not os.path.isdir(epoch_corr_dir):
-        os.mkdir(epoch_corr_dir)
+    if not epoch_corr_dir.isdir():
+        epoch_corr_dir.mkdir()
 
-    skip = False
-    if not rms_path.exists():
-        logger.warning(f"RMS image not found for {image_path}.")
-    if not bkg_path.exists():
-        logger.warning(f"Background image not found for {image_path}.")
-
-    # Look for any component and island files correspnding to this image
-    image_root = image_path.parent.as_posix()
-    catalog_root = image_root.replace("IMAGES", "SELAVY")
-
-    catalog_filename = image_path.name.replace("image", "selavy-image")
-    catalog_filename = catalog_filename.replace(".fits", ".components.xml")
-
-    catalog_filepath = f"{catalog_root}/{catalog_filename}"
-
-    component_file = Path(catalog_filepath)
-    island_file = Path(catalog_filepath.replace("components", "islands"))
-
-    skip = (
-        not (
-            (rms_path.exists())
-            and (bkg_path.exists())
-            and (ref_file is not None)
-            and (component_file.exists())
-        )
-        or skip
-    )
+    # check for auxiliary files
+    skip, aux_files = check_for_files(image_path=image_path)
+    skip |= ref_file is None
+    bkg_path, rms_path, component_file, island_file = aux_files
     if skip:
         if not ((rms_path.exists()) and (bkg_path.exists())):
             logger.warning(f"Skipping {image_path}, RMS/BKG maps do not exist")
@@ -471,7 +547,7 @@ def correct_field(
         )
 
         # get corrections
-        corrected_hdul = []
+        corrected_hdus = []
         for path in (image_path, rms_path, bkg_path):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
             output_dir = outdir / stokes_dir / epoch_dir
@@ -496,7 +572,7 @@ def correct_field(
                     logger.success(f"Writing corrected image to: {output_path}.")
                     corrected_hdu.close()
                 else:
-                    corrected_hdul.append(corrected_hdu)
+                    corrected_hdus.append(corrected_hdu)
 
         # Do the same for catalog files
         corrected_catalogs = []
@@ -506,6 +582,7 @@ def correct_field(
             output_path = output_dir / path.with_suffix(".corrected.xml").name
             if output_path.exists() and not overwrite:
                 logger.warning(f"Will not overwrite existing catalogue: {output_path}.")
+                continue
             else:
                 corrected_catalog = shift_and_scale_catalog(
                     path,
@@ -528,7 +605,7 @@ def correct_field(
                     logger.success(f"Writing corrected catalogue: {output_path}.")
                 else:
                     corrected_catalogs.append(corrected_catalog)
-        return (corrected_hdul, corrected_catalogs)
+        return (corrected_hdus, corrected_catalogs)
 
 
 def correct_files(
@@ -542,6 +619,7 @@ def correct_files(
     write_output: bool = True,
     outdir: str = None,
     overwrite: bool = False,
+    skip_on_missing=False,
     verbose: bool = False,
 ):
     """Read astrometric and flux corrections produced by vast-xmatch and apply them to
@@ -587,24 +665,39 @@ def correct_files(
     for e in epoch_dirs:
         # read fits/xml files
         image_path_glob_list: list[Generator[Path, None, None]] = []
-        components_path_glob_list: list[Generator[Path, None, None]] = []
-
         image_path_glob_list.append(e.glob("*.fits"))
-        components_path_glob_list.append(e.glob("*.xml"))
+        image_files = list(image_path_glob_list)
 
-        # get corrections for every image and the correct it
-        for image_path in chain.from_iterable(image_path_glob_list):
-            correct_field(
-                image_path=image_path,
-                vast_corrections_root=vast_corrections_root,
-                radius=radius,
-                condon=condon,
-                psf_ref=psf_ref,
-                psf=psf,
-                write_output=write_output,
-                outdir=outdir,
-                overwrite=overwrite,
-            )
-            logger.info(
-                f"Successfully corrected the images and catalogs for {image_path.as_posix()}"
-            )
+        skip_epoch = False
+        for img in image_files:
+            skip_file, _ = check_for_files(image_path=img)
+            skip_epoch |= skip_file
+            if skip_epoch:
+                logger.warning(
+                    f"One/Some of the bkg/rms/catlogues is are missing for {img}"
+                )
+                break
+        if skip_on_missing:
+            if skip_epoch:
+                logger.warning(
+                    "User input is to skip the entire epoch if one of the images \
+                        have missing bkg/rms/catalog files, so skipping epoch {e}"
+                )
+                break
+        else:
+            # get corrections for every image and the correct it
+            for image_path in image_files:
+                correct_field(
+                    image_path=image_path,
+                    vast_corrections_root=vast_corrections_root,
+                    radius=radius,
+                    condon=condon,
+                    psf_ref=psf_ref,
+                    psf=psf,
+                    write_output=write_output,
+                    outdir=outdir,
+                    overwrite=overwrite,
+                )
+                logger.info(
+                    f"Successfully corrected the images and catalogs for {image_path.as_posix()}"
+                )
