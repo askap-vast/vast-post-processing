@@ -202,13 +202,13 @@ def wcs_to_moc(cropped_hdu: fits.hdu.image.PrimaryHDU):
     return MOC.from_polygon_skycoord(sc)
 
 
-def moc_to_stmoc(moc: mocpy.MOC,
+def moc_to_stmoc(moc: mocpy.moc.MOC,
                  hdu: fits.hdu.image.PrimaryHDU):
     """Generate a STMOC from a MOC and the observation information from a HDU
     
     Parameters
     ----------
-    moc : mocpy.MOC
+    moc : mocpy.moc.MOC
         The relevant MOC.
     hdu : astropy.io.fits.hdu.image.PrimaryHDU
         The image HDU containing the datetime information.
