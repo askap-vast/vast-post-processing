@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 from pathlib import Path
 from typing import Tuple, Union, Dict, Optional
 from urllib.parse import quote
@@ -8,8 +8,6 @@ from astropy.table import Table, QTable, join
 import astropy.units as u
 import numpy as np
 import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 SELAVY_COLUMN_UNITS = {
     "ra_deg_cont": u.deg,
@@ -245,14 +243,11 @@ class Catalog:
         if psf is not None:
             self.psf_major, self.psf_minor = psf * u.arcsec
             logger.debug(
-                "Using user provided PSF for %s: %s, %s.",
-                self.path,
-                self.psf_major,
-                self.psf_minor,
+                f"Using user provided PSF for {self.path}: {self.psf_major}, {self.psf_minor}."
             )
         else:
             logger.warning(
-                "PSF is unknown for %s. Condon errors will be unavailable.", self.path
+                f"PSF is unknown for {self.path}. Condon errors will be unavailable."
             )
             self.psf_major = None
             self.psf_minor = None
@@ -260,7 +255,7 @@ class Catalog:
         # Calculate the covariant error using Condon 1997
         if condon and self.psf_major is not None and self.psf_minor is not None:
             self.calculate_condon_flux_errors(correct_peak_for_noise=True)
-            logger.debug("Condon errors computed for %s.", self.path)
+            logger.debug(f"Condon errors computed for {self.path}.")
 
     def _read_catalog(self):
         """Helper function to read and parse the input files
@@ -272,13 +267,13 @@ class Catalog:
         path = self.path
         if self.input_format == "selavy":
             if path.suffix == ".txt":
-                logger.debug("Reading %s as a Selavy txt catalog.", path)
+                logger.debug(f"Reading {path} as a Selavy txt catalog.")
                 read_catalog = read_selavy
             else:
-                logger.debug("Reading %s as a Selavy VOTable catalog.", path)
+                logger.debug(f"Reading {path} as a Selavy VOTable catalog.")
                 read_catalog = read_selavy_votable
         elif self.input_format == "aegean":
-            logger.debug("Reading %s as an Aegean catalog.", path)
+            logger.debug(f"Reading {path} as an Aegean catalog.")
             read_catalog = read_aegean_csv
         else:
             logger.error(
@@ -292,37 +287,52 @@ class Catalog:
         """Helper function to filter sources that are used for cross-match;
         filter sources with bad sizes and optionally given flux limits"""
 
+        sources = self.table
+        flux_peak = (self.table["flux_peak"].to(u.mJy / u.beam)).value
+        flux_int = (self.table["flux_int"].to(u.mJy)).value
+        rms = (self.table["rms_image"].to(u.mJy / u.beam)).value
+
         # Add a flux threshold flag
         if self.flux_flag:
             lim = self.flux_lim
+            flux_mask = flux_peak > lim
             logger.info(
-                f"Filtering %d sources with fluxes <= {lim}",
-                (self.table["flux_peak"] <= lim).sum(),
+                f"Filtering {len(sources[~flux_mask])} sources with fluxes <= {lim}"
             )
-            flux_mask = self.table["flux_peak"] > lim
-            # self.table = self.table[self.table["flux_peak"] > lim]
-        # Add good psf flag
-        logger.info(
-            "Filtering %d sources with fitted sizes <= 0.",
-            ((self.table["maj_axis"] <= 0) | (self.table["min_axis"] <= 0)).sum(),
-        )
-        psf_mask = (self.table["maj_axis"] > 0) & (self.table["min_axis"] > 0)
 
+        # Add good psf flag
+        psf_mask = (self.table["maj_axis"] > 0) & (self.table["min_axis"] > 0)
+        logger.info(
+            f"Filtering {len(sources[~psf_mask])} sources with fitted sizes <= 0."
+        )
         # point source flag
         if self.point_sources:
-            ps_metric = self.table["flux_peak"] / self.table["flux_int"]
+            ps_metric = np.divide(
+                flux_peak, flux_int, where=flux_int != 0, out=np.zeros_like(flux_int)
+            )
             ps_mask = ps_metric < 1.5
+            logger.info(
+                f"Filtering {len(sources[~ps_mask])} sources that are not point sources."
+            )
         else:
             ps_mask = np.ones(len(self.table)).astype(bool)
 
         # Add snr flag
-        snr_mask = self.table["flux_peak"] / self.table["rms_image"] > self.snr_lim
+        snr = np.divide(flux_peak, rms, where=rms != 0, out=np.zeros_like(rms))
+        snr_mask = snr > self.snr_lim
+        logger.info(
+            f"Filtering {len(sources[~snr_mask])} sources with SNR <= {self.snr_lim}"
+        )
 
         # Select distant sources
         dist_mask = self.table["nn_separation"].to(u.arcsec).value > 60 * self.sep_lim
+        logger.info(
+            f"Filtering {len(sources[~dist_mask])} sources that have neighbors within {self.sep_lim} arcmin."
+        )
 
         mask = (flux_mask) & (psf_mask) & (ps_mask) & (snr_mask) & (dist_mask)
         self.table = self.table[mask]
+        logger.info(f"Filtering {len(sources[~mask])} sources in total.")
 
     def calculate_condon_flux_errors(
         self,
