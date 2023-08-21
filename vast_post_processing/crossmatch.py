@@ -1,6 +1,5 @@
-import logging
 from typing import Tuple
-
+from loguru import logger
 from astropy.coordinates import SkyCoord, Angle, match_coordinates_sky
 from astropy.table import QTable, join, join_skycoord
 import astropy.units as u
@@ -8,9 +7,6 @@ import numpy as np
 from scipy import odr
 
 from vast_post_processing.catalogs import Catalog
-
-
-logger = logging.getLogger(__name__)
 
 
 def median_abs_deviation(data):
@@ -76,7 +72,7 @@ def crossmatch_qtables(
     Returns:
         QTable: filtered table that return the cross matches
     """
-    logger.debug("Using crossmatch radius: %s.", radius)
+    logger.debug(f"Using crossmatch radius: {radius}.")
 
     xmatch = join(
         catalog.table,
@@ -102,11 +98,9 @@ def crossmatch_qtables(
     ).decompose()
 
     logger.info(
-        "Num cross-matches: %d. Num cross-matches to unique reference source: %d"
-        " (%d%%).",
-        len(xmatch),
-        len(set(xmatch["coord_id"])),
-        (len(set(xmatch["coord_id"])) / len(xmatch)) * 100,
+        f"Num cross-matches: {len(xmatch)}. Num cross-matches to unique reference "
+        f"source: {len(set(xmatch['coord_id']))} -- "
+        f" ({(len(set(xmatch['coord_id'])) / len(xmatch)) * 100})."
     )
 
     return xmatch

@@ -200,12 +200,9 @@ def shift_and_scale_image(
     image_hdu.header["FLUXOFF"] = flux_offset_mJy * (u.mJy.to(data_unit))
     image_hdu.header["FLUXSCL"] = flux_scale
 
-    image_hdu[
+    image_hdu.header[
         "HISTORY"
-    ] = """
-    Image has been corrected for flux by a scaling factor and an offset given by 
-    FLUXSCL and FLUXOFF.
-    """
+    ] = "Image has been corrected for flux by a scaling factor and an offset given by FLUXSCL and FLUXOFF."
     # check for NaN
     if replace_nan:
         if np.any(np.isnan(image_hdu.data)):
@@ -233,12 +230,9 @@ def shift_and_scale_image(
     image_hdu.header["RAOFF"] = ra_offset_arcsec
     image_hdu.header["DECOFF"] = dec_offset_arcsec
 
-    image_hdu[
+    image_hdu.header[
         "HISTORY"
-    ] = """
-    Image has been corrected for astrometric position by a an offset in both directions 
-    given by RAOFF and DECOFF using a model RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF.
-    """
+    ] = "Image has been corrected for astrometric position by a an offset in both directions given by RAOFF and DECOFF using a model RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
 
     return image_hdul
 
@@ -409,9 +403,9 @@ def get_psf_from_image(image_path: str):
     image_path = image_path.replace("SELAVY", "IMAGES")
     image_path = image_path.replace("selavy-", "")
     image_path = image_path.replace(".components.xml", ".fits")
-    hdu = fits.getheader(image_path)
-    psf_maj = hdu[0].header["BMAJ"] * u.degree
-    psf_min = hdu[0].header["BMIN"] * u.degree
+    hdr = fits.getheader(image_path)
+    psf_maj = hdr["BMAJ"] * u.degree
+    psf_min = hdr["BMIN"] * u.degree
     # hdu.close()
     return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
 
@@ -614,6 +608,9 @@ def correct_field(
                     logger.success(f"Writing corrected catalogue: {output_path}.")
                 else:
                     corrected_catalogs.append(corrected_catalog)
+        logger.info(
+            f"Successfully corrected the images and catalogs for {image_path.as_posix()}"
+        )
         return (corrected_hdus, corrected_catalogs)
 
 
@@ -675,8 +672,7 @@ def correct_files(
         # read fits/xml files
         image_path_glob_list: list[Generator[Path, None, None]] = []
         image_path_glob_list.append(e.glob("*.fits"))
-        image_files = list(image_path_glob_list)
-
+        image_files = list(image_path_glob_list[0])
         skip_epoch = False
         for img in image_files:
             skip_file, _ = check_for_files(image_path=img)
@@ -686,17 +682,16 @@ def correct_files(
                     f"One/Some of the bkg/rms/catlogues is are missing for {img}"
                 )
                 break
-        if skip_on_missing:
-            if skip_epoch:
-                logger.warning(
-                    "User input is to skip the entire epoch if one of the images \
-                        have missing bkg/rms/catalog files, so skipping epoch {e}"
-                )
-                break
+        if skip_on_missing & skip_epoch:
+            logger.warning(
+                "User input is to skip the entire epoch if one of the images"
+                f"have missing bkg/rms/catalog files, so skipping epoch {e}"
+            )
+
         else:
             # get corrections for every image and the correct it
             for image_path in image_files:
-                correct_field(
+                products = correct_field(
                     image_path=image_path,
                     vast_corrections_root=vast_corrections_root,
                     radius=radius,
@@ -707,6 +702,5 @@ def correct_files(
                     outdir=outdir,
                     overwrite=overwrite,
                 )
-                logger.info(
-                    f"Successfully corrected the images and catalogs for {image_path.as_posix()}"
-                )
+                if products is not None:
+                    hdus, catalogs = products
