@@ -182,10 +182,32 @@ class Catalog:
         path: Path,
         psf: Optional[Tuple[float, float]] = None,
         input_format: str = "selavy",
-        condon: bool = False,
-        apply_flux_limit: bool = True,
+        condon: bool = True,
         flux_limit: float = 0,
+        snr_limit: float = 20,
+        nneighbor: float = 1,
+        apply_flux_limit: bool = True,
+        select_point_sources: bool = True,
     ):
+        """Defines a catalog class to read the component files
+
+        Args:
+            path (Path): path to the component file (selavy/aegean supported right now)
+            psf (Optional[Tuple[float, float]], optional): The major and minor axis dimensions
+                in arcsec. Defaults to None. Used to calculate condon errors
+            input_format (str, optional): are the component files selavy or aegean generated?.
+                Defaults to "selavy".
+            condon (bool, optional): Apply condon corrections. Defaults to True.
+            flux_limit (float, optional): Flux limit to select sources (sources with peak flux
+                > this will be selected). Defaults to 0.
+            snr_limit (float, optional): SNR limit to select sources (sources with SNR > this
+                will be selected). Defaults to 20.
+            nneighbor (float, optional): Distance to nearest neighbor (in arcmin). Sources with
+                neighbors < this will be removed. Defaults to 1.
+            apply_flux_limit (bool, optional): Flag to decide to apply flux limit. Defaults to True.
+            select_point_sources (bool, optional): Flag to decide to select point sources.
+                Defaults to True
+        """
         self.path: Path
         self.table: QTable
         self.input_format: Optional[str]
@@ -202,6 +224,9 @@ class Catalog:
         self.input_format = input_format
         self.flux_flag = apply_flux_limit
         self.flux_lim = flux_limit
+        self.snr_lim = snr_limit
+        self.sep_lim = nneighbor  # In arcmin
+        self.point_sources = select_point_sources
 
         # Read the catalog
         self._read_catalog()
@@ -284,14 +309,17 @@ class Catalog:
         psf_mask = (self.table["maj_axis"] > 0) & (self.table["min_axis"] > 0)
 
         # point source flag
-        ps_metric = self.table["flux_peak"] / self.table["flux_int"]
-        ps_mask = ps_metric < 1.5
+        if self.point_sources:
+            ps_metric = self.table["flux_peak"] / self.table["flux_int"]
+            ps_mask = ps_metric < 1.5
+        else:
+            ps_mask = np.ones(len(self.table)).astype(bool)
 
         # Add snr flag
-        snr_mask = self.table["flux_peak"] / self.table["rms_image"] > 20
+        snr_mask = self.table["flux_peak"] / self.table["rms_image"] > self.snr_lim
 
         # Select distant sources
-        dist_mask = self.table["nn_separation"].to(u.arcsec).value > 60
+        dist_mask = self.table["nn_separation"].to(u.arcsec).value > 60 * self.sep_lim
 
         mask = (flux_mask) & (psf_mask) & (ps_mask) & (snr_mask) & (dist_mask)
         self.table = self.table[mask]
