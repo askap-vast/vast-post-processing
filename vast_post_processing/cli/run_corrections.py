@@ -78,6 +78,11 @@ def main(
         "to them as suffix",
     ),
     overwrite: bool = False,
+    skip_on_missing: Optional[bool] = typer.Option(
+        False,
+        help="If there are missing files (noise/bkg/catalogs) corresponding to an image file, should"
+        "we skip the entire epoch or just that one files? Defaults to skipping just that file.",
+    ),
     verbose: bool = False,
 ):
     """
@@ -99,6 +104,7 @@ def main(
         psf=psf,
         outdir=outdir,
         overwrite=overwrite,
+        skip_on_missing=skip_on_missing,
         verbose=verbose,
     )
 
