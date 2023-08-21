@@ -512,11 +512,11 @@ def correct_field(
 
     # construct output path to store corrections for each epoch
     corr_dir = outdir / "corr_db"
-    if not corr_dir.isdir():
+    if not corr_dir.is_dir():
         corr_dir.mkdir()
     epoch_corr_dir = corr_dir / epoch_dir
 
-    if not epoch_corr_dir.isdir():
+    if not epoch_corr_dir.is_dir():
         epoch_corr_dir.mkdir()
 
     # check for auxiliary files
