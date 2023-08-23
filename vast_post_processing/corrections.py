@@ -6,6 +6,7 @@ from pathlib import Path
 from loguru import logger
 from itertools import chain
 from uncertainties import ufloat
+from uncertainties.core import AffineScalarFunc  # for typing
 from typing import Tuple, Optional, Generator
 
 import numpy as np
@@ -38,7 +39,7 @@ def vast_xmatch_qc(
     flux_unit: u.Unit = u.Unit("mJy"),
     crossmatch_output: Optional[str] = None,
     csv_output: Optional[str] = None,
-):
+) -> list[np.ndarray, np.ndarray, AffineScalarFunc, AffineScalarFunc]:
     """Cross-match two catalogues and filter sources within a given radius.
 
     Parameters
@@ -79,16 +80,17 @@ def vast_xmatch_qc(
         File path to write the flux/astrometric corrections to. Defaults to
         None, which means no file is written.
 
-       Returns:
-        dra_median_value: The median offset in RA (arcsec)
-        ddec_median_value: The median offset in DEC (arcsec)
-        flux_corr_mult: Multiplicative flux correction
-        flux_corr_add: Additive flux correction
-
     Returns
     -------
-    _type_
-        _description_
+    TODO verify return types
+    dra_median_value : np.ndarray
+        The median offset in RA (arcsec).
+    ddec_median_value : np.ndarray
+        The median offset in DEC (arcsec).
+    flux_corr_mult : AffineScalarFunc
+        The multiplicative flux correction.
+    flux_corr_add : AffineScalarFunc
+        THe additive flux correction.
     """
     # Convert catalogue path strings to Path objects
     reference_catalog_path = Path(reference_catalog_path)
@@ -129,10 +131,10 @@ def vast_xmatch_qc(
 
     # Calculate positional offsets
     dra_median, ddec_median, dra_madfm, ddec_madfm = calculate_positional_offsets(data)
-    dra_median_value = dra_median.to(positional_unit).value
-    dra_madfm_value = dra_madfm.to(positional_unit).value
-    ddec_median_value = ddec_median.to(positional_unit).value
-    ddec_madfm_value = ddec_madfm.to(positional_unit).value
+    dra_median_value: np.ndarray = dra_median.to(positional_unit).value
+    dra_madfm_value: np.ndarray = dra_madfm.to(positional_unit).value
+    ddec_median_value: np.ndarray = ddec_median.to(positional_unit).value
+    ddec_madfm_value: np.ndarray = ddec_madfm.to(positional_unit).value
     logger.info(
         f"dRA median: {dra_median_value:.2f} MADFM: {dra_madfm_value:.2f} {positional_unit}. dDec median: {ddec_median_value:.2f} MADFM: {ddec_madfm_value:.2f} {positional_unit}.",
     )
@@ -147,8 +149,8 @@ def vast_xmatch_qc(
         f"ODR fit parameters: Sp = Sp,ref * {ugradient} + {uoffset} {flux_unit}.",
     )
 
-    flux_corr_mult = 1 / ugradient
-    flux_corr_add = -1 * uoffset
+    flux_corr_mult: AffineScalarFunc = 1 / ugradient
+    flux_corr_add: AffineScalarFunc = -1 * uoffset
 
     # Write output to csv if requested
     if csv_output is not None:
@@ -192,7 +194,7 @@ def shift_and_scale_image(
     ra_offset_arcsec: float = 0.0,
     dec_offset_arcsec: float = 0.0,
     replace_nan: bool = False,
-):
+) -> fits.PrimaryHDU:
     """Apply astrometric and flux corrections to a FITS image.
 
     Args:
@@ -204,20 +206,28 @@ def shift_and_scale_image(
         replace_nan (bool, optional): Replace NAN's in the data with 0. Defaults to False.
 
     Returns:
-        astropy.io.fits.hdu.image.PrimaryHDU: the HDU of the corrected image
+        fits.PrimaryHDU: the HDU of the corrected image
     """
     logger.debug(f"Correcting {image_path} ...")
 
-    # Open image
     image_hdul = fits.open(image_path)
     image_hdu = image_hdul[0]
 
-    # Calibrate flux scaling
-    image_hdu.data = flux_scale * (image_hdu.data + (flux_offset_mJy * 1e-3))
-    image_hdu.header["FLUXOFF"] = flux_offset_mJy * 1e-3
+    # do the flux scaling, but check that the data is in Jy
+    if image_hdu.header["BUNIT"] == "Jy/beam":
+        data_unit = u.Jy
+    else:
+        data_unit = u.mJy
+    image_hdu.data = flux_scale * (
+        image_hdu.data + (flux_offset_mJy * (u.mJy.to(data_unit)))
+    )
+    image_hdu.header["FLUXOFF"] = flux_offset_mJy * (u.mJy.to(data_unit))
     image_hdu.header["FLUXSCL"] = flux_scale
 
-    # Correct NaN pixels
+    image_hdu.header[
+        "HISTORY"
+    ] = "Image has been corrected for flux by a scaling factor and an offset given by FLUXSCL and FLUXOFF."
+    # check for NaN
     if replace_nan:
         if np.any(np.isnan(image_hdu.data)):
             badpixels = np.isnan(image_hdu.data)
@@ -227,10 +237,9 @@ def shift_and_scale_image(
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=FITSFixedWarning)
         w = WCS(image_hdu.header)
-
-    # Correct positions by adding offsets
-    # Uses SkyCoord to handle units and wraps
-    # New coordinates should be old coordinates + offset
+    # add the offsets to correct the positions
+    # use SkyCoord to handle units and wraps
+    # the new coordinates should be old coordintes + offset
     crval = SkyCoord(w.wcs.crval[0] * u.deg, w.wcs.crval[1] * u.deg)
     crval_offset = SkyCoord(
         crval.ra + ra_offset_arcsec * u.arcsec / np.cos(crval.dec),
@@ -238,9 +247,9 @@ def shift_and_scale_image(
     )
     w.wcs.crval[0:2] = np.array([crval_offset.ra.deg, crval_offset.dec.deg])
     newheader = w.to_header()
-
-    # Update header with new WCS and record offsets
+    # update the header with the new WCS
     image_hdu.header.update(newheader)
+
     image_hdu.header["RAOFF"] = ra_offset_arcsec
     image_hdu.header["DECOFF"] = dec_offset_arcsec
 
@@ -258,17 +267,17 @@ def shift_and_scale_catalog(
     ra_offset_arcsec: float = 0.0,
     dec_offset_arcsec: float = 0.0,
 ):
-    """Apply astrometric and flux corrections to a catalogue.
+    """Apply astrometric and flux corrections to a catalog.
 
     Args:
-        catalog_path (Path): Path for the input catalogue
+        catalog_path (Path): Path for the input catalog
         flux_scale (float, optional): Multiplicative flux correction. Defaults to 1.0.
         flux_offset_mJy (float, optional): Additive flux correction. Defaults to 0.0.
         ra_offset_arcsec (float, optional): RA offset in arcsec. Defaults to 0.0.
         dec_offset_arcsec (float, optional): DEC offset in arcsec. Defaults to 0.0.
 
     Returns:
-        astropy.io.votable: the corrected catalogue
+        astropy.io.votable: the corrected catalog
     """
     # flux-unit columns in all catalogs
     FLUX_COLS = (
@@ -279,8 +288,7 @@ def shift_and_scale_catalog(
         "col_rms_fit_gauss",
         "col_rms_image",
     )
-
-    # Flux-unit columns in the island catalogs only
+    # flux-unit columns in the island catalogs only
     ISLAND_FLUX_COLS = (
         "col_mean_background",
         "col_background_noise",
@@ -290,16 +298,13 @@ def shift_and_scale_catalog(
         "col_rms_residual",
         "col_stdev_residual",
     )
-
-    # Create new output path and check for existing catalogue at path
     logger.debug(f"Correcting {catalog_path} ...")
     is_island = ".islands" in catalog_path.name
 
-    # Open catalogue
     votablefile = parse(catalog_path)
     votable = votablefile.get_first_table()
 
-    # Correct coordinate columns
+    # correct the coordinate columns
     ra_deg = votable.array["col_ra_deg_cont"] * u.deg
     dec_deg = votable.array["col_dec_deg_cont"] * u.deg
     coords_corrected = SkyCoord(
@@ -324,7 +329,7 @@ def shift_and_scale_catalog(
         mask=votable.array["col_dec_dms_cont"].mask,
     )
 
-    # Correct flux columns
+    # correct the flux columns
     cols = (
         FLUX_COLS + ISLAND_FLUX_COLS if is_island else FLUX_COLS + COMPONENT_FLUX_COLS
     )
@@ -380,7 +385,7 @@ def get_correct_file(correction_files_dir: list, img_field: str):
 
     Args:
         correction_files_list (list): Path to the correction files directory
-        img_field (str): The field name of the input catalogue
+        img_field (str): The field name of the input catalog
 
     Returns:
         str: the correspoding file with the same field as the one requested.
@@ -484,13 +489,13 @@ def correct_field(
 
     Args:
         image path (Path): Path to the image file that needs to be corrected.
-        vast_corrections_root (Path, optional): Path to the catalogues of referecne catalogue.
+        vast_corrections_root (Path, optional): Path to the catalogues of referecne catalog.
             Defaults to "/data/vast-survey/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY".
         radius (float, optional): Crossmatch radius. Defaults to 10.
         condon (bool, optional): Flag to replace errros with Condon errors. Defaults to True.
-        psf_ref (list[float], optional): PSF information of the reference catalogue. Defaults to None.
-        psf (list[float], optional): PSF information of the input catalogue. Defaults to None.
-        write_output (bool, optional): Write the corrected image and catalogue files or return the
+        psf_ref (list[float], optional): PSF information of the reference catalog. Defaults to None.
+        psf (list[float], optional): PSF information of the input catalog. Defaults to None.
+        write_output (bool, optional): Write the corrected image and catalog files or return the
             corrected hdul and the corrected table?. Defaults to True, which means to write
         outdir (str, optional): The stem of the output directory to write the files to
         overwrite (bool, optional): Overwrite the existing files?. Defaults to False.
@@ -525,7 +530,7 @@ def correct_field(
         if not ((rms_path.exists()) and (bkg_path.exists())):
             logger.warning(f"Skipping {image_path}, RMS/BKG maps do not exist")
         elif not (component_file.exists()):
-            logger.warning(f"Skipping {image_path}, catalogue files do not exist")
+            logger.warning(f"Skipping {image_path}, catalog files do not exist")
         elif ref_file is None:
             logger.warning(f"Skipping {image_path}, no reference field found.")
         return None
@@ -591,7 +596,7 @@ def correct_field(
                 else:
                     corrected_hdus.append(corrected_hdu)
 
-        # Do the same for catalogue files
+        # Do the same for catalog files
         corrected_catalogs = []
         for path in (component_file, island_file):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
@@ -649,14 +654,14 @@ def correct_files(
         vast_tile_data_root (Path): Path to the data that needs to be corrected.
             Should follow VAST convention, something like
             /data/VAST/vast-data/TILES/ that has STOKESI_IMAGES/epoch_xx/
-        vast_corrections_root (Path, optional): Path to the catalogues of referecne catalogue.
+        vast_corrections_root (Path, optional): Path to the catalogues of referecne catalog.
             Defaults to "/data/vast-survey/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY".
         epoch (list[int], optional): Epoch to be corrected. Defaults to None.
         radius (float, optional): Crossmatch radius. Defaults to 10.
         condon (bool, optional): Flag to replace errros with Condon errors. Defaults to True.
-        psf_ref (list[float], optional): PSF information of the reference catalogue. Defaults to None.
-        psf (list[float], optional): PSF information of the input catalogue. Defaults to None.
-        write_output (bool, optional): Write the corrected image and catalogue files or return the
+        psf_ref (list[float], optional): PSF information of the reference catalog. Defaults to None.
+        psf (list[float], optional): PSF information of the input catalog. Defaults to None.
+        write_output (bool, optional): Write the corrected image and catalog files or return the
             corrected hdul and the corrected table?. Defaults to True, which means to write
         outdir (str, optional): The stem of the output directory to write the files to
         overwrite (bool, optional): Overwrite the existing files?. Defaults to False.
