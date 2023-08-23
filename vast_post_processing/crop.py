@@ -352,10 +352,10 @@ def run_full_crop(
         # This uses the last cropped hdu from the above for loop
         # which should be the image file, but doesn't actually matter
         cropped_components_vot = crop_catalogue(
-            components_vot, cropped_hdu, field_centre, size
+            components_vot, cropped_hdu, field_centre, crop_size
         )
         cropped_islands_vot = crop_catalogue(
-            islands_vot, cropped_hdu, field_centre, size
+            islands_vot, cropped_hdu, field_centre, crop_size
         )
 
         if components_outfile.exists() and not overwrite:
