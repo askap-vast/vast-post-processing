@@ -3,12 +3,14 @@
 
 import pytest
 from pathlib import Path
+from uncertainties.core import AffineScalarFunc
+
+import numpy as np
 
 from astropy.io import fits
 from astropy.io import votable
 from astropy.io.votable.tree import Table
 from astropy.coordinates import SkyCoord
-
 from mocpy import MOC
 
 from vast_post_processing import corrections
@@ -26,6 +28,10 @@ IMAGE_PATH = (
     / "epoch_38"
     / "image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.fits"
 )
+"""Path: Path to random VAST epoch 38 image for testing purposes. 
+"""
+
+TEST_PATH = DATA_PATH / "STOKESI_IMAGES" / "epoch_38" / "test_image.fits"
 """Path: Path to random VAST epoch 38 image for testing purposes. 
 """
 
@@ -66,11 +72,46 @@ image for testing the function get_image_geometry().
 
 
 def test_vast_xmatch_qc():
-    pass
+    """Test `corrections.vast_xmatch_qc` by checking the returned values.
+
+    Assumes the returned value list is of length 4 and contains two `np.ndarray`
+    objects, then two `AffineScalarFunc` objects.
+    """
+    # Crossmatch a catalogue with itself and check for basic return validity
+    values = corrections.vast_xmatch_qc(VOTABLE_PATH, VOTABLE_PATH)
+    correct_variables = len(values) == 4
+    correct_types = (
+        isinstance(values[0], np.ndarray)
+        and isinstance(values[1], np.ndarray)
+        and isinstance(values[2], AffineScalarFunc)
+        and isinstance(values[3], AffineScalarFunc)
+    )
+    assert correct_variables and correct_types
 
 
 def test_shift_and_scale_image():
-    pass
+    """Test `corrections.shift_and_scale_image` by checking for header
+    modifications on the HDU operated on.
+    """
+    # Open initial image and headers
+    image_path = TEST_PATH
+    hdu: fits.PrimaryHDU = fits.open(image_path)[0]
+    initial_headers = hdu.header
+
+    # Open headers after function operations
+    shifted_hdu: fits.PrimaryHDU = corrections.shift_and_scale_image(image_path)[0]
+    modified_headers = shifted_hdu.header
+    headers_were_updated = False
+
+    # Check for any new or updated headers
+    for header in modified_headers:
+        if (
+            header not in initial_headers
+            or modified_headers[header] != initial_headers[header]
+        ):
+            headers_were_updated = True
+            break
+    assert headers_were_updated
 
 
 def test_shift_and_scale_catalog():
