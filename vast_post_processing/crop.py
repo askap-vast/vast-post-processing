@@ -382,13 +382,13 @@ def run_full_crop(
 
         if not moc_output_dir.exists():
             moc_output_dir.mkdir(parents=True)
-        moc = vpc.wcs_to_moc(cropped_hdu)
+        moc = wcs_to_moc(cropped_hdu)
         moc.write(moc_outfile, overwrite=overwrite)
         logger.debug(f"Wrote {moc_outfile}")
 
         stmoc_filename = image_path.name.replace(".fits", ".stmoc.fits")
         stmoc_outfile = moc_output_dir / stmoc_filename
 
-        stmoc = vpc.moc_to_stmoc(moc, cropped_hdu)
+        stmoc = moc_to_stmoc(moc, cropped_hdu)
         stmoc.write(stmoc_outfile, overwrite=overwrite)
         logger.debug("Wrote {stmoc_outfile}")
