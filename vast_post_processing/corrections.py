@@ -1,21 +1,17 @@
-"""Applies various corrections to FITS images. 
-"""
-
-import warnings, sys, os
 from pathlib import Path
-from loguru import logger
+import warnings, sys, os
+from typing import Generator
 from itertools import chain
-from uncertainties import ufloat
-from typing import Tuple, Optional, Generator
-
-import numpy as np
-
+from astropy.coordinates import SkyCoord, Angle
 from astropy.io import fits
 from astropy.io.votable import parse
-from astropy.coordinates import SkyCoord, Angle
-from astropy.wcs import WCS, FITSFixedWarning
+from astropy.io.votable.tree import Param
 import astropy.units as u
-
+from uncertainties import ufloat
+from astropy.wcs import WCS, FITSFixedWarning
+from loguru import logger
+import numpy as np
+from typing import Tuple, Optional
 from vast_post_processing.catalogs import Catalog
 from vast_post_processing.crossmatch import (
     crossmatch_qtables,
