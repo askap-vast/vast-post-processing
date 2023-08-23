@@ -3,3 +3,4 @@
 *.tar
 __pycache__
 test-data/
+*/build/*
