@@ -5,15 +5,15 @@ import warnings
 from pathlib import Path
 from loguru import logger
 from datetime import datetime
-from typing import Optional, Union
 from itertools import chain
+from typing import Optional, Union, Generator
 
 from astropy.io import fits
-from astropy.io import votable
+from astropy.io.votable import parse
 from astropy.io.votable.tree import VOTableFile, Table
 
-from astropy import wcs
 from astropy.coordinates import SkyCoord
+from astropy import wcs
 
 from astropy import units as u
 from astropy.nddata.utils import Cutout2D
@@ -40,8 +40,8 @@ def get_field_centre(header: fits.Header) -> SkyCoord:
 def crop_hdu(
     hdu: fits.PrimaryHDU,  # TODO verify correct typing
     field_centre: SkyCoord,
-    size: u.Quantity = 6.3 * u.deg,
-    rotation: u.Quantity = 0.0 * u.deg,
+    size: Optional[u.Quantity] = 6.3 * u.deg,
+    rotation: Optional[u.Quantity] = 0.0 * u.deg,
 ) -> fits.PrimaryHDU:
     if rotation != 0.0 * u.deg:
         raise NotImplementedError("Rotation handling is not yet available")
@@ -55,8 +55,9 @@ def crop_hdu(
         data = data[0, 0, :, :]
 
     cutout = Cutout2D(data, position=field_centre, size=size, wcs=wcs_hdu)
+    wcs_cutout: wcs.WCS = cutout.wcs
     hdu.data = cutout.data
-    hdu.header.update(cutout.wcs.to_header())
+    hdu.header.update(wcs_cutout.to_header())
 
     coord_str = field_centre.to_string("hmsdms", sep=":")
     hdu.header.add_history(
@@ -97,7 +98,7 @@ def wcs_to_moc(cropped_hdu: fits.PrimaryHDU) -> MOC:
     return MOC.from_polygon_skycoord(sc)
 
 
-def moc_to_stmoc(moc, hdu):
+def moc_to_stmoc(moc: MOC, hdu: fits.PrimaryHDU):
     start = Time([hdu.header["DATE-BEG"]])
     end = Time([hdu.header["DATE-END"]])
 
@@ -108,7 +109,7 @@ def moc_to_stmoc(moc, hdu):
 
 def run_full_crop(
     data_root: Union[str, Path],
-    crop_size: u.quantity.Quantity,
+    crop_size: u.Quantity,
     epoch: Union[str, int, list],
     stokes: str,
     out_root: Optional[Union[str, Path]] = None,
@@ -202,8 +203,8 @@ def run_full_crop(
         components_outfile = cat_output_dir / components_path.name
         islands_outfile = cat_output_dir / islands_path.name
 
-        components_vot = votable.parse(str(components_path))
-        islands_vot = votable.parse(str(islands_path))
+        components_vot = parse(str(components_path))
+        islands_vot = parse(str(islands_path))
 
         # This uses the last cropped hdu from the above for loop
         # which should be the image file, but doesn't actually matter
