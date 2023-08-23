@@ -4,6 +4,8 @@ import astropy.units as u
 import astropy.wcs as wcs
 import matplotlib.pyplot as plt
 
+from vast_post_processing.utils import fitsutils
+
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.io.votable import parse
@@ -218,8 +220,13 @@ def moc_to_stmoc(moc: mocpy.moc.MOC,
     stmoc : mocpy.moc.STMOC
         The resulting STMOC.
     """
-    start = Time([hdu.header["DATE-BEG"]])
-    end = Time([hdu.header["DATE-END"]])
+    if "DATE-BEG" not in hdu.header.keys or "DATE-END" not in hdu.header.keys:
+        header = fitsutils.update_header_datetimes(hdu.header)
+    else:
+        header = hdu.header
+        
+    start = Time([header["DATE-BEG"]])
+    end = Time([header["DATE-END"]])
 
     stmoc = STMOC.from_spatial_coverages(start, end, [moc])
 
