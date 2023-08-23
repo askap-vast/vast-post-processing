@@ -8,9 +8,10 @@ from uncertainties.core import AffineScalarFunc
 import numpy as np
 
 from astropy.io import fits
-from astropy.io import votable
-from astropy.io.votable.tree import Table
+from astropy.io.votable import parse
+from astropy.io.votable.tree import VOTableFile, Table
 from astropy.coordinates import SkyCoord
+from astropy.utils.collections import HomogeneousList
 from mocpy import MOC
 
 from vast_post_processing import corrections
@@ -31,7 +32,7 @@ IMAGE_PATH = (
 """Path: Path to random VAST epoch 38 image for testing purposes. 
 """
 
-TEST_PATH = DATA_PATH / "STOKESI_IMAGES" / "epoch_38" / "test_image.fits"
+TEST_IMAGE_PATH = DATA_PATH / "STOKESI_IMAGES" / "epoch_38" / "test_image.fits"
 """Path: Path to random VAST epoch 38 image for testing purposes. 
 """
 
@@ -56,8 +57,7 @@ WEIGHTS_PATH = (
     / "epoch_38"
     / "weights.i.VAST_0334-37.SB50801.cont.taylor.0.fits"
 )
-"""Path: Path to VAST epoch 38 weights data corresponding to IMAGE_PATH image
-for testing the function mask_weightless_pixels().
+"""Path: Path to VAST epoch 38 weights data corresponding to IMAGE_PATH image.
 """
 
 VOTABLE_PATH = (
@@ -67,7 +67,12 @@ VOTABLE_PATH = (
     / "selavy-image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.components.xml"
 )
 """Path: Path to VAST epoch 38 selavy .xml data corresponding to IMAGE_PATH
-image for testing the function get_image_geometry(). 
+image. 
+"""
+
+TEST_CATALOG_PATH = DATA_PATH / "STOKESI_SELAVY" / "epoch_38" / "test_catalog.xml"
+"""Path: Path to VAST epoch 38 selavy .xml data corresponding to IMAGE_PATH
+image. 
 """
 
 
@@ -92,9 +97,11 @@ def test_vast_xmatch_qc():
 def test_shift_and_scale_image():
     """Test `corrections.shift_and_scale_image` by checking for header
     modifications on the HDU operated on.
+
+    TODO test for specific headers?
     """
     # Open initial image and headers
-    image_path = TEST_PATH
+    image_path = TEST_IMAGE_PATH
     hdu: fits.PrimaryHDU = fits.open(image_path)[0]
     initial_headers = hdu.header
 
@@ -115,7 +122,28 @@ def test_shift_and_scale_image():
 
 
 def test_shift_and_scale_catalog():
-    pass
+    catalog_path = TEST_CATALOG_PATH
+    initial_votablefile = parse(catalog_path)
+    initial_votable: Table = initial_votablefile.get_first_table()
+
+    modified_votablefile = corrections.shift_and_scale_catalog(catalog_path)
+    modified_votable: Table = modified_votablefile.get_first_table()
+    correction_params = ["flux_scl", "flux_offset", "ra_offset", "dec_offset"]
+    coordinate_keys = [
+        "col_ra_deg_cont",
+        "col_dec_deg_cont",
+        "col_ra_hms_cont",
+        "col_dec_dms_cont",
+    ]
+
+    params_extended = len(modified_votable.params) == len(initial_votable.params) + 4
+    coordinates_modified = all(
+        [
+            modified_votable.array[key] != initial_votable.array[key]
+            for key in coordinate_keys
+        ]
+    )
+    corrections_added = all([])
 
 
 def test_get_correct_filed():

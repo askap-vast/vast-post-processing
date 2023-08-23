@@ -13,7 +13,7 @@ import numpy as np
 
 from astropy.io import fits
 from astropy.io.votable import parse
-from astropy.io.votable.tree import Param
+from astropy.io.votable.tree import Param, VOTableFile, Table
 from astropy.coordinates import SkyCoord, Angle
 from astropy.wcs import WCS, FITSFixedWarning
 import astropy.units as u
@@ -277,7 +277,7 @@ def shift_and_scale_catalog(
         dec_offset_arcsec (float, optional): DEC offset in arcsec. Defaults to 0.0.
 
     Returns:
-        astropy.io.votable: the corrected catalog
+        VOTableFile: the corrected catalog
     """
     # flux-unit columns in all catalogs
     FLUX_COLS = (
@@ -302,7 +302,7 @@ def shift_and_scale_catalog(
     is_island = ".islands" in catalog_path.name
 
     votablefile = parse(catalog_path)
-    votable = votablefile.get_first_table()
+    votable: Table = votablefile.get_first_table()
 
     # correct the coordinate columns
     ra_deg = votable.array["col_ra_deg_cont"] * u.deg
