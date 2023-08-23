@@ -6,7 +6,10 @@ from pathlib import Path
 
 from astropy.io import fits
 from astropy.io import votable
+from astropy.io.votable.tree import Table
 from astropy.coordinates import SkyCoord
+
+from mocpy import MOC
 
 from vast_post_processing import crop
 
@@ -103,21 +106,38 @@ def test_crop_hdu():
     assert correct_dimensionality and modified_dimensions and modified_headers
 
 
-def test_crop_catalogue():
+@pytest.fixture
+def cropped_hdu():
+    """Fixture to return cropped image HDU.
+
+    Returns
+    -------
+    fits.PrimaryHDU
+        The HDU provided by IMAGE_PATH, cropped by
+        :func:`~vast_post_processing.crop.crop_hdu`.
+    """
+    # Load, crop, and return HDU
+    hdu: fits.PrimaryHDU = fits.open(IMAGE_PATH)[0]
+    field_centre = crop.get_field_centre(hdu.header)
+    return crop.crop_hdu(hdu, field_centre)
+
+
+def test_crop_catalogue(cropped_hdu: fits.PrimaryHDU):
     """Test :func:`~vast_post_processing.crop.crop_catalogue` by comparing the
     catalogue length before and after the function.
 
     The function should eliminate images not in the specified area. Assume more
     than zero images have been cropped from the catalogue.
-    """
-    # Load and crop HDU
-    hdu = fits.open(IMAGE_PATH)[0]
-    field_centre = crop.get_field_centre(hdu.header)
-    cropped_hdu = crop.crop_hdu(hdu, field_centre)
 
+    Parameters
+    ----------
+    cropped_hdu : fits.PrimaryHDU
+        Cropped HDU found at `IMAGE_PATH`.
+    """
     # Load and crop VOT
     vot = votable.parse(VOTABLE_PATH)
-    initial_size = vot.get_first_table().array.shape[0]
+    initial_table: Table = vot.get_first_table()
+    initial_size = initial_table.array.shape[0]
     cropped_table = crop.crop_catalogue(vot, cropped_hdu)
 
     # Check that the catalogue has been cropped
@@ -125,5 +145,25 @@ def test_crop_catalogue():
     assert initial_size > cropped_size
 
 
-def test_wcs_to_moc():
+def test_wcs_to_moc(cropped_hdu: fits.PrimaryHDU):
+    """Test :func:`~vast_post_processing.crop.wcs_to_moc` by asserting the
+    returned object is a MOC object.
+
+    Parameters
+    ----------
+    cropped_hdu : fits.PrimaryHDU
+        Cropped HDU found at `IMAGE_PATH`.
+    """
+    moc = crop.wcs_to_moc(cropped_hdu)
+    assert isinstance(moc, MOC)
+
+
+def test_moc_to_stmoc(cropped_hdu: fits.PrimaryHDU):
+    moc = crop.wcs_to_moc(cropped_hdu)
+
+    # not every epoch has date-beg and date-end headers
+    pass
+
+
+def test_run_full_crop():
     pass
