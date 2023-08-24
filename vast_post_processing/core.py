@@ -1,9 +1,13 @@
-"""_summary_
+"""
+
+Core Pipeline Entry Point for VAST Post-processing
+
 """
 from pathlib import Path
+import importlib.resources
 from loguru import logger
 from itertools import chain
-from typing import Union, Optional, Generator
+from typing import Union, Optional, Generator, List
 
 from astropy.io import fits
 from astropy import units as u
@@ -11,15 +15,29 @@ from astropy import units as u
 from . import crop, corrections, compress
 
 
+DATA_FOLDER = importlib.resources.files(__package__) / "data"
+
+
 def run(
-    data_root: Union[str, Path],
-    crop_size: u.Quantity,
-    epoch: Union[str, int, list],
-    stokes: str,
+    config_file: Optional[Union[str, Path]] = None,
+    data_root: Optional[Union[str, Path]] = None,
+    crop_size: Optional[u.Quantity] = None,
+    epoch: Optional[List[str]] = None,
+    stokes: Optional[str] = None,
     out_root: Optional[Union[str, Path]] = None,
-    create_moc: bool = False,
-    overwrite: bool = False,
+    create_moc: Optional[bool] = None,
+    overwrite: Optional[bool] = None,
+    compress: Optional[bool] = None,
 ):
+
+    # Interpreting Configuration Files and CLI options
+
+
+    # Setting up logger
+
+
+    # Setting up paths and required locations
+
     if out_root is None:
         out_root = data_root
 
@@ -28,6 +46,8 @@ def run(
     image_root = Path(data_root / f"STOKES{stokes}_IMAGES").resolve()
     logger.debug(image_root)
 
+     
+
     if type(epoch) is int:
         epoch = list(epoch)
     if epoch is None or len(epoch) == 0:
@@ -35,6 +55,8 @@ def run(
     else:
         for n in epoch:
             image_path_glob_list.append(image_root.glob(f"epoch_{n}/*.fits"))
+
+    # Iterating over all FITS files
 
     for image_path in chain.from_iterable(image_path_glob_list):
         logger.info(f"Working on {image_path}...")
@@ -145,3 +167,4 @@ def run(
             stmoc = crop.moc_to_stmoc(moc, cropped_hdu)
             stmoc.write(stmoc_outfile, overwrite=overwrite)
             logger.debug("Wrote {stmoc_outfile}")
+
