@@ -6,15 +6,13 @@ since they can also be set via the configuration files.
 
 """
 
-import sys
 import typer
 
 import vast_post_processing.core as vpc
 import astropy.units as u
 
-from typing import Optional, Generator, List
+from typing import Optional, List
 from pathlib import Path
-from loguru import logger
 
 
 app = typer.Typer()
@@ -22,7 +20,14 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    data_root: Path = typer.Option(
+    config_file: Optional[Path] = typer.Option(
+        None,
+        help=("Path to the yaml configuration"),
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    data_root: Optional[Path] = typer.Option(
         None,
         help=("Path to the data directory"),
         exists=True,
@@ -65,19 +70,9 @@ def main(
     ),
     compress: Optional[bool] = typer.Option(None, help=("Compress all fits files")),
 ):
-    # configure logger
-    if not verbose:
-        # replace the default sink
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
-    if debug:
-        # replace the default sink
-        logger.remove()
-        logger.add(sys.stderr, level="DEBUG")
-
-    logger.debug(locals())
 
     vpc.run(
+        config_file,
         data_root,
         crop_size * u.deg,
         epoch,
@@ -85,6 +80,8 @@ def main(
         out_root,
         create_moc,
         overwrite,
+        verbose,
+        debug,
         compress,
     )
 
