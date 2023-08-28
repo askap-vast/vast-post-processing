@@ -71,6 +71,29 @@ def main(
             "arcsec for `catalog`. First argument is major axis followed by nimor axis."
         ),
     ),
+    flux_limit: Optional[float] = typer.Option(
+        0,
+        help="Flux limit to select sources (sources with peak flux"
+        "> this will be selected). Defaults to 0.",
+    ),
+    snr_limit: Optional[float] = typer.Option(
+        20,
+        help="SNR limit to select sources (sources with SNR > this"
+        "will be selected). Defaults to 20.",
+    ),
+    nneighbor: Optional[float] = typer.Option(
+        1,
+        help="Distance to nearest neighbor (in arcmin). Sources with"
+        "neighbors < this will be removed. Defaults to 1.",
+    ),
+    apply_flux_limit: Optional[bool] = typer.Option(
+        True,
+        help="Flag to decide to apply flux limit. Defaults to True",
+    ),
+    select_point_sources: Optional[bool] = typer.Option(
+        True,
+        help="Flag to decide to select point sources. Defaults to True",
+    ),
     outdir: Optional[str] = typer.Option(
         None,
         help="Stem of the output directory to store the corrected images and cataloges to. The default"
@@ -102,6 +125,11 @@ def main(
         condon=condon,
         psf_ref=psf_ref,
         psf=psf,
+        flux_limit=flux_limit,
+        snr_limit=snr_limit,
+        nneighbor=nneighbor,
+        apply_flux_limit=apply_flux_limit,
+        select_point_sources=select_point_sources,
         outdir=outdir,
         overwrite=overwrite,
         skip_on_missing=skip_on_missing,
