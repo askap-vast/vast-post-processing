@@ -31,6 +31,11 @@ def vast_xmatch_qc(
     fix_b: bool = False,
     positional_unit: u.Unit = u.Unit("arcsec"),
     flux_unit: u.Unit = u.Unit("mJy"),
+    flux_limit: float = 0,
+    snr_limit: float = 20,
+    nneighbor: float = 1,
+    apply_flux_limit: bool = True,
+    select_point_sources: bool = True,
     crossmatch_output: Optional[str] = None,
     csv_output: Optional[str] = None,
 ):
@@ -56,6 +61,15 @@ def vast_xmatch_qc(
             Defaults to u.Unit("arcsec").
         flux_unit (u.Unit, optional): output unit in which the flux scale is given.
             Defaults to u.Unit("mJy").
+        flux_limit (float, optional): Flux limit to select sources (sources with peak flux
+            > this will be selected). Defaults to 0.
+        snr_limit (float, optional): SNR limit to select sources (sources with SNR > this
+            will be selected). Defaults to 20.
+        nneighbor (float, optional): Distance to nearest neighbor (in arcmin). Sources with
+            neighbors < this will be removed. Defaults to 1.
+        apply_flux_limit (bool, optional): Flag to decide to apply flux limit. Defaults to True.
+        select_point_sources (bool, optional): Flag to decide to select point sources.
+            Defaults to True
         crossmatch_output (Optional[str], optional): File path to write the crossmatch output.
             Defaults to None, which means no file is written
         csv_output (Optional[str], optional): File path to write the flux/astrometric corrections.
@@ -77,12 +91,22 @@ def vast_xmatch_qc(
         psf=psf_reference,
         condon=condon,
         input_format="selavy",
+        flux_limit=flux_limit,
+        snr_limit=snr_limit,
+        nneighbor=nneighbor,
+        apply_flux_limit=apply_flux_limit,
+        select_point_sources=select_point_sources,
     )
     catalog = Catalog(
         catalog_path,
         psf=psf,
         condon=condon,
         input_format="selavy",
+        flux_limit=flux_limit,
+        snr_limit=snr_limit,
+        nneighbor=nneighbor,
+        apply_flux_limit=apply_flux_limit,
+        select_point_sources=select_point_sources,
     )
 
     # perform the crossmatch
@@ -125,37 +149,28 @@ def vast_xmatch_qc(
 
     if csv_output is not None:
         # output has been requested
-
-        if True:  # csv_output is not None:
-            csv_output_path = Path(csv_output)  # ensure Path object
-            sbid = catalog.sbid if catalog.sbid is not None else ""
-            if not csv_output_path.exists():
-                f = open(csv_output_path, "w")
-                print(
-                    "field,release_epoch,sbid,ra_correction,dec_correction,ra_madfm,"
-                    "dec_madfm,flux_peak_correction_multiplicative,flux_peak_correction_additive,"
-                    "flux_peak_correction_multiplicative_err,flux_peak_correction_additive_err,"
-                    "n_sources",
-                    file=f,
-                )
-            else:
-                f = open(csv_output_path, "a")
-            logger.info(
-                "Writing corrections CSV. To correct positions, add the corrections to"
-                " the original source positions i.e. RA' = RA + ra_correction /"
-                " cos(Dec). To correct fluxes, add the additive correction and multiply"
-                " the result by the multiplicative correction i.e. S' ="
-                " flux_peak_correction_multiplicative(S +"
-                " flux_peak_correction_additive)."
-            )
-            print(
-                f"{catalog.field},{catalog.epoch},{sbid},{dra_median_value * -1},"
-                f"{ddec_median_value * -1},{dra_madfm_value},{ddec_madfm_value},"
-                f"{flux_corr_mult.nominal_value},{flux_corr_add.nominal_value},"
-                f"{flux_corr_mult.std_dev},{flux_corr_add.std_dev},{len(data)}",
-                file=f,
-            )
-            f.close()
+        csv_output_path = Path(csv_output)  # ensure Path object
+        sbid = catalog.sbid if catalog.sbid is not None else ""
+        if not csv_output_path.exists():
+            f = open(csv_output_path, "w")
+        else:
+            f = open(csv_output_path, "a")
+        logger.info(
+            "Writing corrections CSV. To correct positions, add the corrections to"
+            " the original source positions i.e. RA' = RA + ra_correction /"
+            " cos(Dec). To correct fluxes, add the additive correction and multiply"
+            " the result by the multiplicative correction i.e. S' ="
+            " flux_peak_correction_multiplicative(S +"
+            " flux_peak_correction_additive)."
+        )
+        print(
+            f"{catalog.field},{catalog.epoch},{sbid},{dra_median_value * -1},"
+            f"{ddec_median_value * -1},{dra_madfm_value},{ddec_madfm_value},"
+            f"{flux_corr_mult.nominal_value},{flux_corr_add.nominal_value},"
+            f"{flux_corr_mult.std_dev},{flux_corr_add.std_dev},{len(data)}",
+            file=f,
+        )
+        f.close()
     return dra_median_value, ddec_median_value, flux_corr_mult, flux_corr_add
 
 
@@ -193,12 +208,13 @@ def shift_and_scale_image(
     image_hdu.data = flux_scale * (
         image_hdu.data + (flux_offset_mJy * (u.mJy.to(data_unit)))
     )
-    image_hdu.header["FLUXOFF"] = flux_offset_mJy * (u.mJy.to(data_unit))
-    image_hdu.header["FLUXSCL"] = flux_scale
+    image_hdu.header["FLUXOFFSET"] = flux_offset_mJy * (u.mJy.to(data_unit))
+    image_hdu.header["FLUXSCALE"] = flux_scale
 
-    image_hdu.header[
-        "HISTORY"
-    ] = "Image has been corrected for flux by a scaling factor and an offset given by FLUXSCL and FLUXOFF."
+    image_hdu.header.add_history(
+        "Image has been corrected for flux by a scaling factor and\
+        an offset given by FLUXSCALE and FLUXOFFSET."
+    )
     # check for NaN
     if replace_nan:
         if np.any(np.isnan(image_hdu.data)):
@@ -225,9 +241,11 @@ def shift_and_scale_image(
     image_hdu.header["RAOFF"] = ra_offset_arcsec
     image_hdu.header["DECOFF"] = dec_offset_arcsec
 
-    image_hdu.header[
-        "HISTORY"
-    ] = "Image has been corrected for astrometric position by a an offset in both directions given by RAOFF and DECOFF using a model RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
+    image_hdu.header.add_history(
+        "Image has been corrected for astrometric position by a an offset\
+        in both directions given by RAOFF and DECOFF using a model\
+        RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
+    )
 
     return image_hdul
 
@@ -311,16 +329,16 @@ def shift_and_scale_catalog(
     # Add in the corrections to the votable
     flux_scl_param = Param(
         votable=votablefile,
-        ID="flux_scl",
-        name="flux_scl",
+        ID="FluxScale",
+        name="FluxScale",
         value=flux_scale,
         datatype="float",
         unit=None,
     )
     flux_off_param = Param(
         votable=votablefile,
-        ID="flux_offset",
-        name="flux_offset",
+        ID="FluxOffset",
+        name="FluxOffset",
         value=flux_offset_mJy,
         datatype="float",
         unit=u.mJy,
@@ -328,8 +346,8 @@ def shift_and_scale_catalog(
 
     ra_offset_param = Param(
         votable=votablefile,
-        ID="ra_offset",
-        name="ra_offset",
+        ID="RAOffset",
+        name="RAOffset",
         value=ra_offset_arcsec,
         datatype="float",
         unit=u.arcsec,
@@ -337,8 +355,8 @@ def shift_and_scale_catalog(
 
     dec_offset_param = Param(
         votable=votablefile,
-        ID="dec_offset",
-        name="dec_offset",
+        ID="DECOffset",
+        name="DECOffset",
         value=dec_offset_arcsec,
         datatype="float",
         unit=u.arcsec,
@@ -452,6 +470,11 @@ def correct_field(
     condon: bool = True,
     psf_ref: list[float] = None,
     psf: list[float] = None,
+    flux_limit: float = 0,
+    snr_limit: float = 20,
+    nneighbor: float = 1,
+    apply_flux_limit: bool = True,
+    select_point_sources: bool = True,
     write_output: bool = True,
     outdir: str = None,
     overwrite: bool = False,
@@ -536,6 +559,11 @@ def correct_field(
             psf=psf_image,
             fix_m=False,
             fix_b=False,
+            flux_limit=flux_limit,
+            snr_limit=snr_limit,
+            nneighbor=nneighbor,
+            apply_flux_limit=apply_flux_limit,
+            select_point_sources=select_point_sources,
             crossmatch_output=crossmatch_file,
             csv_output=csv_file,
         )
@@ -613,6 +641,11 @@ def correct_files(
     condon: bool = True,
     psf_ref: list[float] = None,
     psf: list[float] = None,
+    flux_limit: float = 0,
+    snr_limit: float = 20,
+    nneighbor: float = 1,
+    apply_flux_limit: bool = True,
+    select_point_sources: bool = True,
     write_output: bool = True,
     outdir: str = None,
     overwrite: bool = False,
@@ -682,16 +715,19 @@ def correct_files(
         else:
             # get corrections for every image and the correct it
             for image_path in image_files:
-                products = correct_field(
+                _ = correct_field(
                     image_path=image_path,
                     vast_corrections_root=vast_corrections_root,
                     radius=radius,
                     condon=condon,
                     psf_ref=psf_ref,
                     psf=psf,
+                    flux_limit=flux_limit,
+                    snr_limit=snr_limit,
+                    nneighbor=nneighbor,
+                    apply_flux_limit=apply_flux_limit,
+                    select_point_sources=select_point_sources,
                     write_output=write_output,
                     outdir=outdir,
                     overwrite=overwrite,
                 )
-                if products is not None:
-                    hdus, catalogs = products
