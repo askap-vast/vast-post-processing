@@ -11,7 +11,7 @@ import typer
 import vast_post_processing.core as vpc
 import astropy.units as u
 
-from typing import Optional, List
+from typing import Optional, Union, List
 from pathlib import Path
 
 
@@ -20,7 +20,7 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    config_file: Optional[Path] = typer.Option(
+    config_file: Optional[Union[str, Path]] = typer.Option(
         None,
         help=("Path to the yaml configuration"),
         exists=True,

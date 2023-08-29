@@ -8,7 +8,7 @@ from pathlib import Path
 import importlib.resources
 from itertools import chain
 import yaml
-from typing import Union, Optional, Generator, Tuple, List, Any
+from typing import Union, Optional, Generator, Tuple, List, Dict, Any
 
 from astropy.io import fits
 from astropy.io.votable.tree import VOTableFile
@@ -24,9 +24,145 @@ DATA_DIRECTORY: Path = importlib.resources.files(__package__) / "data"
 configuration for a run.
 """
 
+NEWEST_EPOCH: int = 42
+"""Newest epoch whose data is available on the VAST data server.
+"""
+
 logger: logging.Logger = logging.getLogger(__name__)
 """Global reference to the logger for this module.
 """
+
+
+def correct_type(value: Any, name: str, types: List[type]) -> bool:
+    """Evaluate the type correctness of a value.
+
+    Helper function for :func:`setup_configuration_variable`.
+
+    Parameters
+    ----------
+    value : Any
+        Value whose type is to be evaluated.
+    name : str
+        Name of the variable whose value is being evaluated.
+    types : List[type]
+        List of valid types for the value.
+
+    Returns
+    -------
+    bool
+        Whether the variable value is of correct type.
+
+    See Also
+    --------
+    :func:`setup_configuration_variable`
+        Main function for this function.
+    """
+    # Iterate over each provided type
+    for type in types:
+        # If value is of matching type then it is correctly typed
+        if isinstance(value, type):
+            return True
+    # If value has not been matched to a type then it is incorrectly typed
+    logger.warning(f"{name} of incorrect type. Setting to next acceptable value.")
+    return False
+
+
+def setup_configuration_variable(
+    name: str,
+    user_value: Optional[Union[Path, u.Quantity, str, List[str], bool]] = None,
+    config_value: Optional[Union[Path, u.Quantity, str, List[str], bool]] = None,
+    default_value: Optional[Union[Path, u.Quantity, str, List[str], bool]] = None,
+) -> Union[Path, u.Quantity, str, List[str], bool]:
+    """Get the value for a configuration variable.
+
+    Consider, in descending priority and where existent, the user-specified
+    value from the command line, the value from a user-specified configuration
+    file, and the value from the default configuration file. Check for type and
+    value correctness, and warn where invalid.
+
+    Parameters
+    ----------
+    name : str
+        Name of the configuration variable.
+    user_value : Optional[Union[Path, u.Quantity, str, List[str], bool]], optional
+        Possible value for the variable from the command line, by default None.
+    config_value : Optional[Union[Path, u.Quantity, str, List[str], bool]], optional
+        Possible value for the variable from the specified configuration, by default None.
+    default_value : Optional[Union[Path, u.Quantity, str, List[str], bool]], optional
+        Possible value for the variable from the default configuration, by default None.
+
+    Returns
+    -------
+    Union[Path, u.Quantity, str, List[str], bool]
+        The highest priority valid value for this configuration variable.
+
+    Raises
+    ------
+    ValueError
+        If no valid values for a configuration variable are found. For example,
+        if the user does not provide an epoch number.
+    """
+    # Iterate over possible variable values in descending priority
+    for value in [user_value, config_value, default_value]:
+        # Skip empty values
+        if not value:
+            continue
+
+        # Assess values for validity
+        # If variable is Path, test that it points to an existing object
+        if (name == "data_root") or (name == "out_root"):
+            if not correct_type(value, name, [str, Path]):
+                continue
+            if not Path(value).resolve().exists():
+                logger.warning(f"{name} does not resolve to a valid Path.")
+                continue
+        # If variable is Stokes, test that it is a valid option
+        elif name == "stokes":
+            if not correct_type(value, name, [str, List[str]]):
+                continue
+            if isinstance(value, str):
+                value = [value]
+            if isinstance(value, List[str]):
+                for parameter in value:
+                    if parameter not in ["I", "Q", "U", "V", "i", "q", "u", "v"]:
+                        logger.warning(f"{parameter} is not a valid Stokes parameter.")
+                        continue
+        # If variable is epoch number, test that it is an existing epoch
+        # TODO find number by regex if str or list of str
+        elif name == "epoch":
+            if not correct_type(value, name, [int, List[int], str, List[str]]):
+                continue
+            if isinstance(value, int):
+                value = [value]
+            if isinstance(value, List[int]):
+                for epoch in value:
+                    if (epoch < 1) or (epoch > NEWEST_EPOCH):
+                        logger.warning(f"{epoch} is not a valid epoch.")
+                        continue
+        # If variable is crop size, test that it is a possible angle
+        # TODO correct typing with u.deg
+        elif name == "crop_size":
+            if not correct_type(value, name, [float, u.Quantity]):
+                continue
+            if (value <= 0.0) or (value > 360.0):
+                logger.warning(f"{value} is not a valid crop angle.")
+                continue
+        # If variable is a flag, test that it is of correct type
+        elif (
+            (name == "create_moc")
+            or (name == "compress")
+            or (name == "overwrite")
+            or (name == "verbose")
+            or (name == "debug")
+        ):
+            if not correct_type(value, name, [bool]):
+                continue
+
+        # If all conditions pass, value is valid and should be assigned
+        return value
+
+    # If none of the provided values are valid, end the run
+    raise ValueError(f"{name} value not found. Terminating program.")
 
 
 def setup_configuration(
@@ -41,8 +177,45 @@ def setup_configuration(
     overwrite: Optional[bool] = None,
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
-):
+) -> Tuple[Path, Path, List[str], List[int], u.Quantity, bool, bool, bool, bool, bool]:
+    """Set up the configuration settings for this run.
+
+    Parameters
+    ----------
+    config_file : Optional[Union[str, Path]], optional
+        Path to a configuration yaml, by default None.
+    data_root : Optional[Union[str, Path]], optional
+        Path to the root data directory, by default None. This must be either
+        provided in the program call, or by configuration.
+    out_root : Optional[Union[str, Path]], optional
+        Path to the root output directory, by default None. This must be either
+        provided in the program call, or by configuration.
+    stokes : Optional[str], optional
+        Stokes parameter to process, by default None.
+    epoch : Optional[List[str]], optional
+        Epoch to process, by default None.
+    crop_size : Optional[u.Quantity], optional
+        Angular size of image crops, in degrees, by default None.
+    create_moc : Optional[bool], optional
+        Flag to create MOCs, by default None.
+    compress : Optional[bool], optional
+        Flag to compress files, by default None.
+    overwrite : Optional[bool], optional
+        Flag to overwrite existing data, by default None.
+    verbose : Optional[bool], optional
+        Flag to display status and progress to output, by default None.
+    debug : Optional[bool], optional
+        Flag to display errors to output, by default None.
+
+    Returns
+    -------
+    Tuple[Path, Path, List[str], List[int], u.Quantity, bool, bool, bool, bool, bool]
+        Valid configuration settings for this run.
+    """
+    # Load in default configuration
     default_config = yaml.safe_load(open(DATA_DIRECTORY / "default_config.yaml"))
+
+    # Load in user configuration if passed and valid, otherwise create empty dict
     if (
         (config_file)
         and (Path(config_file).resolve().exists())
@@ -50,96 +223,36 @@ def setup_configuration(
     ):
         user_config = yaml.safe_load(open(Path(config_file)))
     else:
-        user_config = {key: None for key in default_config}
+        user_config = {name: None for name in default_config}
 
-    data_root = setup_configuration_variable(
-        from_default=default_config["data_root"],
-        name="data_root",
-        variable_type=Path,
-        from_command=data_root,
-        from_config=user_config["data_root"],
-    )
-    crop_size = 
+    # Map user variables to their names
+    user_variables = {
+        "data_root": data_root,
+        "out_root": out_root,
+        "stokes": stokes,
+        "epoch": epoch,
+        "crop_size": crop_size,
+        "create_moc": create_moc,
+        "compress": compress,
+        "overwrite": overwrite,
+        "verbose": verbose,
+        "debug": debug,
+    }
 
-
-
-def setup_configuration_variable(
-    from_default: Union[str, Path, u.Quantity, List[str], bool],
-    name: str,
-    variable_type: type,
-    condition: Optional[Union[Tuple[int], List[str]]] = None,
-    from_command: Optional[Union[str, Path, u.Quantity, List[str], bool]] = None,
-    from_config: Optional[Union[str, Path, u.Quantity, List[str], bool]] = None,
-) -> Union[str, Path, u.Quantity, List[str], bool]:
-    """Get the value for a configuration variable.
-
-    Consider, in descending priority and where existent, the user-specified
-    value from the command line, the value from a user-specified configuration
-    file, and the value from the default configuration file. Check for type and
-    value correctness, and warn where invalid.
-
-    Parameters
-    ----------
-    from_default : Union[str, Path, u.Quantity, List[str], bool]
-        Value from default configuration file.
-    name : str
-        Name of the variable for warning purposes.
-    variable_type : type
-        Type of the variable.
-    condition : Optional[Union[Tuple[int], List[str]]], optional
-        Condition the variable value must meet.
-        For quantities, this is an upper and lower bound.
-        For the Stokes parameter, this is all Stokes parameters.
-        For Paths (default), this is set to none and the test is instead
-        resolvability.
-    from_command : Optional[Union[str, Path, u.Quantity, List[str], bool]], optional
-        Value from the command line, by default None.
-    from_config : Optional[Union[str, Path, u.Quantity, List[str], bool]], optional
-        Value from the specified configuration file, by default None.
-
-    Returns
-    -------
-    Union[str, Path, u.Quantity, List[str], bool]
-        The highest priority valid value for this configuration variable.
-    """
-    # Iterate over possible variable values in descending priority
-    for source in [from_command, from_config, from_default]:
-        # Skip empty values, as they were not provided by user
-        if not source:
-            continue
-
-        # Skip values of incorrect type
-        if not isinstance(source, variable_type):
-            logger.warning(
-                f"{name} of incorrect type. Setting to next acceptable value."
+    # Set configuration variables to first valid value by priority
+    variables = []
+    for name in default_config:
+        variables.append(
+            setup_configuration_variable(
+                name=name,
+                user_value=user_variables[name],
+                config_value=user_config[name],
+                default_value=default_config[name],
             )
-            continue
+        )
 
-        # Assess values for validity
-        # Quantities must be between minimum and maximum bounds
-        if (isinstance(condition, Tuple[int])) and (
-            (source < condition[0]) or (source > condition[1])
-        ):
-            logger.warning(
-                f"{name} not within bounds. Setting to next acceptable value."
-            )
-            continue
-        # Stokes parameters must be one of I, Q, U, or V
-        elif (isinstance(condition, List[str])) and (source not in condition):
-            logger.warning(
-                f"{name} of invalid option. Setting to next acceptable value."
-            )
-            continue
-        # Paths must resolve to existent file
-        elif (not condition) and (not Path(source).resolve().exists()):
-            logger.warning(
-                f"{name} does not resolve to a valid Path. Setting to next acceptable value."
-            )
-            continue
-
-        # If all conditions pass, value is valid
-        return source
-    raise ValueError(f"{name} value not found. Terminating program.")
+    # Return configuration settings as tuple
+    return tuple(variables)
 
 
 def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
@@ -186,10 +299,32 @@ def run(
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
 ):
-    # Interpreting Configuration Files and CLI options
-    # TODO separate function with prioritization of provided config and default
-    # config
-    setup_configuration()
+    # Set up configuration settings via configuration files and cli options
+    (
+        config_file,
+        data_root,
+        out_root,
+        stokes,
+        epoch,
+        crop_size,
+        create_moc,
+        compress,
+        overwrite,
+        verbose,
+        debug,
+    ) = setup_configuration(
+        config_file=config_file,
+        data_root=data_root,
+        out_root=out_root,
+        stokes=stokes,
+        epoch=epoch,
+        crop_size=crop_size,
+        create_moc=create_moc,
+        compress=compress,
+        overwrite=overwrite,
+        verbose=verbose,
+        debug=debug,
+    )
 
     # Set up logger
     main_logger = setup_logger(verbose=verbose, debug=debug)
