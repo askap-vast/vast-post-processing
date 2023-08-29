@@ -1,0 +1,36 @@
+---
+# Path to root data directory for this run. 
+# Expects same structure as on `data:/mnt/data/VAST/vast-data/TILES/`.
+# Not set by default, should be specified at runtime.
+data_root: null
+
+# Path to output directory for this run.
+# Not set by default, should be specified at runtime.
+out_root: null
+
+# Stokes parameter to operate on for this run, by default I.
+# TODO should this be more than one at a time? 
+stokes: I 
+
+# Epoch number for this run. 
+# Not set by default, should be specified at runtime.
+epoch: null
+
+# Image crop size for this run, in degrees.
+# Defaults to 6.3 degrees.
+crop_size: 6.3
+
+# Flag to create MOCs for this run, by default True. 
+create_moc: True
+
+# Flag to compress data following pipeline, by default True. 
+compress: True
+
+# Flag to overwrite FITS data to disk, by default False. 
+overwrite: False
+
+# Flag to display progress and status to screen, by default False.
+verbose: False
+
+# Flag to display errors and functionality, by default False. 
+debug: False

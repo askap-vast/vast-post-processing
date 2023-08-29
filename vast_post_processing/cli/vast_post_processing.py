@@ -1,7 +1,7 @@
-"""
+"""Command Line Interface for VAST Post-processing. 
 
-The Command Line Interface for VAST Post-processing. All commands here can be optional
-since they can also be set via the configuration files.
+All commands here can be optional since they can also be set via the
+configuration files.
 
 
 """
@@ -34,9 +34,12 @@ def main(
         file_okay=False,
         dir_okay=True,
     ),
-    crop_size: Optional[float] = typer.Option(
+    out_root: Optional[Path] = typer.Option(
+        None, exists=True, file_okay=False, dir_okay=True
+    ),
+    stokes: Optional[str] = typer.Option(
         None,
-        help=("Size of the cropped image (each side measured in " "degrees)."),
+        help=("Stokes parameter to use (I, Q, U, V)."),
     ),
     epoch: Optional[List[str]] = typer.Option(
         None,
@@ -46,10 +49,14 @@ def main(
             "given (the default), then correct all available epochs."
         ),
     ),
-    stokes: Optional[str] = typer.Option(
+    crop_size: Optional[float] = typer.Option(
         None,
-        help=("Stokes parameter to use (I, Q, U, V)."),
+        help=("Size of the cropped image (each side measured in " "degrees)."),
     ),
+    create_moc: Optional[bool] = typer.Option(
+        None, help=("Create MOC files based on cropped images")
+    ),
+    compress: Optional[bool] = typer.Option(None, help=("Compress all fits files")),
     overwrite: Optional[bool] = typer.Option(
         None,
         help=("Overwrite existing cropped data"),
@@ -62,27 +69,19 @@ def main(
         None,
         help=("Debug output."),
     ),
-    out_root: Optional[Path] = typer.Option(
-        None, exists=True, file_okay=False, dir_okay=True
-    ),
-    create_moc: Optional[bool] = typer.Option(
-        None, help=("Create MOC files based on cropped images")
-    ),
-    compress: Optional[bool] = typer.Option(None, help=("Compress all fits files")),
 ):
-
     vpc.run(
         config_file,
         data_root,
-        crop_size * u.deg,
-        epoch,
-        stokes,
         out_root,
+        stokes,
+        epoch,
+        crop_size * u.deg,
         create_moc,
+        compress,
         overwrite,
         verbose,
         debug,
-        compress,
     )
 
 

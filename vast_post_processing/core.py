@@ -1,14 +1,14 @@
-"""
+"""Core Pipeline Entry Point for VAST Post-Processing.
 
-Core Pipeline Entry Point for VAST Post-processing
+
 
 """
-import sys
+import logging
 from pathlib import Path
 import importlib.resources
-import logging
 from itertools import chain
-from typing import Union, Optional, Generator, Tuple, List
+import yaml
+from typing import Union, Optional, Generator, Tuple, List, Any
 
 from astropy.io import fits
 from astropy.io.votable.tree import VOTableFile
@@ -19,41 +19,182 @@ from . import crop, corrections, compress
 from utils import misc, logutils
 
 
-DATA_FOLDER = importlib.resources.files(__package__) / "data"
+DATA_DIRECTORY: Path = importlib.resources.files(__package__) / "data"
+"""Path to data directory containing standards, such as the default
+configuration for a run.
+"""
 
-# Setting Sub-module Logger
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
+"""Global reference to the logger for this module.
+"""
 
 
-def run(
+def setup_configuration(
     config_file: Optional[Union[str, Path]] = None,
     data_root: Optional[Union[str, Path]] = None,
-    crop_size: Optional[u.Quantity] = None,
-    epoch: Optional[List[str]] = None,
-    stokes: Optional[str] = None,
     out_root: Optional[Union[str, Path]] = None,
+    stokes: Optional[str] = None,
+    epoch: Optional[List[str]] = None,
+    crop_size: Optional[u.Quantity] = None,
     create_moc: Optional[bool] = None,
+    compress: Optional[bool] = None,
     overwrite: Optional[bool] = None,
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
-    compress: Optional[bool] = None,
 ):
-    # Interpreting Configuration Files and CLI options
+    default_config = yaml.safe_load(open(DATA_DIRECTORY / "default_config.yaml"))
+    if (
+        (config_file)
+        and (Path(config_file).resolve().exists())
+        and (Path(config_file).suffix == ".yaml")
+    ):
+        user_config = yaml.safe_load(open(Path(config_file)))
+    else:
+        user_config = {key: None for key in default_config}
 
-    # Setting up logger
+    data_root = setup_configuration_variable(
+        from_default=default_config["data_root"],
+        name="data_root",
+        variable_type=Path,
+        from_command=data_root,
+        from_config=user_config["data_root"],
+    )
+    crop_size = 
+
+
+
+def setup_configuration_variable(
+    from_default: Union[str, Path, u.Quantity, List[str], bool],
+    name: str,
+    variable_type: type,
+    condition: Optional[Union[Tuple[int], List[str]]] = None,
+    from_command: Optional[Union[str, Path, u.Quantity, List[str], bool]] = None,
+    from_config: Optional[Union[str, Path, u.Quantity, List[str], bool]] = None,
+) -> Union[str, Path, u.Quantity, List[str], bool]:
+    """Get the value for a configuration variable.
+
+    Consider, in descending priority and where existent, the user-specified
+    value from the command line, the value from a user-specified configuration
+    file, and the value from the default configuration file. Check for type and
+    value correctness, and warn where invalid.
+
+    Parameters
+    ----------
+    from_default : Union[str, Path, u.Quantity, List[str], bool]
+        Value from default configuration file.
+    name : str
+        Name of the variable for warning purposes.
+    variable_type : type
+        Type of the variable.
+    condition : Optional[Union[Tuple[int], List[str]]], optional
+        Condition the variable value must meet.
+        For quantities, this is an upper and lower bound.
+        For the Stokes parameter, this is all Stokes parameters.
+        For Paths (default), this is set to none and the test is instead
+        resolvability.
+    from_command : Optional[Union[str, Path, u.Quantity, List[str], bool]], optional
+        Value from the command line, by default None.
+    from_config : Optional[Union[str, Path, u.Quantity, List[str], bool]], optional
+        Value from the specified configuration file, by default None.
+
+    Returns
+    -------
+    Union[str, Path, u.Quantity, List[str], bool]
+        The highest priority valid value for this configuration variable.
+    """
+    # Iterate over possible variable values in descending priority
+    for source in [from_command, from_config, from_default]:
+        # Skip empty values, as they were not provided by user
+        if not source:
+            continue
+
+        # Skip values of incorrect type
+        if not isinstance(source, variable_type):
+            logger.warning(
+                f"{name} of incorrect type. Setting to next acceptable value."
+            )
+            continue
+
+        # Assess values for validity
+        # Quantities must be between minimum and maximum bounds
+        if (isinstance(condition, Tuple[int])) and (
+            (source < condition[0]) or (source > condition[1])
+        ):
+            logger.warning(
+                f"{name} not within bounds. Setting to next acceptable value."
+            )
+            continue
+        # Stokes parameters must be one of I, Q, U, or V
+        elif (isinstance(condition, List[str])) and (source not in condition):
+            logger.warning(
+                f"{name} of invalid option. Setting to next acceptable value."
+            )
+            continue
+        # Paths must resolve to existent file
+        elif (not condition) and (not Path(source).resolve().exists()):
+            logger.warning(
+                f"{name} does not resolve to a valid Path. Setting to next acceptable value."
+            )
+            continue
+
+        # If all conditions pass, value is valid
+        return source
+    raise ValueError(f"{name} value not found. Terminating program.")
+
+
+def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
+    """Set up logging functionality for this module.
+
+    Parameters
+    ----------
+    verbose : bool
+        Flag to display program status and progress to output.
+    debug : bool
+        Flag to display program errors and actions to output.
+
+    Returns
+    -------
+    logging.Logger
+        The main Logger object for this module.
+    """
+    # Set up logging level
     logging_level = "INFO"
     if verbose:
         logging_level = "WARNING"
     if debug:
         logging_level = "DEBUG"
-
     main_logger = logutils.create_logger("postprocessing.log", logging_level)
 
-    # Recording all Local Variables to Logger
+    # Record all local variables to logger
     main_logger.debug("All Runtime Local Variables:")
     main_logger.debug(locals())
 
-    # Setting up paths and required locations
+    # Return logger object
+    return main_logger
+
+
+def run(
+    config_file: Optional[Union[str, Path]] = None,
+    data_root: Optional[Union[str, Path]] = None,
+    out_root: Optional[Union[str, Path]] = None,
+    stokes: Optional[str] = None,
+    epoch: Optional[List[str]] = None,
+    crop_size: Optional[u.Quantity] = None,
+    create_moc: Optional[bool] = None,
+    compress: Optional[bool] = None,
+    overwrite: Optional[bool] = None,
+    verbose: Optional[bool] = None,
+    debug: Optional[bool] = None,
+):
+    # Interpreting Configuration Files and CLI options
+    # TODO separate function with prioritization of provided config and default
+    # config
+    setup_configuration()
+
+    # Set up logger
+    main_logger = setup_logger(verbose=verbose, debug=debug)
+
+    # Set up paths and required locations
     if out_root is None:
         out_root = data_root
 
@@ -69,7 +210,7 @@ def run(
         for n in epoch:
             image_path_glob_list.append(image_root.glob(f"epoch_{n}/*.fits"))
 
-    # Iterating over all FITS files
+    # Iterate over all FITS files to run post-processing
     for image_path in chain.from_iterable(image_path_glob_list):
         main_logger.info(f"Working on {image_path}...")
         epoch_dir = misc.get_epoch_directory(image_path)
@@ -84,13 +225,11 @@ def run(
         )
 
         # Correct astrometry and flux of image data
-        (field_centre, cropped_hdu, corrected_cats) = correct_astrometry_and_flux(
+        field_centre, cropped_hdu, corrected_cats = crop_and_correct_image(
             epoch_dir=epoch_dir,
             image_path=image_path,
             rms_path=rms_path,
             bkg_path=bkg_path,
-            components_path=components_path,
-            islands_path=islands_path,
             crop_size=crop_size,
             out_root=out_root,
             overwrite=overwrite,
@@ -109,7 +248,7 @@ def run(
             overwrite=overwrite,
         )
 
-        # Create the MOCs
+        # Create MOCs
         if create_moc:
             create_mocs(
                 stokes=stokes,
@@ -135,24 +274,24 @@ def get_corresponding_paths(
 
     The files checked and paths returned for a given image are its corresponding
     noisemap, meanmap, selavy components file, and selavy islands file. Their
-    filenames are expected to follow `data` naming standards.
+    filenames are expected to follow `vast-data` naming standards.
 
     Parameters
     ----------
     data_root : Path
-        The Path to the root of the data directory containing STOKES directories.
+        Path to data directory root.
     stokes : str
-        The Stokes parameter of the observation.
+        Stokes parameter of observation.
     epoch_dir : str
-        The epoch of the observation, in directory format.
+        Observation epoch, in directory format (e.g. "epoch_32")
     image_path : Path
-        The Path to the observation image.
+        Path to the observation image.
 
     Returns
     -------
     Tuple[Path, Path, Path, Path]
-        Paths to the noisemap, meanmap, components, and islands corresponding to
-        the image given by image_path.
+        Paths to the noisemap, meanmap, components, and islands files
+        corresponding to the image given by `image_path`.
     """
     # Resolve paths to RMS and background images
     rms_path = Path(
@@ -188,13 +327,13 @@ def get_corresponding_paths(
         logger.warning(f"selavy islands file ({islands_path}) is missing.")
 
     if not exists:
-        # TODO Is best practice to skip or abort entirely?
+        # TODO is best practice to skip or abort entirely?
         logger.warning(f"Skipping {image_path} due to missing files.")
 
     return rms_path, bkg_path, components_path, islands_path
 
 
-def correct_astrometry_and_flux(
+def crop_and_correct_image(
     epoch_dir: str,
     image_path: Path,
     rms_path: Path,
@@ -203,15 +342,45 @@ def correct_astrometry_and_flux(
     out_root: Path,
     overwrite: bool,
 ) -> Tuple[SkyCoord, fits.PrimaryHDU, List[VOTableFile]]:
+    """Applies corrections to a field, then crops observation images in the
+    field.
+
+    Parameters
+    ----------
+    epoch_dir : str
+        Observation epoch, in directory format (e.g. "epoch_32")
+    image_path : Path
+        Path to the observation image.
+    rms_path : Path
+        Path to corresponding RMS noisemap image.
+    bkg_path : Path
+        Path to corresponding RMS meanmap image.
+    crop_size : u.Quantity
+        Angular size of crop to be applied.
+    out_root : Path
+        Path to root of output directory.
+    overwrite : bool
+        Flag to overwrite image data.
+
+    Returns
+    -------
+    Tuple[SkyCoord, fits.PrimaryHDU, List[VOTableFile]]
+        Field centre of image, cropped image, and corrected catalogues.
+    """
+    # Apply corrections to images and catalogues
     corrected_fits, corrected_cats = corrections.correct_field(image_path)
 
-    # handle the fits files
+    # Iterate over each image to crop and write to a new directory
     for i, path in enumerate((rms_path, bkg_path, image_path)):
-        stokes_dir = f"{path.parent.parent.name}_CROPPED"  # what suffix should we use?
+        # Locate directory to store cropped data, and create if nonexistent
+        # TODO what suffix should we use?
+        # TODO reorganize path handling
+        stokes_dir = f"{path.parent.parent.name}_CROPPED"
         fits_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
         if not fits_output_dir.exists():
             fits_output_dir.mkdir(parents=True)
 
+        # Crop the image and write to disk
         outfile = fits_output_dir / path.name
         hdu: fits.PrimaryHDU = corrected_fits[i]
         field_centre = crop.get_field_centre(hdu.header)
@@ -223,27 +392,27 @@ def correct_astrometry_and_flux(
 
 
 def crop_catalogs(
-    components_path: Path,
-    out_root: Path,
     epoch_dir: str,
-    islands_path: Path,
-    corrected_cats: List[VOTableFile],
-    cropped_hdu: fits.PrimaryHDU,
-    field_centre: SkyCoord,
     crop_size: u.Quantity,
+    field_centre: SkyCoord,
+    cropped_hdu: fits.PrimaryHDU,
+    corrected_cats: List[VOTableFile],
+    components_path: Path,
+    islands_path: Path,
+    out_root: Path,
     overwrite: bool,
 ):
-    stokes_dir = (
-        f"{components_path.parent.parent.name}_CROPPED"  # what suffix should we use?
-    )
+    # Locate directory to store cropped data, and create if nonexistent
+    # TODO what suffix should we use? SEE ABOVE
+    stokes_dir = f"{components_path.parent.parent.name}_CROPPED"
     cat_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
-
     if not cat_output_dir.exists():
         cat_output_dir.mkdir(parents=True)
 
+    # Iterate over each catalogue xml file corresponding to a field
     for i, path in enumerate((components_path, islands_path)):
         outfile = cat_output_dir / path.name
-        vot = corrected_cats[i]  # TODO resolve this
+        vot = corrected_cats[i]
 
         # This uses the last cropped hdu from the previous for loop
         # which should be the image file, but doesn't actually matter
