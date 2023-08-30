@@ -69,10 +69,10 @@ def correct_type(value: Any, name: str, types: List[type]) -> bool:
 
 def setup_configuration_variable(
     name: str,
-    user_value: Optional[Union[Path, u.Quantity, str, List[str], bool]] = None,
-    config_value: Optional[Union[Path, u.Quantity, str, List[str], bool]] = None,
-    default_value: Optional[Union[Path, u.Quantity, str, List[str], bool]] = None,
-) -> Union[Path, u.Quantity, str, List[str], bool]:
+    user_value: Optional[Union[Path, float, str, List[str], bool]] = None,
+    config_value: Optional[Union[Path, float, str, List[str], bool]] = None,
+    default_value: Optional[Union[Path, float, str, List[str], bool]] = None,
+) -> Union[Path, u.Quantity, List[str], List[int], bool]:
     """Get the value for a configuration variable.
 
     Consider, in descending priority and where existent, the user-specified
@@ -84,16 +84,16 @@ def setup_configuration_variable(
     ----------
     name : str
         Name of the configuration variable.
-    user_value : Optional[Union[Path, u.Quantity, str, List[str], bool]], optional
+    user_value : Optional[Union[Path, float, str, List[str], bool]], optional
         Possible value for the variable from the command line, by default None.
-    config_value : Optional[Union[Path, u.Quantity, str, List[str], bool]], optional
+    config_value : Optional[Union[Path, float, str, List[str], bool]], optional
         Possible value for the variable from the specified configuration, by default None.
-    default_value : Optional[Union[Path, u.Quantity, str, List[str], bool]], optional
+    default_value : Optional[Union[Path, float, str, List[str], bool]], optional
         Possible value for the variable from the default configuration, by default None.
 
     Returns
     -------
-    Union[Path, u.Quantity, str, List[str], bool]
+    Union[Path, u.Quantity, List[str], List[int], bool]
         The highest priority valid value for this configuration variable.
 
     Raises
@@ -111,7 +111,7 @@ def setup_configuration_variable(
         # Assess values for validity
         # If variable is Path, test that it points to an existing object
         if (name == "data_root") or (name == "out_root"):
-            if not correct_type(value, name, [str, Path]):
+            if not correct_type(value, name, [Path]):
                 continue
             if not Path(value).resolve().exists():
                 logger.warning(f"{name} does not resolve to a valid Path.")
@@ -122,31 +122,30 @@ def setup_configuration_variable(
                 continue
             if isinstance(value, str):
                 value = [value]
-            if isinstance(value, List[str]):
-                for parameter in value:
-                    if parameter not in ["I", "Q", "U", "V", "i", "q", "u", "v"]:
-                        logger.warning(f"{parameter} is not a valid Stokes parameter.")
-                        continue
+            for parameter in value:
+                if parameter not in ["I", "Q", "U", "V", "i", "q", "u", "v"]:
+                    logger.warning(f"{parameter} is not a valid Stokes parameter.")
+                    continue
         # If variable is epoch number, test that it is an existing epoch
-        # TODO find number by regex if str or list of str
         elif name == "epoch":
-            if not correct_type(value, name, [int, List[int], str, List[str]]):
+            if not correct_type(value, name, [str, List[str]]):
                 continue
-            if isinstance(value, int):
+            if isinstance(value, str):
                 value = [value]
-            if isinstance(value, List[int]):
-                for epoch in value:
-                    if (epoch < 1) or (epoch > NEWEST_EPOCH):
-                        logger.warning(f"{epoch} is not a valid epoch.")
-                        continue
+            value = [int(epoch) for epoch in value]
+            for epoch in value:
+                if (epoch < 1) or (epoch > NEWEST_EPOCH):
+                    logger.warning(f"{epoch} is not a valid epoch.")
+                    continue
         # If variable is crop size, test that it is a possible angle
         # TODO correct typing with u.deg
         elif name == "crop_size":
-            if not correct_type(value, name, [float, u.Quantity]):
+            if not correct_type(value, name, [float]):
                 continue
             if (value <= 0.0) or (value > 360.0):
                 logger.warning(f"{value} is not a valid crop angle.")
                 continue
+            value = value * u.deg
         # If variable is a flag, test that it is of correct type
         elif (
             (name == "create_moc")
@@ -166,12 +165,12 @@ def setup_configuration_variable(
 
 
 def setup_configuration(
-    config_file: Optional[Union[str, Path]] = None,
-    data_root: Optional[Union[str, Path]] = None,
-    out_root: Optional[Union[str, Path]] = None,
-    stokes: Optional[str] = None,
-    epoch: Optional[List[str]] = None,
-    crop_size: Optional[u.Quantity] = None,
+    config_file: Optional[Path] = None,
+    data_root: Optional[Path] = None,
+    out_root: Optional[Path] = None,
+    stokes: Optional[Union[str, List[str]]] = None,
+    epoch: Optional[Union[str, List[str]]] = None,
+    crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
     overwrite: Optional[bool] = None,
@@ -182,19 +181,19 @@ def setup_configuration(
 
     Parameters
     ----------
-    config_file : Optional[Union[str, Path]], optional
+    config_file : Optional[Path], optional
         Path to a configuration yaml, by default None.
-    data_root : Optional[Union[str, Path]], optional
-        Path to the root data directory, by default None. This must be either
-        provided in the program call, or by configuration.
-    out_root : Optional[Union[str, Path]], optional
-        Path to the root output directory, by default None. This must be either
-        provided in the program call, or by configuration.
-    stokes : Optional[str], optional
-        Stokes parameter to process, by default None.
-    epoch : Optional[List[str]], optional
-        Epoch to process, by default None.
-    crop_size : Optional[u.Quantity], optional
+    data_root : Optional[Path], optional
+        Path to the root data directory, by default None.
+        This must be either provided in the program call, or by configuration.
+    out_root : Optional[Path], optional
+        Path to the root output directory, by default None.
+        This must be either provided in the program call, or by configuration.
+    stokes : Optional[Union[str, List[str]]], optional
+        Stokes parameter(s) to process, by default None.
+    epoch : Optional[Union[str, List[str]]], optional
+        Epoch(s) to process, by default None.
+    crop_size : Optional[float], optional
         Angular size of image crops, in degrees, by default None.
     create_moc : Optional[bool], optional
         Flag to create MOCs, by default None.
@@ -286,13 +285,55 @@ def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
     return main_logger
 
 
+def get_image_paths(
+    data_root: Path,
+    stokes: List[str],
+    epoch: List[int],
+    out_root: Optional[Path] = None,
+) -> Tuple[Path, List[Generator[Path, None, None]]]:
+    """Get paths to all FITS images for a given Stokes parameter and epoch.
+
+    Parameters
+    ----------
+    data_root : Path
+        Path to root of data directory.
+    stokes : List[str]
+        Stokes parameter(s) whose images to locate.
+    epoch : List[int]
+        Epoch whose images to locate.
+    out_root : Optional[Path], optional
+        Path to root of output directory, by default None.
+
+    Returns
+    -------
+    Tuple[Path, List[Generator[Path, None, None]]]
+        Path to root of output directory, and paths to images.
+    """
+    # TODO Set output directory as data directory if it is unspecified
+    if out_root is None:
+        out_root = data_root
+
+    # Get path to image directory
+    image_path_glob_list: List[Generator[Path, None, None]] = []
+    image_root = Path(data_root / f"STOKES{stokes}_IMAGES").resolve()
+    logger.debug(f"Image Root {image_root}")
+
+    # TODO Get paths to all FITS images for a given Stokes parameter and epoch
+    if epoch is None or len(epoch) == 0:
+        image_path_glob_list.append(image_root.glob(f"epoch_*/*.fits"))
+    else:
+        for n in epoch:
+            image_path_glob_list.append(image_root.glob(f"epoch_{n}/*.fits"))
+    return out_root, image_path_glob_list
+
+
 def run(
-    config_file: Optional[Union[str, Path]] = None,
-    data_root: Optional[Union[str, Path]] = None,
-    out_root: Optional[Union[str, Path]] = None,
-    stokes: Optional[str] = None,
-    epoch: Optional[List[str]] = None,
-    crop_size: Optional[u.Quantity] = None,
+    config_file: Optional[Path] = None,
+    data_root: Optional[Path] = None,
+    out_root: Optional[Path] = None,
+    stokes: Optional[Union[str, List[str]]] = None,
+    epoch: Optional[Union[str, List[str]]] = None,
+    crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
     overwrite: Optional[bool] = None,
@@ -301,7 +342,6 @@ def run(
 ):
     # Set up configuration settings via configuration files and cli options
     (
-        config_file,
         data_root,
         out_root,
         stokes,
@@ -330,23 +370,12 @@ def run(
     main_logger = setup_logger(verbose=verbose, debug=debug)
 
     # Set up paths and required locations
-    if out_root is None:
-        out_root = data_root
-
-    image_path_glob_list: list[Generator[Path, None, None]] = []
-    image_root = Path(data_root / f"STOKES{stokes}_IMAGES").resolve()
-    main_logger.debug(f"Image Root {image_root}")
-
-    if type(epoch) is int:
-        epoch = list(epoch)
-    if epoch is None or len(epoch) == 0:
-        image_path_glob_list.append(image_root.glob(f"epoch_*/*.fits"))
-    else:
-        for n in epoch:
-            image_path_glob_list.append(image_root.glob(f"epoch_{n}/*.fits"))
+    out_root, image_paths = get_image_paths(
+        data_root=data_root, stokes=stokes, epoch=epoch, out_root=out_root
+    )
 
     # Iterate over all FITS files to run post-processing
-    for image_path in chain.from_iterable(image_path_glob_list):
+    for image_path in chain.from_iterable(image_paths):
         main_logger.info(f"Working on {image_path}...")
         epoch_dir = misc.get_epoch_directory(image_path)
         field, sbid = misc.get_field_and_sbid(image_path)
