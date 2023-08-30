@@ -6,13 +6,11 @@ configuration files.
 
 """
 
+from pathlib import Path
+from typing import Optional, Union, List
 import typer
 
-import vast_post_processing.core as vpc
-import astropy.units as u
-
-from typing import Optional, Union, List
-from pathlib import Path
+from vast_post_processing import core
 
 
 app = typer.Typer()
@@ -20,16 +18,16 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    config_file: Optional[Union[str, Path]] = typer.Option(
+    config_file: Optional[Path] = typer.Option(
         None,
-        help=("Path to the yaml configuration"),
+        help=("Path to a yaml configuration"),
         exists=True,
         file_okay=False,
         dir_okay=True,
     ),
     data_root: Optional[Path] = typer.Option(
         None,
-        help=("Path to the data directory"),
+        help=("Path to the root data directory"),
         exists=True,
         file_okay=False,
         dir_okay=True,
@@ -37,11 +35,11 @@ def main(
     out_root: Optional[Path] = typer.Option(
         None, exists=True, file_okay=False, dir_okay=True
     ),
-    stokes: Optional[str] = typer.Option(
+    stokes: Optional[Union[str, List[str]]] = typer.Option(
         None,
         help=("Stokes parameter to use (I, Q, U, V)."),
     ),
-    epoch: Optional[List[str]] = typer.Option(
+    epoch: Optional[Union[str, List[str]]] = typer.Option(
         None,
         help=(
             "Only correct the given observation epochs. Can be given "
@@ -51,12 +49,12 @@ def main(
     ),
     crop_size: Optional[float] = typer.Option(
         None,
-        help=("Size of the cropped image (each side measured in " "degrees)."),
+        help=("Size of the cropped image (each side measured in degrees)."),
     ),
     create_moc: Optional[bool] = typer.Option(
         None, help=("Create MOC files based on cropped images")
     ),
-    compress: Optional[bool] = typer.Option(None, help=("Compress all fits files")),
+    compress: Optional[bool] = typer.Option(None, help=("Compress all FITS files")),
     overwrite: Optional[bool] = typer.Option(
         None,
         help=("Overwrite existing cropped data"),
@@ -70,13 +68,13 @@ def main(
         help=("Debug output."),
     ),
 ):
-    vpc.run(
+    core.run(
         config_file,
         data_root,
         out_root,
         stokes,
         epoch,
-        crop_size * u.deg,
+        crop_size,
         create_moc,
         compress,
         overwrite,
