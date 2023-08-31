@@ -33,7 +33,11 @@ def main(
         dir_okay=True,
     ),
     out_root: Optional[Path] = typer.Option(
-        None, exists=True, file_okay=False, dir_okay=True
+        None,
+        help=("Path to the root output directory"),
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
     ),
     stokes: Optional[Union[str, List[str]]] = typer.Option(
         None,
