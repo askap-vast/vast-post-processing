@@ -3,12 +3,14 @@
 
 
 """
+# Imports
+
 import logging
 from pathlib import Path
 import importlib.resources
 from itertools import chain
 import yaml
-from typing import Union, Optional, Generator, Tuple, List, Dict, Any
+from typing import Union, Optional, Generator, Tuple, List, Any
 
 from astropy.io import fits
 from astropy.io.votable.tree import VOTableFile
@@ -18,6 +20,7 @@ from astropy import units as u
 from . import crop, corrections, compress
 from utils import misc, logutils
 
+# Constants
 
 DATA_DIRECTORY: Path = importlib.resources.files(__package__) / "data"
 """Path to data directory containing standards, such as the default
@@ -32,25 +35,31 @@ logger: logging.Logger = logging.getLogger(__name__)
 """Global reference to the logger for this module.
 """
 
+# Functions
 
-def correct_type(value: Any, name: str, types: List[type]) -> bool:
+## Setup
+
+
+def verify_correct_type(value: Any, name: str, types: List[type]):
     """Evaluate the type correctness of a value.
 
-    Helper function for :func:`setup_configuration_variable`.
+    Helper function for :func:`setup_configuration_variable`. Returns to main
+    function if variable is of correct type. Terminates current run otherwise.
+    This is to ensure user awareness of the configuration settings being used.
 
     Parameters
     ----------
     value : Any
-        Value whose type is to be evaluated.
+        Value of this configuration variable.
     name : str
-        Name of the variable whose value is being evaluated.
+        Name of this configuration variable.
     types : List[type]
-        List of valid types for the value.
+        Accepted types for this configuration variable.
 
-    Returns
-    -------
-    bool
-        Whether the variable value is of correct type.
+    Raises
+    ------
+    TypeError
+        Providing variables of the wrong type terminates program execution.
 
     See Also
     --------
@@ -61,10 +70,9 @@ def correct_type(value: Any, name: str, types: List[type]) -> bool:
     for type in types:
         # If value is of matching type then it is correctly typed
         if isinstance(value, type):
-            return True
+            return
     # If value has not been matched to a type then it is incorrectly typed
-    logger.warning(f"{name} of incorrect type. Setting to next acceptable value.")
-    return False
+    raise TypeError(f"{name} of incorrect type {type(value)}. Terminating program.")
 
 
 def setup_configuration_variable(
@@ -104,48 +112,44 @@ def setup_configuration_variable(
     """
     # Iterate over possible variable values in descending priority
     for value in [user_value, config_value, default_value]:
-        # Skip empty values
+        # Skip empty values as they were not provided
         if not value:
             continue
 
         # Assess values for validity
         # If variable is Path, test that it points to an existing object
         if (name == "data_root") or (name == "out_root"):
-            if not correct_type(value, name, [Path]):
-                continue
+            verify_correct_type(value, name, [Path])
             if not Path(value).resolve().exists():
-                logger.warning(f"{name} does not resolve to a valid Path.")
-                continue
+                raise FileNotFoundError(f"{name} does not resolve to a valid Path.")
+
         # If variable is Stokes, test that it is a valid option
         elif name == "stokes":
-            if not correct_type(value, name, [str, List[str]]):
-                continue
+            verify_correct_type(value, name, [str, List[str]])
             if isinstance(value, str):
                 value = [value]
             for parameter in value:
                 if parameter not in ["I", "Q", "U", "V", "i", "q", "u", "v"]:
-                    logger.warning(f"{parameter} is not a valid Stokes parameter.")
-                    continue
+                    raise ValueError(f"{parameter} is not a valid Stokes parameter.")
+
         # If variable is epoch number, test that it is an existing epoch
         elif name == "epoch":
-            if not correct_type(value, name, [str, List[str]]):
-                continue
+            verify_correct_type(value, name, [str, List[str]])
             if isinstance(value, str):
                 value = [value]
             value = [int(epoch) for epoch in value]
             for epoch in value:
                 if (epoch < 1) or (epoch > NEWEST_EPOCH):
-                    logger.warning(f"{epoch} is not a valid epoch.")
-                    continue
+                    raise ValueError(f"{epoch} is not a valid epoch.")
+
         # If variable is crop size, test that it is a possible angle
         # TODO correct typing with u.deg
         elif name == "crop_size":
-            if not correct_type(value, name, [float]):
-                continue
+            verify_correct_type(value, name, [float])
             if (value <= 0.0) or (value > 360.0):
-                logger.warning(f"{value} is not a valid crop angle.")
-                continue
+                raise ValueError(f"{value} is not a valid crop angle.")
             value = value * u.deg
+
         # If variable is a flag, test that it is of correct type
         elif (
             (name == "create_moc")
@@ -154,13 +158,21 @@ def setup_configuration_variable(
             or (name == "verbose")
             or (name == "debug")
         ):
-            if not correct_type(value, name, [bool]):
-                continue
+            verify_correct_type(value, name, [bool])
 
         # If all conditions pass, value is valid and should be assigned
         return value
 
+    # If out_root is unspecified, default to data directory
+    if name == "out_root":
+        return None
+
+    # If epoch is unspecified, process all epochs (see get_image_paths)
+    if name == "epoch":
+        return []
+
     # If none of the provided values are valid, end the run
+    # NOTE This will never be reached if default config is correct
     raise ValueError(f"{name} value not found. Terminating program.")
 
 
@@ -250,6 +262,10 @@ def setup_configuration(
             )
         )
 
+    # If out_root is unspecified, default to data directory
+    if not variables[1]:
+        variables[1] = variables[0]
+
     # Return configuration settings as tuple
     return tuple(variables)
 
@@ -277,10 +293,6 @@ def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
         logging_level = "DEBUG"
     main_logger = logutils.create_logger("postprocessing.log", logging_level)
 
-    # Record all local variables to logger
-    main_logger.debug("All Runtime Local Variables:")
-    main_logger.debug(locals())
-
     # Return logger object
     return main_logger
 
@@ -290,7 +302,7 @@ def get_image_paths(
     stokes: List[str],
     epoch: List[int],
     out_root: Optional[Path] = None,
-) -> Tuple[Path, List[Generator[Path, None, None]]]:
+) -> List[Generator[Path, None, None]]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
     Parameters
@@ -300,132 +312,34 @@ def get_image_paths(
     stokes : List[str]
         Stokes parameter(s) whose images to locate.
     epoch : List[int]
-        Epoch whose images to locate.
+        Epoch(s) whose images to locate.
     out_root : Optional[Path], optional
         Path to root of output directory, by default None.
 
     Returns
     -------
-    Tuple[Path, List[Generator[Path, None, None]]]
-        Path to root of output directory, and paths to images.
+    List[Generator[Path, None, None]]
+        Paths to matching images.
     """
-    # TODO Set output directory as data directory if it is unspecified
-    if out_root is None:
-        out_root = data_root
-
-    # Get path to image directory
+    # Initialize empty list of paths
     image_path_glob_list: List[Generator[Path, None, None]] = []
-    image_root = Path(data_root / f"STOKES{stokes}_IMAGES").resolve()
-    logger.debug(f"Image Root {image_root}")
 
-    # TODO Get paths to all FITS images for a given Stokes parameter and epoch
-    if epoch is None or len(epoch) == 0:
-        image_path_glob_list.append(image_root.glob(f"epoch_*/*.fits"))
-    else:
-        for n in epoch:
-            image_path_glob_list.append(image_root.glob(f"epoch_{n}/*.fits"))
-    return out_root, image_path_glob_list
+    # Iterate over each Stokes parameter
+    for parameter in stokes:
+        image_root = Path(data_root / f"STOKES{parameter}_IMAGES").resolve()
+        logger.debug(f"Image Root for Stokes {parameter}: {image_root}")
 
-
-def run(
-    config_file: Optional[Path] = None,
-    data_root: Optional[Path] = None,
-    out_root: Optional[Path] = None,
-    stokes: Optional[Union[str, List[str]]] = None,
-    epoch: Optional[Union[str, List[str]]] = None,
-    crop_size: Optional[float] = None,
-    create_moc: Optional[bool] = None,
-    compress: Optional[bool] = None,
-    overwrite: Optional[bool] = None,
-    verbose: Optional[bool] = None,
-    debug: Optional[bool] = None,
-):
-    # Set up configuration settings via configuration files and cli options
-    (
-        data_root,
-        out_root,
-        stokes,
-        epoch,
-        crop_size,
-        create_moc,
-        compress,
-        overwrite,
-        verbose,
-        debug,
-    ) = setup_configuration(
-        config_file=config_file,
-        data_root=data_root,
-        out_root=out_root,
-        stokes=stokes,
-        epoch=epoch,
-        crop_size=crop_size,
-        create_moc=create_moc,
-        compress=compress,
-        overwrite=overwrite,
-        verbose=verbose,
-        debug=debug,
-    )
-
-    # Set up logger
-    main_logger = setup_logger(verbose=verbose, debug=debug)
-
-    # Set up paths and required locations
-    out_root, image_paths = get_image_paths(
-        data_root=data_root, stokes=stokes, epoch=epoch, out_root=out_root
-    )
-
-    # Iterate over all FITS files to run post-processing
-    for image_path in chain.from_iterable(image_paths):
-        main_logger.info(f"Working on {image_path}...")
-        epoch_dir = misc.get_epoch_directory(image_path)
-        field, sbid = misc.get_field_and_sbid(image_path)
-
-        # Get and verify relevant paths for this file
-        rms_path, bkg_path, components_path, islands_path = get_corresponding_paths(
-            data_root=data_root,
-            stokes=stokes,
-            epoch_dir=epoch_dir,
-            image_path=image_path,
-        )
-
-        # Correct astrometry and flux of image data
-        field_centre, cropped_hdu, corrected_cats = crop_and_correct_image(
-            epoch_dir=epoch_dir,
-            image_path=image_path,
-            rms_path=rms_path,
-            bkg_path=bkg_path,
-            crop_size=crop_size,
-            out_root=out_root,
-            overwrite=overwrite,
-        )
-
-        # Crop catalogues
-        crop_catalogs(
-            components_path=components_path,
-            out_root=out_root,
-            field_centre=field_centre,
-            epoch_dir=epoch_dir,
-            islands_path=islands_path,
-            corrected_cats=corrected_cats,
-            cropped_hdu=cropped_hdu,
-            crop_size=crop_size,
-            overwrite=overwrite,
-        )
-
-        # Create MOCs
-        if create_moc:
-            create_mocs(
-                stokes=stokes,
-                out_root=out_root,
-                epoch_dir=epoch_dir,
-                image_path=image_path,
-                cropped_hdu=cropped_hdu,
-                overwrite=overwrite,
-            )
+        # If epoch is not provided, process all epochs
+        if len(epoch) == 0:
+            image_path_glob_list.append(image_root.glob(f"epoch_*/*.fits"))
+        # Otherwise, only process provided epoch(s)
+        else:
+            for n in epoch:
+                image_path_glob_list.append(image_root.glob(f"epoch_{n}/*.fits"))
+    return image_path_glob_list
 
 
-def resolve_configuration_parameters():
-    pass
+## Pipeline
 
 
 def get_corresponding_paths(
@@ -475,24 +389,19 @@ def get_corresponding_paths(
     components_path = selavy_dir / components_name
     islands_path = selavy_dir / islands_name
 
-    # Check if each of these image and catalogue paths exist, warn otherwise
-    exists = True
+    # If any of these paths are missing, terminate this run
     if not rms_path.exists():
-        exists = False
-        logger.warning(f"noisemap file ({rms_path}) is missing.")
+        raise FileNotFoundError(f"Expected noisemap file ({rms_path}) is missing.")
     if not bkg_path.exists():
-        exists = False
-        logger.warning(f"meanmap file ({bkg_path}) is missing.")
+        raise FileNotFoundError(f"Expected meanmap file ({bkg_path}) is missing.")
     if not components_path.exists():
-        exists = False
-        logger.warning(f"selavy components file ({components_path}) is missing.")
+        raise FileNotFoundError(
+            f"Expected selavy components file ({components_path}) is missing."
+        )
     if not islands_path.exists():
-        exists = False
-        logger.warning(f"selavy islands file ({islands_path}) is missing.")
-
-    if not exists:
-        # TODO is best practice to skip or abort entirely?
-        logger.warning(f"Skipping {image_path} due to missing files.")
+        raise FileNotFoundError(
+            f"Expected selavy islands file ({islands_path}) is missing."
+        )
 
     return rms_path, bkg_path, components_path, islands_path
 
@@ -615,3 +524,105 @@ def create_mocs(
     stmoc = crop.moc_to_stmoc(moc, cropped_hdu)
     stmoc.write(stmoc_outfile, overwrite=overwrite)
     logger.debug("Wrote {stmoc_outfile}")
+
+
+## Main
+def run(
+    config_file: Optional[Path] = None,
+    data_root: Optional[Path] = None,
+    out_root: Optional[Path] = None,
+    stokes: Optional[Union[str, List[str]]] = None,
+    epoch: Optional[Union[str, List[str]]] = None,
+    crop_size: Optional[float] = None,
+    create_moc: Optional[bool] = None,
+    compress: Optional[bool] = None,
+    overwrite: Optional[bool] = None,
+    verbose: Optional[bool] = None,
+    debug: Optional[bool] = None,
+):
+    # Set up configuration settings via configuration files and cli options
+    (
+        data_root,
+        out_root,
+        stokes,
+        epoch,
+        crop_size,
+        create_moc,
+        compress,
+        overwrite,
+        verbose,
+        debug,
+    ) = setup_configuration(
+        config_file=config_file,
+        data_root=data_root,
+        out_root=out_root,
+        stokes=stokes,
+        epoch=epoch,
+        crop_size=crop_size,
+        create_moc=create_moc,
+        compress=compress,
+        overwrite=overwrite,
+        verbose=verbose,
+        debug=debug,
+    )
+
+    # Set up logger
+    main_logger = setup_logger(verbose=verbose, debug=debug)
+
+    # Record all local variables to logger
+    main_logger.debug("All Runtime Local Variables:")
+    main_logger.debug(locals())
+
+    # Set up paths and required locations
+    out_root, image_paths = get_image_paths(
+        data_root=data_root, stokes=stokes, epoch=epoch, out_root=out_root
+    )
+
+    # Iterate over all FITS files to run post-processing
+    for image_path in chain.from_iterable(image_paths):
+        main_logger.info(f"Working on {image_path}...")
+        epoch_dir = misc.get_epoch_directory(image_path)
+        field, sbid = misc.get_field_and_sbid(image_path)
+
+        # Get and verify relevant paths for this file
+        rms_path, bkg_path, components_path, islands_path = get_corresponding_paths(
+            data_root=data_root,
+            stokes=stokes,
+            epoch_dir=epoch_dir,
+            image_path=image_path,
+        )
+
+        # Correct astrometry and flux of image data
+        field_centre, cropped_hdu, corrected_cats = crop_and_correct_image(
+            epoch_dir=epoch_dir,
+            image_path=image_path,
+            rms_path=rms_path,
+            bkg_path=bkg_path,
+            crop_size=crop_size,
+            out_root=out_root,
+            overwrite=overwrite,
+        )
+
+        # Crop catalogues
+        crop_catalogs(
+            components_path=components_path,
+            out_root=out_root,
+            field_centre=field_centre,
+            epoch_dir=epoch_dir,
+            islands_path=islands_path,
+            corrected_cats=corrected_cats,
+            cropped_hdu=cropped_hdu,
+            crop_size=crop_size,
+            overwrite=overwrite,
+        )
+
+        # Create MOCs
+        if create_moc:
+            create_mocs(
+                stokes=stokes,
+                out_root=out_root,
+                epoch_dir=epoch_dir,
+                image_path=image_path,
+                cropped_hdu=cropped_hdu,
+                overwrite=overwrite,
+            )
