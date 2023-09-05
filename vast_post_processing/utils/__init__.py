@@ -2,5 +2,5 @@
 # Utility functions for VAST Post-processing
 #
 
-import misc
-import fileutils
+from . import misc
+from . import fileutils
