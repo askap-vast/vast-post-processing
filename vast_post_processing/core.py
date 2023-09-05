@@ -411,11 +411,12 @@ def crop_and_correct_image(
     image_path: Path,
     rms_path: Path,
     bkg_path: Path,
+    corrected_fits: List[fits.PrimaryHDU],
     crop_size: u.Quantity,
     out_root: Path,
     overwrite: bool,
-) -> Tuple[SkyCoord, fits.PrimaryHDU, List[VOTableFile]]:
-    """Applies corrections to a field, then crops observation images in the
+) -> Tuple[SkyCoord, fits.PrimaryHDU]:
+    """Apply corrections to a field, then crop observation images in the
     field.
 
     Parameters
@@ -428,6 +429,8 @@ def crop_and_correct_image(
         Path to corresponding RMS noisemap image.
     bkg_path : Path
         Path to corresponding RMS meanmap image.
+    corrected_fits : List[fits.PrimaryHDU]
+        List of FITS HDUs which have been previously corrected.
     crop_size : u.Quantity
         Angular size of crop to be applied.
     out_root : Path
@@ -437,12 +440,9 @@ def crop_and_correct_image(
 
     Returns
     -------
-    Tuple[SkyCoord, fits.PrimaryHDU, List[VOTableFile]]
-        Field centre of image, cropped image, and corrected catalogues.
+    Tuple[SkyCoord, fits.PrimaryHDU]
+        Field centre of image, and cropped image.
     """
-    # Apply corrections to images and catalogues
-    corrected_fits, corrected_cats = corrections.correct_field(image_path)
-
     # Iterate over each image to crop and write to a new directory
     for i, path in enumerate((rms_path, bkg_path, image_path)):
         # Locate directory to store cropped data, and create if nonexistent
@@ -455,13 +455,13 @@ def crop_and_correct_image(
 
         # Crop the image and write to disk
         outfile = fits_output_dir / path.name
-        hdu: fits.PrimaryHDU = corrected_fits[i]
+        hdu = corrected_fits[i]
         field_centre = crop.get_field_centre(hdu.header)
         cropped_hdu = crop.crop_hdu(hdu, field_centre, size=crop_size)
         cropped_hdu.writeto(outfile, overwrite=overwrite)
         logger.debug(f"Wrote {outfile}")
 
-    return field_centre, cropped_hdu, corrected_cats
+    return field_centre, cropped_hdu
 
 
 def crop_catalogs(
@@ -475,6 +475,29 @@ def crop_catalogs(
     out_root: Path,
     overwrite: bool,
 ):
+    """Crop field catalogues.
+
+    Parameters
+    ----------
+    epoch_dir : str
+        Observation epoch, in directory format (e.g. "epoch_32")
+    crop_size : u.Quantity
+        Angular size of crop to be applied.
+    field_centre : SkyCoord
+        Fiel centre of image.
+    cropped_hdu : fits.PrimaryHDU
+        Cropped image for this field.
+    corrected_cats : List[VOTableFile]
+        List of corrected catalogues to be cropped.
+    components_path : Path
+        Path to the selavy components xml file for this field.
+    islands_path : Path
+        Path to the selavy islands xml file for this field.
+    out_root : Path
+        Path to root of output directory.
+    overwrite : bool
+        Flag to overwrite image data.
+    """
     # Locate directory to store cropped data, and create if nonexistent
     # TODO what suffix should we use? SEE ABOVE
     stokes_dir = f"{components_path.parent.parent.name}_CROPPED"
@@ -484,13 +507,17 @@ def crop_catalogs(
 
     # Iterate over each catalogue xml file corresponding to a field
     for i, path in enumerate((components_path, islands_path)):
+        # Path to output file
         outfile = cat_output_dir / path.name
+
+        # VOTable to be corrected is the first in the list of catalogues
         vot = corrected_cats[i]
 
         # This uses the last cropped hdu from the previous for loop
         # which should be the image file, but doesn't actually matter
         cropped_vot = crop.crop_catalogue(vot, cropped_hdu, field_centre, crop_size)
 
+        # Overwrite if flag active and output to logger
         if outfile.exists() and not overwrite:
             logger.critical(f"{outfile} exists, not overwriting")
         else:
@@ -506,21 +533,43 @@ def create_mocs(
     cropped_hdu: fits.PrimaryHDU,
     overwrite: bool,
 ):
+    """Create a MOC and STMOC for a given field image.
+
+    Parameters
+    ----------
+    stokes : str
+        Stokes parameter of field.
+    out_root : Path
+        Path to root of output directory.
+    epoch_dir : str
+        Observation epoch, in directory format (e.g. "epoch_32")
+    image_path : Path
+        Path to field image.
+    cropped_hdu : fits.PrimaryHDU
+        Cropped image for this field.
+    overwrite : bool
+        Flag to overwrite image data.
+    """
+    # Define path to MOC output file
     moc_dir = f"STOKES{stokes}_MOC_CROPPED"
     moc_output_dir = Path(out_root / moc_dir / epoch_dir).resolve()
-
     moc_filename = image_path.name.replace(".fits", ".moc.fits")
     moc_outfile = moc_output_dir / moc_filename
 
+    # Create parent directory to output directory if it does not exist
     if not moc_output_dir.exists():
         moc_output_dir.mkdir(parents=True)
+
+    # Write MOC to output file from cropped image and output to logger
     moc = crop.wcs_to_moc(cropped_hdu)
     moc.write(moc_outfile, overwrite=overwrite)
     logger.debug(f"Wrote {moc_outfile}")
 
+    # Define path to STMOC output file
     stmoc_filename = image_path.name.replace(".fits", ".stmoc.fits")
     stmoc_outfile = moc_output_dir / stmoc_filename
 
+    # Wrute STMOC to output file from cropped image and MOC and output to logger
     stmoc = crop.moc_to_stmoc(moc, cropped_hdu)
     stmoc.write(stmoc_outfile, overwrite=overwrite)
     logger.debug("Wrote {stmoc_outfile}")
@@ -592,12 +641,16 @@ def run(
             image_path=image_path,
         )
 
+        # Apply corrections to images and catalogues
+        corrected_fits, corrected_cats = corrections.correct_field(image_path)
+
         # Correct astrometry and flux of image data
         field_centre, cropped_hdu, corrected_cats = crop_and_correct_image(
             epoch_dir=epoch_dir,
             image_path=image_path,
             rms_path=rms_path,
             bkg_path=bkg_path,
+            corrected_fits=corrected_fits,
             crop_size=crop_size,
             out_root=out_root,
             overwrite=overwrite,
