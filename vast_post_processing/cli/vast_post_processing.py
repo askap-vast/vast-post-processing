@@ -22,8 +22,8 @@ def main(
         None,
         help=("Path to a yaml configuration"),
         exists=True,
-        file_okay=False,
-        dir_okay=True,
+        file_okay=True,
+        dir_okay=False,
     ),
     data_root: Optional[Path] = typer.Option(
         None,
