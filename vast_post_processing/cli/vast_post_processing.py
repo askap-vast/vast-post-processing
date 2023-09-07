@@ -7,7 +7,7 @@ configuration files.
 """
 
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import Optional, List
 import typer
 
 from vast_post_processing import core
@@ -39,11 +39,11 @@ def main(
         file_okay=False,
         dir_okay=True,
     ),
-    stokes: Optional[Union[str, List[str]]] = typer.Option(
+    stokes: Optional[List[str]] = typer.Option(
         None,
         help=("Stokes parameter to use (I, Q, U, V)."),
     ),
-    epoch: Optional[Union[str, List[str]]] = typer.Option(
+    epoch: Optional[List[int]] = typer.Option(
         None,
         help=(
             "Only correct the given observation epochs. Can be given "
