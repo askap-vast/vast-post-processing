@@ -3,4 +3,5 @@
 #
 
 from . import misc
+from . import logutils
 from . import fileutils
