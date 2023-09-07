@@ -44,3 +44,5 @@ SELAVY_PATH = (
 """Path: Path to VAST epoch 38 selavy .xml data corresponding to IMAGE_PATH
 image for testing the function get_image_geometry(). 
 """
+
+# conftest fixtures test call pattern
