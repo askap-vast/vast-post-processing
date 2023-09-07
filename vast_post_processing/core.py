@@ -43,47 +43,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 ## Setup
 
 
-def verify_correct_type(value: object, name: str, type: type):
-    """Evaluate the type correctness of a configuration variable.
-
-    Helper function for :func:`setup_configuration_variable`. Returns to main
-    function if variable is of correct type. Terminates current run otherwise.
-    This is to ensure user awareness of the configuration settings being used.
-
-    Parameters
-    ----------
-    value : object
-        Value of this configuration variable.
-    name : str
-        Name of this configuration variable.
-    types : type
-        Type of this configuration variable.
-
-    Raises
-    ------
-    TypeError
-        Providing variables of the wrong type terminates program execution.
-
-    See Also
-    --------
-    :func:`setup_configuration_variable`
-        Main function for this function.
-    """
-    # If type is list of another type each item type must be checked separately
-    if isinstance(type, GenericAlias):
-        for v in value:
-            if not isinstance(v, type.__args__[0]):
-                raise TypeError(
-                    f"{name} contains value of incorrect type. Terminating program."
-                )
-    else:
-        # If value is not of matching type then it is incorrectly typed
-        if not isinstance(value, type):
-            raise TypeError(
-                f"{name} of incorrect type {type(value)}. Terminating program."
-            )
-
-
 def setup_configuration_variable(
     name: str,
     user_value: Optional[Union[Path, list[str], list[int], float, bool]] = None,
@@ -126,55 +85,40 @@ def setup_configuration_variable(
             continue
 
         # Assess values for validity
-        # If variable is Path, test that it points to an existing object
-        if (name == "data_root") or (name == "out_root"):
-            verify_correct_type(value, name, Path)
-
         # If variable is Stokes, test that it is a valid option
-        elif name == "stokes":
-            verify_correct_type(value, name, list[str])
+        if name == "stokes":
             for parameter in value:
                 if parameter not in ["I", "Q", "U", "V", "i", "q", "u", "v"]:
                     raise ValueError(f"{parameter} is not a valid Stokes parameter.")
 
         # If variable is epoch number, test that it is an existing epoch
         elif name == "epoch":
-            verify_correct_type(value, name, list[int])
             for epoch in value:
                 if (epoch < 1) or (epoch > NEWEST_EPOCH):
                     raise ValueError(f"{epoch} is not a valid epoch.")
 
         # If variable is crop size, test that it is a possible angle
-        # TODO correct typing with u.deg
+        # TODO ensure correct typing with u.deg
         elif name == "crop_size":
-            verify_correct_type(value, name, float)
             if (value <= 0.0) or (value > 360.0):
                 raise ValueError(f"{value} is not a valid crop angle.")
             value = value * u.deg
 
-        # If variable is a flag, test that it is of correct type
-        elif (
-            (name == "create_moc")
-            or (name == "compress")
-            or (name == "overwrite")
-            or (name == "verbose")
-            or (name == "debug")
-        ):
-            verify_correct_type(value, name, bool)
-
         # If all conditions pass, value is valid and should be assigned
         return value
 
+    # At this point, the variable has not been provided a valid value
     # If out_root is unspecified, default to data directory
     if name == "out_root":
         return None
 
     # If epoch is unspecified, process all epochs (see get_image_paths)
-    if name == "epoch":
+    elif name == "epoch":
         return []
 
-    # If none of the provided values are valid, end the run
-    raise ValueError(f"{name} value not found. Terminating program.")
+    # For all other variables, terminate since no value has been provided
+    else:
+        raise ValueError(f"{name} value not found. Terminating program.")
 
 
 def setup_configuration(
