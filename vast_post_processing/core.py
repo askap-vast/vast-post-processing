@@ -81,7 +81,7 @@ def setup_configuration_variable(
     # Iterate over possible variable values in descending priority
     for value in [user_value, config_value, default_value]:
         # Skip empty values as they were not provided
-        if not value:
+        if (value is None) or ((isinstance(value, list)) and (len(value) == 0)):
             continue
 
         # Assess values for validity
@@ -172,12 +172,11 @@ def setup_configuration(
     default_config = yaml.safe_load(open(DATA_DIRECTORY / "default_config.yaml"))
 
     # Load in user configuration if passed and valid, otherwise create empty dict
-    if (
-        (config_file)
-        and (Path(config_file).resolve().exists())
-        and (Path(config_file).suffix == ".yaml")
-    ):
+    if (config_file) and (Path(config_file).suffix == ".yaml"):
         user_config = yaml.safe_load(open(Path(config_file)))
+        for name in default_config:
+            if name not in user_config:
+                user_config[name] = None
     else:
         user_config = {name: None for name in default_config}
 
