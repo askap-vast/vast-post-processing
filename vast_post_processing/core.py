@@ -10,15 +10,18 @@ from pathlib import Path
 import importlib.resources
 from itertools import chain
 import yaml
-from typing import Union, Optional, Generator, Tuple, List, Any
+from types import GenericAlias
+from typing import Union, Optional, Generator
 
 from astropy.io import fits
 from astropy.io.votable.tree import VOTableFile
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 
-from . import crop, corrections, compress
-from utils import misc, logutils
+from . import crop, corrections
+
+# from . import compress
+from .utils import misc, logutils
 
 # Constants
 
@@ -40,8 +43,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 ## Setup
 
 
-def verify_correct_type(value: Any, name: str, types: List[type]):
-    """Evaluate the type correctness of a value.
+def verify_correct_type(value: object, name: str, type: type):
+    """Evaluate the type correctness of a configuration variable.
 
     Helper function for :func:`setup_configuration_variable`. Returns to main
     function if variable is of correct type. Terminates current run otherwise.
@@ -49,12 +52,12 @@ def verify_correct_type(value: Any, name: str, types: List[type]):
 
     Parameters
     ----------
-    value : Any
+    value : object
         Value of this configuration variable.
     name : str
         Name of this configuration variable.
-    types : List[type]
-        Accepted types for this configuration variable.
+    types : type
+        Type of this configuration variable.
 
     Raises
     ------
@@ -66,21 +69,27 @@ def verify_correct_type(value: Any, name: str, types: List[type]):
     :func:`setup_configuration_variable`
         Main function for this function.
     """
-    # Iterate over each provided type
-    for type in types:
-        # If value is of matching type then it is correctly typed
-        if isinstance(value, type):
-            return
-    # If value has not been matched to a type then it is incorrectly typed
-    raise TypeError(f"{name} of incorrect type {type(value)}. Terminating program.")
+    # If type is list of another type each item type must be checked separately
+    if isinstance(type, GenericAlias):
+        for v in value:
+            if not isinstance(v, type.__args__[0]):
+                raise TypeError(
+                    f"{name} contains value of incorrect type. Terminating program."
+                )
+    else:
+        # If value is not of matching type then it is incorrectly typed
+        if not isinstance(value, type):
+            raise TypeError(
+                f"{name} of incorrect type {type(value)}. Terminating program."
+            )
 
 
 def setup_configuration_variable(
     name: str,
-    user_value: Optional[Union[Path, float, str, List[str], bool]] = None,
-    config_value: Optional[Union[Path, float, str, List[str], bool]] = None,
-    default_value: Optional[Union[Path, float, str, List[str], bool]] = None,
-) -> Union[Path, u.Quantity, List[str], List[int], bool]:
+    user_value: Optional[Union[Path, list[str], list[int], float, bool]] = None,
+    config_value: Optional[Union[Path, list[str], list[int], float, bool]] = None,
+    default_value: Optional[Union[Path, list[str], list[int], float, bool]] = None,
+) -> Union[Path, list[str], list[int], u.Quantity, bool]:
     """Get the value for a configuration variable.
 
     Consider, in descending priority and where existent, the user-specified
@@ -92,16 +101,16 @@ def setup_configuration_variable(
     ----------
     name : str
         Name of the configuration variable.
-    user_value : Optional[Union[Path, float, str, List[str], bool]], optional
+    user_value : Optional[Union[Path, list[str], list[int], float, bool]], optional
         Possible value for the variable from the command line, by default None.
-    config_value : Optional[Union[Path, float, str, List[str], bool]], optional
+    config_value : Optional[Union[Path, list[str], list[int], float, bool]], optional
         Possible value for the variable from the specified configuration, by default None.
-    default_value : Optional[Union[Path, float, str, List[str], bool]], optional
+    default_value : Optional[Union[Path, list[str], list[int], float, bool]], optional
         Possible value for the variable from the default configuration, by default None.
 
     Returns
     -------
-    Union[Path, u.Quantity, List[str], List[int], bool]
+    Union[Path, list[str], list[int], u.Quantity, bool]
         The highest priority valid value for this configuration variable.
 
     Raises
@@ -119,25 +128,18 @@ def setup_configuration_variable(
         # Assess values for validity
         # If variable is Path, test that it points to an existing object
         if (name == "data_root") or (name == "out_root"):
-            verify_correct_type(value, name, [Path])
-            if not Path(value).resolve().exists():
-                raise FileNotFoundError(f"{name} does not resolve to a valid Path.")
+            verify_correct_type(value, name, Path)
 
         # If variable is Stokes, test that it is a valid option
         elif name == "stokes":
-            verify_correct_type(value, name, [str, List[str]])
-            if isinstance(value, str):
-                value = [value]
+            verify_correct_type(value, name, list[str])
             for parameter in value:
                 if parameter not in ["I", "Q", "U", "V", "i", "q", "u", "v"]:
                     raise ValueError(f"{parameter} is not a valid Stokes parameter.")
 
         # If variable is epoch number, test that it is an existing epoch
         elif name == "epoch":
-            verify_correct_type(value, name, [str, List[str]])
-            if isinstance(value, str):
-                value = [value]
-            value = [int(epoch) for epoch in value]
+            verify_correct_type(value, name, list[int])
             for epoch in value:
                 if (epoch < 1) or (epoch > NEWEST_EPOCH):
                     raise ValueError(f"{epoch} is not a valid epoch.")
@@ -145,7 +147,7 @@ def setup_configuration_variable(
         # If variable is crop size, test that it is a possible angle
         # TODO correct typing with u.deg
         elif name == "crop_size":
-            verify_correct_type(value, name, [float])
+            verify_correct_type(value, name, float)
             if (value <= 0.0) or (value > 360.0):
                 raise ValueError(f"{value} is not a valid crop angle.")
             value = value * u.deg
@@ -158,7 +160,7 @@ def setup_configuration_variable(
             or (name == "verbose")
             or (name == "debug")
         ):
-            verify_correct_type(value, name, [bool])
+            verify_correct_type(value, name, bool)
 
         # If all conditions pass, value is valid and should be assigned
         return value
@@ -172,7 +174,6 @@ def setup_configuration_variable(
         return []
 
     # If none of the provided values are valid, end the run
-    # NOTE This will never be reached if default config is correct
     raise ValueError(f"{name} value not found. Terminating program.")
 
 
@@ -180,15 +181,15 @@ def setup_configuration(
     config_file: Optional[Path] = None,
     data_root: Optional[Path] = None,
     out_root: Optional[Path] = None,
-    stokes: Optional[Union[str, List[str]]] = None,
-    epoch: Optional[Union[str, List[str]]] = None,
+    stokes: Optional[list[str]] = None,
+    epoch: Optional[list[int]] = None,
     crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
     overwrite: Optional[bool] = None,
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
-) -> Tuple[Path, Path, List[str], List[int], u.Quantity, bool, bool, bool, bool, bool]:
+) -> tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, bool, bool, bool]:
     """Set up the configuration settings for this run.
 
     Parameters
@@ -201,9 +202,9 @@ def setup_configuration(
     out_root : Optional[Path], optional
         Path to the root output directory, by default None.
         This must be either provided in the program call, or by configuration.
-    stokes : Optional[Union[str, List[str]]], optional
+    stokes : Optional[list[str]], optional
         Stokes parameter(s) to process, by default None.
-    epoch : Optional[Union[str, List[str]]], optional
+    epoch : Optional[list[str]], optional
         Epoch(s) to process, by default None.
     crop_size : Optional[float], optional
         Angular size of image crops, in degrees, by default None.
@@ -220,7 +221,7 @@ def setup_configuration(
 
     Returns
     -------
-    Tuple[Path, Path, List[str], List[int], u.Quantity, bool, bool, bool, bool, bool]
+    tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, bool, bool, bool]
         Valid configuration settings for this run.
     """
     # Load in default configuration
@@ -262,6 +263,9 @@ def setup_configuration(
             )
         )
 
+        # TODO remove
+        print(f"{name}\t{variables[-1]}\t{type(variables[-1])}")
+
     # If out_root is unspecified, default to data directory
     if not variables[1]:
         variables[1] = variables[0]
@@ -299,30 +303,30 @@ def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
 
 def get_image_paths(
     data_root: Path,
-    stokes: List[str],
-    epoch: List[int],
+    stokes: list[str],
+    epoch: list[int],
     out_root: Optional[Path] = None,
-) -> List[Generator[Path, None, None]]:
+) -> list[Generator[Path, None, None]]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
     Parameters
     ----------
     data_root : Path
         Path to root of data directory.
-    stokes : List[str]
+    stokes : list[str]
         Stokes parameter(s) whose images to locate.
-    epoch : List[int]
+    epoch : list[int]
         Epoch(s) whose images to locate.
     out_root : Optional[Path], optional
         Path to root of output directory, by default None.
 
     Returns
     -------
-    List[Generator[Path, None, None]]
+    list[Generator[Path, None, None]]
         Paths to matching images.
     """
     # Initialize empty list of paths
-    image_path_glob_list: List[Generator[Path, None, None]] = []
+    image_path_glob_list: list[Generator[Path, None, None]] = []
 
     # Iterate over each Stokes parameter
     for parameter in stokes:
@@ -347,7 +351,7 @@ def get_corresponding_paths(
     stokes: str,
     epoch_dir: str,
     image_path: Path,
-) -> Tuple[Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path]:
     """Resolve and return paths to files corresponding to given image.
 
     The files checked and paths returned for a given image are its corresponding
@@ -367,7 +371,7 @@ def get_corresponding_paths(
 
     Returns
     -------
-    Tuple[Path, Path, Path, Path]
+    tuple[Path, Path, Path, Path]
         Paths to the noisemap, meanmap, components, and islands files
         corresponding to the image given by `image_path`.
     """
@@ -411,11 +415,11 @@ def crop_and_correct_image(
     image_path: Path,
     rms_path: Path,
     bkg_path: Path,
-    corrected_fits: List[fits.PrimaryHDU],
+    corrected_fits: list[fits.PrimaryHDU],
     crop_size: u.Quantity,
     out_root: Path,
     overwrite: bool,
-) -> Tuple[SkyCoord, fits.PrimaryHDU]:
+) -> tuple[SkyCoord, fits.PrimaryHDU]:
     """Apply corrections to a field, then crop observation images in the
     field.
 
@@ -429,8 +433,8 @@ def crop_and_correct_image(
         Path to corresponding RMS noisemap image.
     bkg_path : Path
         Path to corresponding RMS meanmap image.
-    corrected_fits : List[fits.PrimaryHDU]
-        List of FITS HDUs which have been previously corrected.
+    corrected_fits : list[fits.PrimaryHDU]
+        list of FITS HDUs which have been previously corrected.
     crop_size : u.Quantity
         Angular size of crop to be applied.
     out_root : Path
@@ -440,7 +444,7 @@ def crop_and_correct_image(
 
     Returns
     -------
-    Tuple[SkyCoord, fits.PrimaryHDU]
+    tuple[SkyCoord, fits.PrimaryHDU]
         Field centre of image, and cropped image.
     """
     # Iterate over each image to crop and write to a new directory
@@ -469,7 +473,7 @@ def crop_catalogs(
     crop_size: u.Quantity,
     field_centre: SkyCoord,
     cropped_hdu: fits.PrimaryHDU,
-    corrected_cats: List[VOTableFile],
+    corrected_cats: list[VOTableFile],
     components_path: Path,
     islands_path: Path,
     out_root: Path,
@@ -487,8 +491,8 @@ def crop_catalogs(
         Fiel centre of image.
     cropped_hdu : fits.PrimaryHDU
         Cropped image for this field.
-    corrected_cats : List[VOTableFile]
-        List of corrected catalogues to be cropped.
+    corrected_cats : list[VOTableFile]
+        list of corrected catalogues to be cropped.
     components_path : Path
         Path to the selavy components xml file for this field.
     islands_path : Path
@@ -580,8 +584,8 @@ def run(
     config_file: Optional[Path] = None,
     data_root: Optional[Path] = None,
     out_root: Optional[Path] = None,
-    stokes: Optional[Union[str, List[str]]] = None,
-    epoch: Optional[Union[str, List[str]]] = None,
+    stokes: Optional[list[str]] = None,
+    epoch: Optional[list[int]] = None,
     crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,

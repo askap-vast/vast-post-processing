@@ -10,7 +10,8 @@ out_root: null
 
 # Stokes parameter to operate on for this run, by default I.
 # TODO should this be more than one at a time? 
-stokes: I 
+stokes: 
+  - I
 
 # Epoch number for this run. 
 # Not set by default, should be specified at runtime.
