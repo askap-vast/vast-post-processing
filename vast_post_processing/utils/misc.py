@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Tuple
 
 
+def get_stokes_parameter(image_path: Path) -> str:
+    return image_path.parent.parent.name[6]
+
+
 def get_epoch_directory(image_path: Path) -> str:
     return image_path.parent.name
 

@@ -581,26 +581,33 @@ def run(
     main_logger.debug(locals())
 
     # Set up paths and required locations
-    out_root, image_paths = get_image_paths(
+    image_paths = get_image_paths(
         data_root=data_root, stokes=stokes, epoch=epoch, out_root=out_root
     )
 
     # Iterate over all FITS files to run post-processing
     for image_path in chain.from_iterable(image_paths):
         main_logger.info(f"Working on {image_path}...")
+        stokes_dir = misc.get_stokes_parameter(image_path)
         epoch_dir = misc.get_epoch_directory(image_path)
         field, sbid = misc.get_field_and_sbid(image_path)
 
         # Get and verify relevant paths for this file
         rms_path, bkg_path, components_path, islands_path = get_corresponding_paths(
             data_root=data_root,
-            stokes=stokes,
+            stokes=stokes_dir,
             epoch_dir=epoch_dir,
             image_path=image_path,
         )
 
         # Apply corrections to images and catalogues
-        corrected_fits, corrected_cats = corrections.correct_field(image_path)
+        corrected = corrections.correct_field(image_path)
+
+        # Skip images skipped by previous step
+        if corrected is None:
+            continue
+        else:
+            corrected_fits, corrected_cats = corrected[0], corrected[1]
 
         # Correct astrometry and flux of image data
         field_centre, cropped_hdu, corrected_cats = crop_and_correct_image(
@@ -630,7 +637,7 @@ def run(
         # Create MOCs
         if create_moc:
             create_mocs(
-                stokes=stokes,
+                stokes=stokes_dir,
                 out_root=out_root,
                 epoch_dir=epoch_dir,
                 image_path=image_path,
