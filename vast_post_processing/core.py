@@ -74,9 +74,12 @@ def setup_configuration_variable(
 
     Raises
     ------
+    FileNotFoundError
+        If provided path does not exist.
     ValueError
-        If no valid values for a configuration variable are found. For example,
-        if the user does not provide an epoch number.
+        If provided values are invalid, or no valid values for a configuration
+        variable are found. For example, if the user does not provide an epoch
+        number.
     """
     # Iterate over possible variable values in descending priority
     for value in [user_value, config_value, default_value]:
@@ -85,6 +88,14 @@ def setup_configuration_variable(
             continue
 
         # Assess values for validity
+        # If variable is Path, ensure it points to an existing directory
+        if (name == "data_root") or (name == "out_root"):
+            path = Path(value).resolve()
+            if not path.exists():
+                raise FileNotFoundError(f"Provided path for {name} {value} not found.")
+            else:
+                return path
+
         # If variable is Stokes, test that it is a valid option
         if name == "stokes":
             for parameter in value:
@@ -174,9 +185,12 @@ def setup_configuration(
     # Load in user configuration if passed and valid, otherwise create empty dict
     if (config_file) and (Path(config_file).suffix == ".yaml"):
         user_config = yaml.safe_load(open(Path(config_file)))
+
+        # Set unconfigured variables to None
         for name in default_config:
             if name not in user_config:
                 user_config[name] = None
+
     else:
         user_config = {name: None for name in default_config}
 
@@ -205,9 +219,6 @@ def setup_configuration(
                 default_value=default_config[name],
             )
         )
-
-        # TODO remove
-        print(f"{name}\t{variables[-1]}\t{type(variables[-1])}")
 
     # If out_root is unspecified, default to data directory
     if not variables[1]:
