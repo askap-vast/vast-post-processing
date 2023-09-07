@@ -4,8 +4,8 @@
 # Not set by default, should be specified at runtime.
 data_root: null
 
-# Path to output directory for this run.
-# Not set by default, should be specified at runtime.
+# Path to output directory for this run. 
+# By default None, and set to data_root in program.
 out_root: null
 
 # Stokes parameter to operate on for this run, by default I.
@@ -14,7 +14,7 @@ stokes:
   - I
 
 # Epoch number for this run. 
-# Not set by default, should be specified at runtime.
+# By default None, and interpreted as all in program.
 epoch: null
 
 # Image crop size for this run, in degrees.
