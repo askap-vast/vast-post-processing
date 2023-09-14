@@ -1,9 +1,12 @@
+# User
+test.ipynb
+vast_post_processing.log
+
 .*/
 *.sif
 *.tar
 __pycache__
 test-data/
-test.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

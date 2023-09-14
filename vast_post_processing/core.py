@@ -249,7 +249,7 @@ def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
         logging_level = "WARNING"
     if debug:
         logging_level = "DEBUG"
-    main_logger = logutils.create_logger("postprocessing.log", logging_level)
+    main_logger = logutils.create_logger("vast_post_processing.log", logging_level)
 
     # Return logger object
     return main_logger
