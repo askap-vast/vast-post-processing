@@ -11,7 +11,7 @@ from . import validation
 from . import utils
 from . import cli
 
-__githash__ = utils.misc.read_git_hash(core.logger)
+__githash__ = utils.misc.read_git_hash()
 """Git hash of the current branch's latest commit, from the repository this
 version of the program was downloaded from.
 """

@@ -7,7 +7,6 @@ from astropy.time import Time, TimeDelta
 from astropy.io import fits
 
 from . import misc
-from .. import __githash__
 
 
 # Functions
@@ -54,4 +53,8 @@ def update_header_history(header: fits.Header):
     header : fits.Header
         FITS header to update.
     """
+    # Import git hash variable from init
+    from .. import __githash__
+
+    # Write usage and hash to FITS history
     header["HISTORY"] = f"Processed with VAST Post-Processing commit {__githash__}"
