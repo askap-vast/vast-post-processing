@@ -12,7 +12,7 @@ DIRECTORY_NAME = "test-data"
 """str: Name of the directory containing test data.
 """
 
-MODULE_PATH = (resources.files(__package__) / "..").resolve()
+MODULE_PATH = (Path(__file__) / ".." / "..").resolve()
 """Path: Absolute path to the testing module.
 """
 
@@ -28,7 +28,7 @@ def data_directory():
         Required files for testing, organized by directory as keys.
     """
     return yaml.safe_load(
-        open(MODULE_PATH / "data_existence" / "required_data.yaml", "r")
+        open(MODULE_PATH / "test_test-data" / "required_data.yaml", "r")
     )
 
 
