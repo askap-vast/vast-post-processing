@@ -12,7 +12,7 @@ from vast_post_processing import combine
 
 # Paths to images used for this test module
 
-DATA_PATH = (Path(__file__) / ".." / "test-data" / "TILES").resolve()
+DATA_PATH = (Path(__file__) / ".." / ".." / "test-data" / "TILES").resolve()
 """Path: Path to directory containing test data for this module.
 """
 
@@ -25,8 +25,11 @@ IMAGE_PATH = (
 """Path: Path to random VAST epoch 38 image for testing purposes. 
 """
 
+
 REFERENCE_PATH = (
     DATA_PATH
+    / ".."
+    / "OTHER"
     / "STOKESI_IMAGES"
     / "epoch_38"
     / "image.i.VAST_0345-31.SB50802.cont.taylor.0.restored.conv.fits"

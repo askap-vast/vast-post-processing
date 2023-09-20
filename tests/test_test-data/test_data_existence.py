@@ -28,7 +28,7 @@ def data_directory():
         Required files for testing, organized by directory as keys.
     """
     return yaml.safe_load(
-        open(MODULE_PATH / "data_existence" / "required_data.yaml", "r")
+        open(MODULE_PATH / "test_test-data" / "required_data.yaml", "r")
     )
 
 
