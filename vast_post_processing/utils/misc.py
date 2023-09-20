@@ -11,6 +11,13 @@ from re import fullmatch
 from typing import Tuple
 
 
+# Constants
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this module.
+"""
+
+
 # Functions
 
 
@@ -80,15 +87,12 @@ def write_git_hash():
     with open(git_hash_file_path, mode="w") as git_hash_file:
         git_hash_file.write(git_hash)
 
+    logger.warning(f"Git hash file written - {git_hash}")
 
-def read_git_hash(logger: logging.Logger) -> str:
+
+def read_git_hash() -> str:
     """Read the stored git hash of this commit of the project and return where
     valid, or error str otherwise.
-
-    Parameters
-    ----------
-    logger : logging.Logger
-        Main Logger object for this run.
 
     Returns
     -------
@@ -122,7 +126,7 @@ def read_git_hash(logger: logging.Logger) -> str:
                     return git_hash
                 else:
                     logger.warning(
-                        "Git hash file {path_str} contains invalid git hash."
+                        f"Git hash file {path_str} contains invalid git hash."
                     )
                     return "HASH_INVALID"
 
