@@ -3,14 +3,16 @@
 
 
 """
+
+
 # Imports
+
 
 import logging
 from pathlib import Path
-import importlib.resources
+from importlib import resources
 from itertools import chain
 import yaml
-from types import GenericAlias
 from typing import Union, Optional, Generator
 
 from astropy.io import fits
@@ -18,14 +20,15 @@ from astropy.io.votable.tree import VOTableFile
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 
+# TODO from . import compress
 from . import crop, corrections
+from .utils import misc, logutils, fitsutils
 
-# from . import compress
-from .utils import misc, logutils
 
 # Constants
 
-DATA_DIRECTORY: Path = importlib.resources.files(__package__) / "data"
+
+DATA_DIRECTORY: Path = resources.files(__package__) / "data"
 """Path to data directory containing standards, such as the default
 configuration for a run.
 """
@@ -38,7 +41,9 @@ logger: logging.Logger = logging.getLogger(__name__)
 """Global reference to the logger for this module.
 """
 
+
 # Functions
+
 
 ## Setup
 
@@ -644,3 +649,7 @@ def run(
                 cropped_hdu=cropped_hdu,
                 overwrite=overwrite,
             )
+
+        # Update FITS history
+        image_hdu: fits.PrimaryHDU = fits.open(image_path)[0]
+        fitsutils.update_header_history(image_hdu.header)

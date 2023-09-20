@@ -1,9 +1,16 @@
+"""FITS utilities for VAST Post-Processing.
 """
-Utility functions for handling fits files
-"""
+
+# Imports
 
 from astropy.time import Time, TimeDelta
 from astropy.io import fits
+
+from . import misc
+from .. import __githash__
+
+
+# Functions
 
 
 def update_header_datetimes(header: fits.Header):
@@ -12,8 +19,8 @@ def update_header_datetimes(header: fits.Header):
 
     Parameters
     ----------
-    header: fits.header.Header
-        The FITS header to update.
+    header: fits.Header
+        FITS header to update.
 
     Raises
     ------
@@ -36,3 +43,15 @@ def update_header_datetimes(header: fits.Header):
     header["MJD-END"] = obs_end.mjd
     header["TELAPSE"] = duration.sec
     header["TIMEUNIT"] = "s"
+
+
+def update_header_history(header: fits.Header):
+    """Update FITS history to document usage of this program, as well as the git
+    hash of the installed version.
+
+    Parameters
+    ----------
+    header : fits.Header
+        FITS header to update.
+    """
+    header["HISTORY"] = f"Processed with VAST Post-Processing commit {__githash__}"
