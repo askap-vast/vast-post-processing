@@ -23,6 +23,7 @@ pydata-sphinx-theme = "^0.13.3"
 pytest = "^7.4.0"
 racs-tools = "^2.2.4"
 pyyaml = "^6.0.1"
+poethepoet = "^0.22.1"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.910"
@@ -46,3 +47,10 @@ vast_post_processing = "vast_post_processing.cli.vast_post_processing:app"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poe.poetry_hooks]
+post_build = "track"
+
+[tool.poe.tasks.track]
+script = "vast_post_processing.utils.misc:write_git_hash()"
+help = "Track the git hash of this project in corrected FITS headers"
