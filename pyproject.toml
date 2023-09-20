@@ -50,7 +50,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poe.poetry_hooks]
-post_build = "track"
+post_install = "track"
 
 [tool.poe.tasks.track]
 script = "vast_post_processing.utils.misc:write_git_hash()"
