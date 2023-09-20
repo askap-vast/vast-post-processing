@@ -1,0 +1,17 @@
+test-data:
+  TILES:
+    STOKESI_IMAGES:
+      epoch_38:
+        - image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.fits
+        - image.i.VAST_0345-31.SB50802.cont.taylor.0.restored.conv.fits
+    STOKESI_RMSMAPS:
+      epoch_38:
+        - meanMap.image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.fits
+        - noiseMap.image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.fits
+    STOKESI_SELAVY:
+      epoch_38:
+        - selavy-image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.components.xml
+        - selavy-image.i.VAST_0334-37.SB50801.cont.taylor.0.restored.conv.islands.xml
+    STOKESI_WEIGHTS:
+      epoch_38:
+        - weights.i.VAST_0334-37.SB50801.cont.taylor.0.fits

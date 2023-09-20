@@ -1,3 +1,6 @@
+"""Applies various corrections to FITS images. 
+"""
+
 from pathlib import Path
 import warnings, sys, os
 from typing import Generator
@@ -197,6 +200,7 @@ def shift_and_scale_image(
     """
     logger.debug(f"Correcting {image_path} ...")
 
+    # Open image
     image_hdul = fits.open(image_path)
     image_hdu = image_hdul[0]
 
@@ -225,9 +229,10 @@ def shift_and_scale_image(
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=FITSFixedWarning)
         w = WCS(image_hdu.header)
-    # add the offsets to correct the positions
-    # use SkyCoord to handle units and wraps
-    # the new coordinates should be old coordintes + offset
+
+    # Correct positions by adding offsets
+    # Uses SkyCoord to handle units and wraps
+    # New coordinates should be old coordinates + offset
     crval = SkyCoord(w.wcs.crval[0] * u.deg, w.wcs.crval[1] * u.deg)
     crval_offset = SkyCoord(
         crval.ra + ra_offset_arcsec * u.arcsec / np.cos(crval.dec),
@@ -235,9 +240,9 @@ def shift_and_scale_image(
     )
     w.wcs.crval[0:2] = np.array([crval_offset.ra.deg, crval_offset.dec.deg])
     newheader = w.to_header()
-    # update the header with the new WCS
-    image_hdu.header.update(newheader)
 
+    # Update header with new WCS and record offsets
+    image_hdu.header.update(newheader)
     image_hdu.header["RAOFF"] = ra_offset_arcsec
     image_hdu.header["DECOFF"] = dec_offset_arcsec
 
@@ -278,7 +283,8 @@ def shift_and_scale_catalog(
         "col_rms_fit_gauss",
         "col_rms_image",
     )
-    # flux-unit columns in the island catalogs only
+
+    # Flux-unit columns in the island catalogs only
     ISLAND_FLUX_COLS = (
         "col_mean_background",
         "col_background_noise",
@@ -288,13 +294,16 @@ def shift_and_scale_catalog(
         "col_rms_residual",
         "col_stdev_residual",
     )
+
+    # Create new output path and check for existing catalog at path
     logger.debug(f"Correcting {catalog_path} ...")
     is_island = ".islands" in catalog_path.name
 
+    # Open catalog
     votablefile = parse(catalog_path)
     votable = votablefile.get_first_table()
 
-    # correct the coordinate columns
+    # Correct coordinate columns
     ra_deg = votable.array["col_ra_deg_cont"] * u.deg
     dec_deg = votable.array["col_dec_deg_cont"] * u.deg
     coords_corrected = SkyCoord(
@@ -319,7 +328,7 @@ def shift_and_scale_catalog(
         mask=votable.array["col_dec_dms_cont"].mask,
     )
 
-    # correct the flux columns
+    # Correct flux columns
     cols = (
         FLUX_COLS + ISLAND_FLUX_COLS if is_island else FLUX_COLS + COMPONENT_FLUX_COLS
     )

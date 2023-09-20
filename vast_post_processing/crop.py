@@ -13,12 +13,12 @@ from astropy.wcs import WCS
 from astropy.nddata.utils import Cutout2D
 from astropy.time import Time
 from astropy.wcs.wcs import FITSFixedWarning
-from astropy.io.votable.tree import Param
+from astropy.io.votable.tree import Param, VOTableFile
 
 from loguru import logger
 from mocpy import MOC, STMOC
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional, Union, Generator
 from pathlib import Path
 from itertools import chain
 
@@ -27,12 +27,12 @@ warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
 def get_field_centre(header: fits.header.Header):
     """Get the field centre given the FITS header
-    
+
     Parameters
     ----------
     header : astropy.io.fits.header.Header
         FITS image header
-    
+
     Returns
     -------
     field_centre : astropy.coordinates.SkyCoord
@@ -49,12 +49,14 @@ def get_field_centre(header: fits.header.Header):
     return field_centre
 
 
-def crop_hdu(hdu: fits.hdu.image.PrimaryHDU,
-            field_centre: SkyCoord,
-            size: Optional[u.quantity.Quantity] = 6.3 * u.deg,
-            rotation: Optional[u.quantity.Quantity] = 0.0 * u.deg):
-    """ Crop the data and update the header of a FITS image HDU
-    
+def crop_hdu(
+    hdu: fits.hdu.image.PrimaryHDU,
+    field_centre: SkyCoord,
+    size: Optional[u.quantity.Quantity] = 6.3 * u.deg,
+    rotation: Optional[u.quantity.Quantity] = 0.0 * u.deg,
+):
+    """Crop the data and update the header of a FITS image HDU
+
     Parameters
     ----------
     hdu : astropy.io.fits.hdu.image.PrimaryHDU
@@ -65,7 +67,7 @@ def crop_hdu(hdu: fits.hdu.image.PrimaryHDU,
         The size of each side of the square crop, by default 6.3 * u.deg.
     rotation : astropy.units.quantity.Quantity
         The rotation to apply, by default 0.0 * u.deg.
-    
+
     Returns
     -------
     hdu : astropy.io.fits.hdu.image.PrimaryHDU
@@ -94,12 +96,11 @@ def crop_hdu(hdu: fits.hdu.image.PrimaryHDU,
     return hdu
 
 
-def _add_votable_params(votable: astropy.io.votable,
-                        field_centre: SkyCoord,
-                        size: u.quantity.Quantity
-                        ):
+def _add_votable_params(
+    votable: VOTableFile, field_centre: SkyCoord, size: u.quantity.Quantity
+):
     """Add crop parameter information to a VOTable.
-    
+
     Parameters
     ----------
     votable : astropy.io.votable
@@ -108,40 +109,44 @@ def _add_votable_params(votable: astropy.io.votable,
         A SkyCoord with the coordinates of the field centre
     size : astropy.units.quantity.Quantity
         The size of the crop
-    
+
     Returns
     -------
     None
     """
-    crop_ra_param = Param(votable,
-                          value=field_centre.ra.deg,
-                          ID='CropCentreRA',
-                          name='CropCentreRA',
-                          datatype='float'
-                          )
-    crop_dec_param = Param(votable,
-                           value=field_centre.dec.deg,
-                           ID='CropCentreDec',
-                           name='CropCentreDec',
-                           datatype='float'
-                           )
-    crop_size = Param(votable,
-                      value=size.to(u.deg).value,
-                      ID='CropSize',
-                      name='CropSize',
-                      datatype='float',
-                      )
-    
+    crop_ra_param = Param(
+        votable,
+        value=field_centre.ra.deg,
+        ID="CropCentreRA",
+        name="CropCentreRA",
+        datatype="float",
+    )
+    crop_dec_param = Param(
+        votable,
+        value=field_centre.dec.deg,
+        ID="CropCentreDec",
+        name="CropCentreDec",
+        datatype="float",
+    )
+    crop_size = Param(
+        votable,
+        value=size.to(u.deg).value,
+        ID="CropSize",
+        name="CropSize",
+        datatype="float",
+    )
+
     votable.params.extend([crop_ra_param, crop_dec_param, crop_size])
-    
-    
-def crop_catalogue(vot: astropy.io.votable,
-                   cropped_hdu: io.fits.hdu.image.PrimaryHDU,
-                   field_centre: SkyCoord,
-                   size: u.quantity.Quantity
-                   ):
+
+
+def crop_catalogue(
+    vot: VOTableFile,
+    cropped_hdu: fits.PrimaryHDU,
+    field_centre: SkyCoord,
+    size: u.quantity.Quantity,
+):
     """Crop the catalogue based on the coverage of the cropped HDU
-    
+
     Parameters
     ----------
     votable : astropy.io.votable
@@ -152,7 +157,7 @@ def crop_catalogue(vot: astropy.io.votable,
         A SkyCoord with the coordinates of the field centre.
     size : astropy.units.quantity.Quantity
         The size of the crop.
-    
+
     Returns
     -------
     votable : astropy.io.votable
@@ -169,21 +174,20 @@ def crop_catalogue(vot: astropy.io.votable,
 
     in_footprint = cropped_wcs.footprint_contains(sc)
     votable.array = votable.array[in_footprint]
-    
+
     _add_votable_params(votable, field_centre, size)
-    
 
     return votable
 
 
 def wcs_to_moc(cropped_hdu: fits.hdu.image.PrimaryHDU):
     """Generate a MOC object from a cropped HDU
-    
+
     Parameters
     ----------
     cropped_hdu : astropy.io.fits.hdu.image.PrimaryHDU
         The cropped image HDU.
-    
+
     Returns
     -------
     moc : mocpy.moc.MOC
@@ -204,17 +208,16 @@ def wcs_to_moc(cropped_hdu: fits.hdu.image.PrimaryHDU):
     return MOC.from_polygon_skycoord(sc)
 
 
-def moc_to_stmoc(moc: mocpy.moc.MOC,
-                 hdu: fits.hdu.image.PrimaryHDU):
+def moc_to_stmoc(moc: MOC, hdu: fits.hdu.image.PrimaryHDU):
     """Generate a STMOC from a MOC and the observation information from a HDU
-    
+
     Parameters
     ----------
     moc : mocpy.moc.MOC
         The relevant MOC.
     hdu : astropy.io.fits.hdu.image.PrimaryHDU
         The image HDU containing the datetime information.
-    
+
     Returns
     -------
     stmoc : mocpy.moc.STMOC
@@ -224,7 +227,7 @@ def moc_to_stmoc(moc: mocpy.moc.MOC,
         header = fitsutils.update_header_datetimes(hdu.header)
     else:
         header = hdu.header
-        
+
     start = Time([header["DATE-BEG"]])
     end = Time([header["DATE-END"]])
 
@@ -243,7 +246,7 @@ def run_full_crop(
     overwrite: Optional[bool] = False,
 ):
     """Run the crop on all data that has been provided.
-    
+
     Parameters
     ----------
     data_root : Union[str, Path]
@@ -251,17 +254,17 @@ def run_full_crop(
     crop_size : u.quantity.Quantity,
         The size of each side of the square crop.
     epoch : Union[str, int, list]
-        The epoch number/identifier(s) to include. 
+        The epoch number/identifier(s) to include.
     stokes : str
         The Stokes parameter to crop (I or V).
     out_root : Union[str, Path], optional
-        The root output directory, by default None which results in 
+        The root output directory, by default None which results in
         using the data_root directory.
     create_moc: bool, optional
         Whether or not to create cropped MOC files, by default False.
     overwrite: bool, optional
         Whether or not to overwrite existing files, by default False.
-    
+
     Returns
     -------
     None
