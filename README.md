@@ -35,6 +35,10 @@ poetry install
 poetry shell
 ```
 
+## Testing
+# TODO WRITE
+1. Download data
+
 <!-- ## Usage
 1. To be written -->
 
