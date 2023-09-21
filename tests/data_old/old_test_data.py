@@ -1,20 +1,36 @@
-"""Checks for existence and structure of test data used in this module and pulls
-from vast-data if nonexistent. 
+"""Test for existence and structure of expected data for this test suite.
+
+Download missing test data. Create and structure directories where necessary.
+
+See Also
+--------
+`vast-post-processing/tests/data/required.yaml`
+    Required data and corresponding structure for this test suite. 
 """
+
+
+# Imports
+
 
 import os
 import yaml
 import pytest
 from pathlib import Path
-from importlib import resources
 
-DIRECTORY_NAME = "test-data"
+
+# Constants
+
+
+DATA_DIRECTORY_NAME = "test-data"
 """str: Name of the directory containing test data.
 """
 
-MODULE_PATH = (Path(__file__) / ".." / "..").resolve()
+TEST_DIRECTORY_PATH = (Path(__file__) / ".." / "..").resolve()
 """Path: Absolute path to the testing module.
 """
+
+
+# Fixtures
 
 
 @pytest.fixture
@@ -24,15 +40,18 @@ def data_directory():
 
     Returns
     -------
-    Dict
+    dict
         Required files for testing, organized by directory as keys.
     """
     return yaml.safe_load(
-        open(MODULE_PATH / "test_test-data" / "required_data.yaml", "r")
+        open(TEST_DIRECTORY_PATH / "test_test-data" / "required.yaml", "r")
     )
 
 
-def check_directory(path: Path, directories: dict):
+# Functions
+
+
+def check_directory(path: Path, directories: dict[str, str]):
     """Helper function for test_structure to check for directory existence and
     create where nonexistent.
 
@@ -40,7 +59,7 @@ def check_directory(path: Path, directories: dict):
     ----------
     path : Path
         Path to current directory being checked.
-    directories : dict
+    directories : dict[str, str]
         List of subdirectories in current directory being checked.
     """
     # Iterate over each subdirectory in current directories dict
@@ -52,42 +71,6 @@ def check_directory(path: Path, directories: dict):
         # Recursive call if subdirectory contains subdirectories
         if isinstance(directories[directory], dict):
             check_directory(path / directory, directories[directory])
-
-
-def test_structure(data_directory: dict):
-    """Tests the directory structure of the test-data directory, ensuring the
-    required subdirectories match the subdirectories found on the local module.
-
-    Parameters
-    ----------
-    data_directory : dict
-        Fixture representing required test data filenames.
-
-    See Also
-    --------
-    required_data.yaml
-        YAML file detailing required files and directory structure.
-    """
-    # Checks for directory and creates if nonexistent
-    check_directory(MODULE_PATH, data_directory)
-
-    # The required/expected directories, and local directories
-    required_directories = list(data_directory[DIRECTORY_NAME].keys())
-    actual_directories = [
-        item.name
-        for item in (MODULE_PATH / DIRECTORY_NAME).iterdir()
-        if ((item.name[0] != "_") and (item.name[0] != ".") and (item.is_dir()))
-    ]
-
-    # Boolean evaluating whether all expected subdirectories exist locally
-    directories_exist = True
-
-    # Iterate over each expected subdirectory
-    for directory in required_directories:
-        # Boolean evaluates as False if expected subdirectories do not exist locally
-        if directory not in actual_directories:
-            directories_exist = False
-    assert directories_exist
 
 
 def check_existence(path: Path, directories: dict) -> bool:
@@ -124,6 +107,45 @@ def check_existence(path: Path, directories: dict) -> bool:
     return True
 
 
+# Tests
+
+
+def test_structure(data_directory: dict):
+    """Tests the directory structure of the test-data directory, ensuring the
+    required subdirectories match the subdirectories found on the local module.
+
+    Parameters
+    ----------
+    data_directory : dict
+        Fixture representing required test data filenames.
+
+    See Also
+    --------
+    required_data.yaml
+        YAML file detailing required files and directory structure.
+    """
+    # Checks for directory and creates if nonexistent
+    check_directory(TEST_DIRECTORY_PATH, data_directory)
+
+    # The required/expected directories, and local directories
+    required_directories = list(data_directory[DATA_DIRECTORY_NAME].keys())
+    actual_directories = [
+        item.name
+        for item in (TEST_DIRECTORY_PATH / DATA_DIRECTORY_NAME).iterdir()
+        if ((item.name[0] != "_") and (item.name[0] != ".") and (item.is_dir()))
+    ]
+
+    # Boolean evaluating whether all expected subdirectories exist locally
+    directories_exist = True
+
+    # Iterate over each expected subdirectory
+    for directory in required_directories:
+        # Boolean evaluates as False if expected subdirectories do not exist locally
+        if directory not in actual_directories:
+            directories_exist = False
+    assert directories_exist
+
+
 def test_existence(data_directory: dict):
     """Tests for file existence in the test data directory.
 
@@ -142,4 +164,4 @@ def test_existence(data_directory: dict):
     If this test fails, consider running the script pull_data.sh in this module
     to download the data these tests were written for.
     """
-    assert check_existence(MODULE_PATH, data_directory)
+    assert check_existence(TEST_DIRECTORY_PATH, data_directory)
