@@ -42,6 +42,7 @@ swarp_neighbours = "vast_post_processing.cli.swarp:app"
 selavy_prepare = "vast_post_processing.cli.selavy_combined:app"
 crop_fields = "vast_post_processing.cli.run_crop:app"
 vast_post_processing = "vast_post_processing.cli.vast_post_processing:app"
+pull_test_data = "tests.data.pull_data:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
