@@ -406,13 +406,16 @@ def crop_and_correct_image(
     tuple[SkyCoord, fits.PrimaryHDU]
         Field centre of image, and cropped image.
     """
+    logger.debug(f"corrected_fits: {corrected_fits}")
     # Iterate over each image to crop and write to a new directory
     for i, path in enumerate((rms_path, bkg_path, image_path)):
+        logger.debug(f"Working on {i} and {path}")
         # Locate directory to store cropped data, and create if nonexistent
         # TODO what suffix should we use?
         # TODO reorganize path handling
         stokes_dir = f"{path.parent.parent.name}_CROPPED"
         fits_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
+        logger.debug(f"Using fits_output_dir: {fits_output_dir}")
         if not fits_output_dir.exists():
             fits_output_dir.mkdir(parents=True)
 
@@ -606,10 +609,18 @@ def run(
         )
 
         # Apply corrections to images and catalogues
-        corrected = corrections.correct_field(image_path)
+        corrected = corrections.correct_field(image_path,
+                                              overwrite=overwrite,
+                                              outdir=out_root,
+        )
+        
+        main_logger.debug(corrected)
 
         # Skip images skipped by previous step
-        if corrected is None:
+        if (corrected is None) or (corrected == ([], [])):
+            main_logger.warning(f"Field correction was skipped for "
+                                f"{image_path}. Skipping remaining steps"
+                                )
             continue
         else:
             corrected_fits, corrected_cats = corrected[0], corrected[1]

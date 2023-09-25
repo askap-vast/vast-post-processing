@@ -198,7 +198,7 @@ def shift_and_scale_image(
     Returns:
         astropy.io.fits.hdu.image.PrimaryHDU: the HDU of the corrected image
     """
-    logger.debug(f"Correcting {image_path} ...")
+    logger.debug(f"Correcting {image_path}...")
 
     # Open image
     image_hdul = fits.open(image_path)
@@ -212,8 +212,8 @@ def shift_and_scale_image(
     image_hdu.data = flux_scale * (
         image_hdu.data + (flux_offset_mJy * (u.mJy.to(data_unit)))
     )
-    image_hdu.header["FLUXOFFSET"] = flux_offset_mJy * (u.mJy.to(data_unit))
-    image_hdu.header["FLUXSCALE"] = flux_scale
+    image_hdu.header["FLUXOFF"] = flux_offset_mJy * (u.mJy.to(data_unit))
+    image_hdu.header["FLUXSCL"] = flux_scale
 
     image_hdu.header.add_history(
         "Image has been corrected for flux by a scaling factor and\
@@ -393,7 +393,8 @@ def get_correct_file(correction_files_dir: list, img_field: str):
     if img_field[-1] == "A":
         img_field = img_field[:-1]
     img_field = img_field.replace("VAST", "RACS")
-    matched_field = list(correction_files_dir.glob(f"*{img_field}*components*"))
+    cat_glob_str = f"*{img_field}*restored.components.xml"
+    matched_field = list(correction_files_dir.glob(cat_glob_str))
     if len(matched_field) > 0:
         # This means that there are multpile files with the same field,
         # possibly with different sbid's corresponding to different observations
@@ -474,11 +475,11 @@ def check_for_files(image_path: str):
 
 def correct_field(
     image_path: Path,
-    vast_corrections_root: Path = "/data/vast-survey/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY",
+    vast_corrections_root: Path = "/data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY",
     radius: float = 10,
     condon: bool = True,
-    psf_ref: list[float] = None,
-    psf: list[float] = None,
+    psf_ref: list[float] = [],
+    psf: list[float] = [],
     flux_limit: float = 0,
     snr_limit: float = 20,
     nneighbor: float = 1,
@@ -494,7 +495,7 @@ def correct_field(
     Args:
         image path (Path): Path to the image file that needs to be corrected.
         vast_corrections_root (Path, optional): Path to the catalogues of referecne catalog.
-            Defaults to "/data/vast-survey/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY".
+            Defaults to "/data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY".
         radius (float, optional): Crossmatch radius. Defaults to 10.
         condon (bool, optional): Flag to replace errros with Condon errors. Defaults to True.
         psf_ref (list[float], optional): PSF information of the reference catalog. Defaults to None.
