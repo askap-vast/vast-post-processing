@@ -474,7 +474,7 @@ def check_for_files(image_path: str):
 
 def correct_field(
     image_path: Path,
-    vast_corrections_root: Path = "/data/vast-survey/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY",
+    vast_corrections_root: Path = "/data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY",
     radius: float = 10,
     condon: bool = True,
     psf_ref: list[float] = None,
