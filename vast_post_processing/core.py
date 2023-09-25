@@ -406,13 +406,16 @@ def crop_and_correct_image(
     tuple[SkyCoord, fits.PrimaryHDU]
         Field centre of image, and cropped image.
     """
+    logger.debug("corrected_fits: {corrected_fits}")
     # Iterate over each image to crop and write to a new directory
     for i, path in enumerate((rms_path, bkg_path, image_path)):
+        logger.debug("Working on {i} and {path}")
         # Locate directory to store cropped data, and create if nonexistent
         # TODO what suffix should we use?
         # TODO reorganize path handling
         stokes_dir = f"{path.parent.parent.name}_CROPPED"
         fits_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
+        logger.debug("Using fits_output_dir: {fits_output_dir}")
         if not fits_output_dir.exists():
             fits_output_dir.mkdir(parents=True)
 
