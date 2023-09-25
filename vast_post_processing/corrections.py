@@ -198,7 +198,7 @@ def shift_and_scale_image(
     Returns:
         astropy.io.fits.hdu.image.PrimaryHDU: the HDU of the corrected image
     """
-    logger.debug(f"Correcting {image_path} ...")
+    logger.debug(f"Correcting {image_path}...")
 
     # Open image
     image_hdul = fits.open(image_path)
