@@ -610,6 +610,8 @@ def run(
 
         # Apply corrections to images and catalogues
         corrected = corrections.correct_field(image_path)
+        
+        main_logger.debug(corrected)
 
         # Skip images skipped by previous step
         if corrected is ([], []):
