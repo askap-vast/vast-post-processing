@@ -612,7 +612,10 @@ def run(
         corrected = corrections.correct_field(image_path)
 
         # Skip images skipped by previous step
-        if corrected is None:
+        if corrected is ([], []):
+            main_logger.warning("Field correction was skipped for "
+                                "{image_path}. Skipping remaining steps"
+                                )
             continue
         else:
             corrected_fits, corrected_cats = corrected[0], corrected[1]
