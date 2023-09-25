@@ -210,3 +210,5 @@ def main():
             config["overwrite"],
             config["release"],
         )
+
+    print(f"All done! Check out {test_data_root}.")
