@@ -615,8 +615,8 @@ def run(
 
         # Skip images skipped by previous step
         if corrected == ([], []):
-            main_logger.warning("Field correction was skipped for "
-                                "{image_path}. Skipping remaining steps"
+            main_logger.warning(f"Field correction was skipped for "
+                                f"{image_path}. Skipping remaining steps"
                                 )
             continue
         else:
