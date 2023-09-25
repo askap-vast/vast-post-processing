@@ -212,8 +212,8 @@ def shift_and_scale_image(
     image_hdu.data = flux_scale * (
         image_hdu.data + (flux_offset_mJy * (u.mJy.to(data_unit)))
     )
-    image_hdu.header["FLUXOFFSET"] = flux_offset_mJy * (u.mJy.to(data_unit))
-    image_hdu.header["FLUXSCALE"] = flux_scale
+    image_hdu.header["FLUXOFF"] = flux_offset_mJy * (u.mJy.to(data_unit))
+    image_hdu.header["FLUXSCL"] = flux_scale
 
     image_hdu.header.add_history(
         "Image has been corrected for flux by a scaling factor and\
