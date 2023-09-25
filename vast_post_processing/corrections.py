@@ -494,7 +494,7 @@ def correct_field(
     Args:
         image path (Path): Path to the image file that needs to be corrected.
         vast_corrections_root (Path, optional): Path to the catalogues of referecne catalog.
-            Defaults to "/data/vast-survey/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY".
+            Defaults to "/data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY".
         radius (float, optional): Crossmatch radius. Defaults to 10.
         condon (bool, optional): Flag to replace errros with Condon errors. Defaults to True.
         psf_ref (list[float], optional): PSF information of the reference catalog. Defaults to None.
