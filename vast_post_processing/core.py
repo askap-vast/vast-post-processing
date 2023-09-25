@@ -609,7 +609,10 @@ def run(
         )
 
         # Apply corrections to images and catalogues
-        corrected = corrections.correct_field(image_path)
+        corrected = corrections.correct_field(image_path,
+                                              overwrite=overwrite,
+                                              outdir=out_root,
+        )
         
         main_logger.debug(corrected)
 
