@@ -1,4 +1,6 @@
-test_data_root: "../../test-data/"
+test_data_root: "test-data"
+overwrite: false
+release: true
 pull:
   - field: "0334-37"
     sbid: "50801"
