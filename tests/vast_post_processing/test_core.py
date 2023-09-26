@@ -1,9 +1,17 @@
 """Test the module `vast_post_processing.core`. 
 """
 
+
+# Imports
+
+
 import pytest
+from pathlib import Path
 
 from vast_post_processing import core
+
+
+# Tests
 
 
 def test_verify_correct_type():
