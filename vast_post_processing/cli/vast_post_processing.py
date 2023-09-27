@@ -39,6 +39,13 @@ def main(
         file_okay=False,
         dir_okay=True,
     ),
+    corrections_path: Optional[Path] = typer.Option(
+        None,
+        help=("Path to locate corresponding reference catalogues"),
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
     stokes: Optional[List[str]] = typer.Option(
         None,
         help=("Stokes parameter to use (I, Q, U, V)."),
@@ -76,6 +83,7 @@ def main(
         config_file,
         data_root,
         out_root,
+        corrections_path,
         stokes,
         epoch,
         crop_size,
