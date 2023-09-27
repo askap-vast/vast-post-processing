@@ -94,7 +94,11 @@ def setup_configuration_variable(
 
         # Assess values for validity
         # If variable is Path, ensure it points to an existing directory
-        if (name == "data_root") or (name == "out_root"):
+        if (
+            (name == "data_root")
+            or (name == "out_root")
+            or (name == "corrections_path")
+        ):
             path = Path(value).resolve()
             if not path.exists():
                 raise FileNotFoundError(f"Provided path for {name} {value} not found.")
@@ -124,14 +128,13 @@ def setup_configuration_variable(
         return value
 
     # At this point, the variable has not been provided a valid value
+
     # If out_root is unspecified, default to data directory
     if name == "out_root":
         return None
-
     # If epoch is unspecified, process all epochs (see get_image_paths)
     elif name == "epoch":
         return []
-
     # For all other variables, terminate since no value has been provided
     else:
         raise ValueError(f"{name} value not found. Terminating program.")
@@ -141,6 +144,7 @@ def setup_configuration(
     config_file: Optional[Path] = None,
     data_root: Optional[Path] = None,
     out_root: Optional[Path] = None,
+    corrections_path: Optional[Path] = None,
     stokes: Optional[list[str]] = None,
     epoch: Optional[list[int]] = None,
     crop_size: Optional[float] = None,
@@ -162,6 +166,8 @@ def setup_configuration(
     out_root : Optional[Path], optional
         Path to the root output directory, by default None.
         This must be either provided in the program call, or by configuration.
+    corrections_path : Optional[Path], optional
+        Path to locate corresponding reference catalogues, by default None.
     stokes : Optional[list[str]], optional
         Stokes parameter(s) to process, by default None.
     epoch : Optional[list[str]], optional
@@ -203,6 +209,7 @@ def setup_configuration(
     user_variables = {
         "data_root": data_root,
         "out_root": out_root,
+        "corrections_path": corrections_path,
         "stokes": stokes,
         "epoch": epoch,
         "crop_size": crop_size,
@@ -546,6 +553,7 @@ def run(
     config_file: Optional[Path] = None,
     data_root: Optional[Path] = None,
     out_root: Optional[Path] = None,
+    corrections_path: Optional[Path] = None,
     stokes: Optional[list[str]] = None,
     epoch: Optional[list[int]] = None,
     crop_size: Optional[float] = None,
@@ -559,6 +567,7 @@ def run(
     (
         data_root,
         out_root,
+        corrections_path,
         stokes,
         epoch,
         crop_size,
@@ -571,6 +580,7 @@ def run(
         config_file=config_file,
         data_root=data_root,
         out_root=out_root,
+        corrections_path=corrections_path,
         stokes=stokes,
         epoch=epoch,
         crop_size=crop_size,
@@ -609,18 +619,21 @@ def run(
         )
 
         # Apply corrections to images and catalogues
-        corrected = corrections.correct_field(image_path,
-                                              overwrite=overwrite,
-                                              outdir=out_root,
+        corrected = corrections.correct_field(
+            image_path,
+            overwrite=overwrite,
+            outdir=out_root,
+            vast_corrections_root=corrections_path,
         )
-        
+
         main_logger.debug(corrected)
 
         # Skip images skipped by previous step
         if (corrected is None) or (corrected == ([], [])):
-            main_logger.warning(f"Field correction was skipped for "
-                                f"{image_path}. Skipping remaining steps"
-                                )
+            main_logger.warning(
+                f"Field correction was skipped for "
+                f"{image_path}. Skipping remaining steps"
+            )
             continue
         else:
             corrected_fits, corrected_cats = corrected[0], corrected[1]

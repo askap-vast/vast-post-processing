@@ -8,8 +8,11 @@ data_root: null
 # By default None, and set to data_root in program.
 out_root: null
 
+# Path to locate corresponding reference catalogues.
+# By default /data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY. 
+corrections_path: "/data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY"
+
 # Stokes parameter to operate on for this run, by default I.
-# TODO should this be more than one at a time? 
 stokes: 
   - I
 
