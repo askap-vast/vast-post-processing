@@ -1,7 +1,4 @@
 """Core Pipeline Entry Point for VAST Post-Processing.
-
-
-
 """
 
 
@@ -545,10 +542,12 @@ def create_mocs(
     # Wrute STMOC to output file from cropped image and MOC and output to logger
     stmoc = crop.moc_to_stmoc(moc, cropped_hdu)
     stmoc.write(stmoc_outfile, overwrite=overwrite)
-    logger.debug("Wrote {stmoc_outfile}")
+    logger.debug(f"Wrote {stmoc_outfile}")
 
 
 ## Main
+
+
 def run(
     config_file: Optional[Path] = None,
     data_root: Optional[Path] = None,
@@ -563,6 +562,37 @@ def run(
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
 ):
+    """Run the Post-Processing Pipeline on a given set of observation data.
+
+    Parameters
+    ----------
+    config_file : Optional[Path], optional
+        Path to a configuration yaml, by default None.
+    data_root : Optional[Path], optional
+        Path to the root data directory, by default None.
+        This must be either provided in the program call, or by configuration.
+    out_root : Optional[Path], optional
+        Path to the root output directory, by default None.
+        This must be either provided in the program call, or by configuration.
+    corrections_path : Optional[Path], optional
+        Path to locate corresponding reference catalogues, by default None.
+    stokes : Optional[list[str]], optional
+        Stokes parameter(s) to process, by default None.
+    epoch : Optional[list[str]], optional
+        Epoch(s) to process, by default None.
+    crop_size : Optional[float], optional
+        Angular size of image crops, in degrees, by default None.
+    create_moc : Optional[bool], optional
+        Flag to create MOCs, by default None.
+    compress : Optional[bool], optional
+        Flag to compress files, by default None.
+    overwrite : Optional[bool], optional
+        Flag to overwrite existing data, by default None.
+    verbose : Optional[bool], optional
+        Flag to display status and progress to output, by default None.
+    debug : Optional[bool], optional
+        Flag to display errors to output, by default None.
+    """
     # Set up configuration settings via configuration files and cli options
     (
         data_root,
