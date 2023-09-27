@@ -1,26 +1,37 @@
 """Applies various corrections to FITS images. 
 """
 
+
+# Imports
+
+
+import sys
+import warnings
+from loguru import logger
+
+import csv
 from pathlib import Path
-import warnings, sys, os
-from typing import Generator
-from itertools import chain
-from astropy.coordinates import SkyCoord, Angle
+from uncertainties import ufloat
+from typing import Generator, Tuple, Optional
+
+import numpy as np
+
 from astropy.io import fits
 from astropy.io.votable import parse
 from astropy.io.votable.tree import Param
-import astropy.units as u
-from uncertainties import ufloat
 from astropy.wcs import WCS, FITSFixedWarning
-from loguru import logger
-import numpy as np
-from typing import Tuple, Optional
+from astropy.coordinates import SkyCoord, Angle
+import astropy.units as u
+
 from vast_post_processing.catalogs import Catalog
 from vast_post_processing.crossmatch import (
     crossmatch_qtables,
     calculate_positional_offsets,
     calculate_flux_offsets,
 )
+
+
+# Functions
 
 
 def vast_xmatch_qc(
@@ -150,30 +161,45 @@ def vast_xmatch_qc(
     flux_corr_mult = 1 / ugradient
     flux_corr_add = -1 * uoffset
 
+    # Write output to csv if requested
     if csv_output is not None:
-        # output has been requested
-        csv_output_path = Path(csv_output)  # ensure Path object
+        # Get path to output csv file
+        csv_output_path = Path(csv_output).resolve()
+
+        # Get SBID of observation
         sbid = catalog.sbid if catalog.sbid is not None else ""
-        if not csv_output_path.exists():
-            f = open(csv_output_path, "w")
-        else:
-            f = open(csv_output_path, "a")
-        logger.info(
-            "Writing corrections CSV. To correct positions, add the corrections to"
-            " the original source positions i.e. RA' = RA + ra_correction /"
-            " cos(Dec). To correct fluxes, add the additive correction and multiply"
-            " the result by the multiplicative correction i.e. S' ="
-            " flux_peak_correction_multiplicative(S +"
-            " flux_peak_correction_additive)."
-        )
-        print(
-            f"{catalog.field},{catalog.epoch},{sbid},{dra_median_value * -1},"
-            f"{ddec_median_value * -1},{dra_madfm_value},{ddec_madfm_value},"
-            f"{flux_corr_mult.nominal_value},{flux_corr_add.nominal_value},"
-            f"{flux_corr_mult.std_dev},{flux_corr_add.std_dev},{len(data)}",
-            file=f,
-        )
-        f.close()
+
+        # Write new file if nonexistent, append otherwise
+        with open(csv_output_path, mode="a", newline="") as f:
+            # Output instructions to logger
+            logger.info(
+                "Writing corrections CSV. To correct positions, add the corrections to"
+                " the original source positions i.e. RA' = RA + ra_correction /"
+                " cos(Dec). To correct fluxes, add the additive correction and multiply"
+                " the result by the multiplicative correction i.e. S' ="
+                " flux_peak_correction_multiplicative(S +"
+                " flux_peak_correction_additive)."
+            )
+
+            # Write row to file
+            writer = csv.writer(f)
+            writer.writerow(
+                [
+                    catalog.field,
+                    catalog.epoch,
+                    sbid,
+                    dra_median_value * -1,
+                    ddec_median_value * -1,
+                    dra_madfm_value,
+                    ddec_madfm_value,
+                    flux_corr_mult.nominal_value,
+                    flux_corr_add.nominal_value,
+                    flux_corr_mult.std_dev,
+                    flux_corr_add.std_dev,
+                    len(data),
+                ]
+            )
+
     return dra_median_value, ddec_median_value, flux_corr_mult, flux_corr_add
 
 
