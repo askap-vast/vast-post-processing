@@ -19,6 +19,7 @@ from astropy import units as u
 
 # TODO from . import compress
 from . import crop, corrections
+from .compress import compress_hdu
 from .utils import misc, logutils, fitsutils
 
 
@@ -370,7 +371,7 @@ def get_corresponding_paths(
     return rms_path, bkg_path, components_path, islands_path
 
 
-def crop_and_correct_image(
+def crop_image(
     out_root: Path,
     image_path: Path,
     epoch_dir: str,
@@ -378,10 +379,10 @@ def crop_and_correct_image(
     bkg_path: Path,
     corrected_fits: list[fits.PrimaryHDU],
     crop_size: u.Quantity,
+    compress: bool,
     overwrite: bool,
 ) -> tuple[SkyCoord, fits.PrimaryHDU]:
-    """Apply corrections to a field, then crop observation images in the
-    field.
+    """Crop and compress data corresponding to image data.
 
     Parameters
     ----------
@@ -399,13 +400,15 @@ def crop_and_correct_image(
         list of FITS HDUs which have been previously corrected.
     crop_size : u.Quantity
         Angular size of crop to be applied.
+    compress : bool
+        Flag to compress image data.
     overwrite : bool
         Flag to overwrite image data.
 
     Returns
     -------
     tuple[SkyCoord, fits.PrimaryHDU]
-        Field centre of image, and cropped image.
+        Field centre of image, and cropped (and compressed, if requested) image.
     """
     logger.debug(f"corrected_fits: {corrected_fits}")
 
@@ -422,19 +425,22 @@ def crop_and_correct_image(
         if not fits_output_dir.exists():
             fits_output_dir.mkdir(parents=True)
 
-        # Crop the image and write to disk
+        # Crop image data
         outfile = fits_output_dir / path.name
         hdu = corrected_fits[i]
         field_centre = crop.get_field_centre(hdu.header)
         cropped_hdu = crop.crop_hdu(hdu, field_centre, size=crop_size)
-        cropped_hdu.writeto(outfile, overwrite=overwrite)
-        logger.debug(f"Wrote {outfile}")
 
-    # Update FITS history
-    fitsutils.update_header_history(cropped_hdu.header)
+        # Compress image if requested
+        processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
+
+        # Write processed image to disk and update history
+        processed_hdu.writeto(outfile, overwrite=overwrite)
+        logger.debug(f"Wrote {outfile}")
+        fitsutils.update_header_history(processed_hdu.header)
 
     # Return field centre and processed HDU
-    return field_centre, cropped_hdu
+    return field_centre, processed_hdu
 
 
 def crop_catalogs(
@@ -649,14 +655,13 @@ def run(
             epoch_dir=epoch_dir,
         )
 
-        # Apply corrections to images and catalogues
+        # Apply corrections to field of passed image
         corrected = corrections.correct_field(
             outdir=out_root,
             vast_corrections_root=corrections_path,
             image_path=image_path,
             overwrite=overwrite,
         )
-
         main_logger.debug(corrected)
 
         # Skip images skipped by previous step
@@ -669,8 +674,8 @@ def run(
         else:
             corrected_fits, corrected_cats = corrected[0], corrected[1]
 
-        # Correct astrometry and flux of image data
-        field_centre, cropped_hdu, corrected_cats = crop_and_correct_image(
+        # Crop corrected images
+        field_centre, cropped_hdu, corrected_cats = crop_image(
             out_root=out_root,
             image_path=image_path,
             epoch_dir=epoch_dir,
