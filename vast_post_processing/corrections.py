@@ -12,6 +12,7 @@ from loguru import logger
 import csv
 from pathlib import Path
 from uncertainties import ufloat
+from uncertainties.core import AffineScalarFunc
 from typing import Generator, Tuple, Optional
 
 import numpy as np
@@ -52,54 +53,67 @@ def vast_xmatch_qc(
     select_point_sources: bool = True,
     crossmatch_output: Optional[str] = None,
     csv_output: Optional[str] = None,
-):
-    """Function to cross-match two catalogs and filter sources that are within
-       a given radius
+) -> Tuple[float, float, AffineScalarFunc, AffineScalarFunc]:
+    """Cross-match two catalogues, and filter sources within a given radius.
 
-    Args:
-        reference_catalog_path (str): Path to the reference catalog
-        catalog_path (str): Path to the catalog that needs flux/astrometric corrections
-        radius (Angle, optional): Cross-match radius. Defaults to Angle("10arcsec").
-        condon (bool, optional): Flag to calculate Condon error. Defaults to False.
-        psf_reference (Optional[Tuple[float, float]], optional): PSF of the reference catalog.
-            This includes information about the major/minor axis FWHM. Defaults to None. If None,
-            Condon errors will not be calculated.
-        psf (Optional[Tuple[float, float]], optional): PSF of the input catalog.
-            This includes information about the major/minor axis FWHM. Defaults to None. If None,
-            Condon errors will not be calculated.
-        fix_m (bool, optional): Flag to fix the slope. For tge straight line fit, should we fix
-            the slope to certain value or leave it free to be fit. Defaults to False.
-        fix_b (bool, optional): Flag to fix the intercept. For tge straight line fit, should we fix
-            the slope to certain value or leave it free to be fit. Defaults to False.
-        positional_unit (u.Unit, optional): output unit in which the astrometric offset is given.
-            Defaults to u.Unit("arcsec").
-        flux_unit (u.Unit, optional): output unit in which the flux scale is given.
-            Defaults to u.Unit("mJy").
-        flux_limit (float, optional): Flux limit to select sources (sources with peak flux
-            > this will be selected). Defaults to 0.
-        snr_limit (float, optional): SNR limit to select sources (sources with SNR > this
-            will be selected). Defaults to 20.
-        nneighbor (float, optional): Distance to nearest neighbor (in arcmin). Sources with
-            neighbors < this will be removed. Defaults to 1.
-        apply_flux_limit (bool, optional): Flag to decide to apply flux limit. Defaults to True.
-        select_point_sources (bool, optional): Flag to decide to select point sources.
-            Defaults to True
-        crossmatch_output (Optional[str], optional): File path to write the crossmatch output.
-            Defaults to None, which means no file is written
-        csv_output (Optional[str], optional): File path to write the flux/astrometric corrections.
-            Defaults to None, which means no file is written
+    Parameters
+    ----------
+    reference_catalog_path : str
+        Path to reference catalogue.
+    catalog_path : str
+        Path to catalogue to be corrected.
+    radius : Angle, optional
+        Radius of cross-match, by default Angle("10arcsec").
+    condon : bool, optional
+        Flag to calculate Condon error, by default False.
+    psf_reference : Optional[Tuple[float, float]], optional
+        PSF of reference catalogue. Includes information about the major/minor
+        axis FWHM. If None (default), Condon errors will not be calculated.
+    psf : Optional[Tuple[float, float]], optional
+        PSF of input catalogue. Includes information about the major/minor axis
+        FWHM. If None (default), Condon errors will not be calculated.
+    fix_m : bool, optional
+        Flag to fix slope, by default False.
+        TODO re: linear fit - variable or fixed slope?
+    fix_b : bool, optional
+        Flag to fix intercept, by default False.
+        TODO re: linear fit - variable or fixed slope?
+    positional_unit : u.Unit, optional
+        Output unit of astrometric offset, by default u.Unit("arcsec").
+    flux_unit : u.Unit, optional
+        Output unit of flux scale, by default u.Unit("mJy").
+    flux_limit : float, optional
+        Minimum for a source's maximum flux to select that source, by default 0.
+    snr_limit : float, optional
+        Minimum for a source's maximum SNR to select that source, by default 20.
+    nneighbor : float, optional
+        Minimum distance, in arcmin, to a source's nearest neighbour to select
+        that source, by default 1.
+    apply_flux_limit : bool, optional
+        Flag to apply flux limit, by default True.
+    select_point_sources : bool, optional
+        Flag to select point sources, by default True.
+    crossmatch_output : Optional[str], optional
+        Path to write cross-match output to.
+        If None (default), no file is written.
+    csv_output : Optional[str], optional
+        Path to write flux and astrometric correction output to.
+        If None (default), no file is written.
 
-    Returns:
-        dra_median_value: The median offset in RA (arcsec)
-        ddec_median_value: The median offset in DEC (arcsec)
-        flux_corr_mult: Multiplicative flux correction
-        flux_corr_add: Additive flux correction
+    Returns
+    -------
+    Tuple[float, float, AffineScalarFunc, AffineScalarFunc]
+        Median RA offset in arcsec, median DEC offset in arcsec, multiplicative
+        flux correction, and additive flux correction.
     """
-    # convert catalog path strings to Path objects
-    reference_catalog_path = Path(reference_catalog_path)
-    catalog_path = Path(catalog_path)
-    flux_unit /= u.beam  # add beam divisor as we currently only work with peak fluxes
+    # Convert catalog path strings to Path objects
+    reference_catalog_path = Path(reference_catalog_path).resolve()
+    catalog_path = Path(catalog_path).resolve()
 
+    # Add beam divisor as we currently only work with peak fluxes
+    flux_unit /= u.beam
+
+    # Create Catalog objects for the reference and pre-corrected catalogues
     reference_catalog = Catalog(
         reference_catalog_path,
         psf=psf_reference,
@@ -123,9 +137,10 @@ def vast_xmatch_qc(
         select_point_sources=select_point_sources,
     )
 
-    # perform the crossmatch
+    # Perform the crossmatch
     xmatch_qt = crossmatch_qtables(catalog, reference_catalog, radius=radius)
-    # select xmatches with non-zero flux errors and no siblings
+
+    # Select xmatches with non-zero flux errors and no siblings
     logger.info("Removing crossmatched sources with siblings or flux peak errors = 0.")
     mask = xmatch_qt["flux_peak_err"] > 0
     mask &= xmatch_qt["flux_peak_err_reference"] > 0
@@ -133,33 +148,37 @@ def vast_xmatch_qc(
     mask &= xmatch_qt["has_siblings_reference"] == 0
     data = xmatch_qt[mask]
     logger.info(
-        f"{len(data):.2f} crossmatched sources remaining ({(len(data) / len(xmatch_qt)) * 100:.2f}%).",
+        f"{len(data):.2f} crossmatched sources remaining"
+        + f"({(len(data) / len(xmatch_qt)) * 100:.2f}%).",
     )
 
     # Write the cross-match data into csv
     if crossmatch_output is not None:
         data.write(crossmatch_output, overwrite=True)
-    # calculate positional offsets and flux ratio
+
+    # Calculate positional offsets and medians
     dra_median, ddec_median, dra_madfm, ddec_madfm = calculate_positional_offsets(data)
     dra_median_value = dra_median.to(positional_unit).value
     dra_madfm_value = dra_madfm.to(positional_unit).value
     ddec_median_value = ddec_median.to(positional_unit).value
     ddec_madfm_value = ddec_madfm.to(positional_unit).value
     logger.info(
-        f"dRA median: {dra_median_value:.2f} MADFM: {dra_madfm_value:.2f} {positional_unit}. dDec median: {ddec_median_value:.2f} MADFM: {ddec_madfm_value:.2f} {positional_unit}.",
+        f"dRA median: {dra_median_value:.2f} MADFM: {dra_madfm_value:.2f} "
+        + f"{positional_unit}. dDec median: {ddec_median_value:.2f} "
+        + f"MADFM: {ddec_madfm_value:.2f} {positional_unit}.",
     )
 
+    # Calculate flux offsets and ratio
     gradient, offset, gradient_err, offset_err = calculate_flux_offsets(
         data, fix_m=fix_m, fix_b=fix_b
     )
     ugradient = ufloat(gradient, gradient_err)
     uoffset = ufloat(offset.to(flux_unit).value, offset_err.to(flux_unit).value)
+    flux_corr_mult = 1 / ugradient
+    flux_corr_add = -1 * uoffset
     logger.info(
         f"ODR fit parameters: Sp = Sp,ref * {ugradient} + {uoffset} {flux_unit}.",
     )
-
-    flux_corr_mult = 1 / ugradient
-    flux_corr_add = -1 * uoffset
 
     # Write output to csv if requested
     if csv_output is not None:
@@ -200,6 +219,7 @@ def vast_xmatch_qc(
                 ]
             )
 
+    # Return positional medians and flux corrections
     return dra_median_value, ddec_median_value, flux_corr_mult, flux_corr_add
 
 
