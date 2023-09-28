@@ -268,7 +268,6 @@ def get_image_paths(
     data_root: Path,
     stokes: list[str],
     epoch: list[int],
-    out_root: Optional[Path] = None,
 ) -> list[Generator[Path, None, None]]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
@@ -280,8 +279,6 @@ def get_image_paths(
         Stokes parameter(s) whose images to locate.
     epoch : list[int]
         Epoch(s) whose images to locate.
-    out_root : Optional[Path], optional
-        Path to root of output directory, by default None.
 
     Returns
     -------
@@ -311,9 +308,9 @@ def get_image_paths(
 
 def get_corresponding_paths(
     data_root: Path,
+    image_path: Path,
     stokes: str,
     epoch_dir: str,
-    image_path: Path,
 ) -> tuple[Path, Path, Path, Path]:
     """Resolve and return paths to files corresponding to given image.
 
@@ -325,12 +322,12 @@ def get_corresponding_paths(
     ----------
     data_root : Path
         Path to data directory root.
+    image_path : Path
+        Path to the observation image.
     stokes : str
         Stokes parameter of observation.
     epoch_dir : str
         Observation epoch, in directory format (e.g. "epoch_32")
-    image_path : Path
-        Path to the observation image.
 
     Returns
     -------
@@ -374,13 +371,13 @@ def get_corresponding_paths(
 
 
 def crop_and_correct_image(
-    epoch_dir: str,
+    out_root: Path,
     image_path: Path,
+    epoch_dir: str,
     rms_path: Path,
     bkg_path: Path,
     corrected_fits: list[fits.PrimaryHDU],
     crop_size: u.Quantity,
-    out_root: Path,
     overwrite: bool,
 ) -> tuple[SkyCoord, fits.PrimaryHDU]:
     """Apply corrections to a field, then crop observation images in the
@@ -388,10 +385,12 @@ def crop_and_correct_image(
 
     Parameters
     ----------
-    epoch_dir : str
-        Observation epoch, in directory format (e.g. "epoch_32")
+    out_root : Path
+        Path to root of output directory.
     image_path : Path
         Path to the observation image.
+    epoch_dir : str
+        Observation epoch, in directory format (e.g. "epoch_32")
     rms_path : Path
         Path to corresponding RMS noisemap image.
     bkg_path : Path
@@ -400,8 +399,6 @@ def crop_and_correct_image(
         list of FITS HDUs which have been previously corrected.
     crop_size : u.Quantity
         Angular size of crop to be applied.
-    out_root : Path
-        Path to root of output directory.
     overwrite : bool
         Flag to overwrite image data.
 
@@ -411,9 +408,11 @@ def crop_and_correct_image(
         Field centre of image, and cropped image.
     """
     logger.debug(f"corrected_fits: {corrected_fits}")
+
     # Iterate over each image to crop and write to a new directory
     for i, path in enumerate((rms_path, bkg_path, image_path)):
         logger.debug(f"Working on {i} and {path}")
+
         # Locate directory to store cropped data, and create if nonexistent
         # TODO what suffix should we use?
         # TODO reorganize path handling
@@ -431,40 +430,44 @@ def crop_and_correct_image(
         cropped_hdu.writeto(outfile, overwrite=overwrite)
         logger.debug(f"Wrote {outfile}")
 
+    # Update FITS history
+    fitsutils.update_header_history(cropped_hdu.header)
+
+    # Return field centre and processed HDU
     return field_centre, cropped_hdu
 
 
 def crop_catalogs(
+    out_root: Path,
     epoch_dir: str,
-    crop_size: u.Quantity,
-    field_centre: SkyCoord,
     cropped_hdu: fits.PrimaryHDU,
-    corrected_cats: list[VOTableFile],
+    field_centre: SkyCoord,
     components_path: Path,
     islands_path: Path,
-    out_root: Path,
+    corrected_cats: list[VOTableFile],
+    crop_size: u.Quantity,
     overwrite: bool,
 ):
     """Crop field catalogues.
 
     Parameters
     ----------
+    out_root : Path
+        Path to root of output directory.
     epoch_dir : str
-        Observation epoch, in directory format (e.g. "epoch_32")
-    crop_size : u.Quantity
-        Angular size of crop to be applied.
-    field_centre : SkyCoord
-        Fiel centre of image.
+        Observation epoch, in directory format (e.g. "epoch_32").
     cropped_hdu : fits.PrimaryHDU
         Cropped image for this field.
-    corrected_cats : list[VOTableFile]
-        list of corrected catalogues to be cropped.
+    field_centre : SkyCoord
+        Field centre of image.
     components_path : Path
         Path to the selavy components xml file for this field.
     islands_path : Path
         Path to the selavy islands xml file for this field.
-    out_root : Path
-        Path to root of output directory.
+    corrected_cats : list[VOTableFile]
+        list of corrected catalogues to be cropped.
+    crop_size : u.Quantity
+        Angular size of crop to be applied.
     overwrite : bool
         Flag to overwrite image data.
     """
@@ -496,10 +499,10 @@ def crop_catalogs(
 
 
 def create_mocs(
-    stokes: str,
     out_root: Path,
-    epoch_dir: str,
     image_path: Path,
+    stokes: str,
+    epoch_dir: str,
     cropped_hdu: fits.PrimaryHDU,
     overwrite: bool,
 ):
@@ -507,14 +510,14 @@ def create_mocs(
 
     Parameters
     ----------
-    stokes : str
-        Stokes parameter of field.
     out_root : Path
         Path to root of output directory.
-    epoch_dir : str
-        Observation epoch, in directory format (e.g. "epoch_32")
     image_path : Path
         Path to field image.
+    stokes : str
+        Stokes parameter of field.
+    epoch_dir : str
+        Observation epoch, in directory format (e.g. "epoch_32")
     cropped_hdu : fits.PrimaryHDU
         Cropped image for this field.
     overwrite : bool
@@ -629,9 +632,7 @@ def run(
     main_logger.debug(locals())
 
     # Set up paths and required locations
-    image_paths = get_image_paths(
-        data_root=data_root, stokes=stokes, epoch=epoch, out_root=out_root
-    )
+    image_paths = get_image_paths(data_root=data_root, stokes=stokes, epoch=epoch)
 
     # Iterate over all FITS files to run post-processing
     for image_path in chain.from_iterable(image_paths):
@@ -643,17 +644,17 @@ def run(
         # Get and verify relevant paths for this file
         rms_path, bkg_path, components_path, islands_path = get_corresponding_paths(
             data_root=data_root,
+            image_path=image_path,
             stokes=stokes_dir,
             epoch_dir=epoch_dir,
-            image_path=image_path,
         )
 
         # Apply corrections to images and catalogues
         corrected = corrections.correct_field(
-            image_path,
-            overwrite=overwrite,
             outdir=out_root,
             vast_corrections_root=corrections_path,
+            image_path=image_path,
+            overwrite=overwrite,
         )
 
         main_logger.debug(corrected)
@@ -670,25 +671,25 @@ def run(
 
         # Correct astrometry and flux of image data
         field_centre, cropped_hdu, corrected_cats = crop_and_correct_image(
-            epoch_dir=epoch_dir,
+            out_root=out_root,
             image_path=image_path,
+            epoch_dir=epoch_dir,
             rms_path=rms_path,
             bkg_path=bkg_path,
             corrected_fits=corrected_fits,
             crop_size=crop_size,
-            out_root=out_root,
             overwrite=overwrite,
         )
 
         # Crop catalogues
         crop_catalogs(
-            components_path=components_path,
             out_root=out_root,
-            field_centre=field_centre,
             epoch_dir=epoch_dir,
+            cropped_hdu=cropped_hdu,
+            field_centre=field_centre,
+            components_path=components_path,
             islands_path=islands_path,
             corrected_cats=corrected_cats,
-            cropped_hdu=cropped_hdu,
             crop_size=crop_size,
             overwrite=overwrite,
         )
@@ -696,14 +697,10 @@ def run(
         # Create MOCs
         if create_moc:
             create_mocs(
-                stokes=stokes_dir,
                 out_root=out_root,
-                epoch_dir=epoch_dir,
                 image_path=image_path,
+                stokes=stokes_dir,
+                epoch_dir=epoch_dir,
                 cropped_hdu=cropped_hdu,
                 overwrite=overwrite,
             )
-
-        # Update FITS history
-        image_hdu: fits.PrimaryHDU = fits.open(image_path)[0]
-        fitsutils.update_header_history(image_hdu.header)
