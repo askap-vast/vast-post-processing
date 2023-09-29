@@ -535,6 +535,8 @@ def correct_field(
     write_output: bool = True,
     outdir: str = None,
     overwrite: bool = False,
+    verbose: bool = False,
+    debug: bool = False,
 ):
     """Read astrometric and flux corrections produced by vast-xmatch and apply them to
     VAST images and catalogues in vast-data. See https://github.com/marxide/vast-xmatch.
@@ -551,7 +553,10 @@ def correct_field(
         write_output (bool, optional): Write the corrected image and catalog files or return the
             corrected hdul and the corrected table?. Defaults to True, which means to write
         outdir (str, optional): The stem of the output directory to write the files to
-        overwrite (bool, optional): Overwrite the existing files?. Defaults to False.
+        overwrite (bool, optional): Overwrite the existing files?. Defaults to
+        False.
+        verbose (bool, optional): Flag to display status and progress, by default False.
+        debug (bool, optional): Flag to display errors to output, by default False.
     """
     epoch_dir = image_path.parent.name
     _, _, field, *_ = image_path.name.split(".")
