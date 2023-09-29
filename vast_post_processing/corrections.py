@@ -521,6 +521,7 @@ def check_for_files(image_path: str):
 
 def correct_field(
     image_path: Path,
+    stokes: str = "I",
     vast_corrections_root: Path = "/data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY",
     radius: float = 10,
     condon: bool = True,
@@ -540,6 +541,7 @@ def correct_field(
 
     Args:
         image path (Path): Path to the image file that needs to be corrected.
+        stokes (str): Stokes parameter of the image file.
         vast_corrections_root (Path, optional): Path to the catalogues of referecne catalog.
             Defaults to "/data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY".
         radius (float, optional): Crossmatch radius. Defaults to 10.
@@ -572,6 +574,10 @@ def correct_field(
 
     if not epoch_corr_dir.is_dir():
         epoch_corr_dir.mkdir()
+
+    # TODO Stokes V correction - assume Stokes I has already been corrected
+    if stokes == "V":
+        return
 
     # check for auxiliary files
     skip, aux_files = check_for_files(image_path=image_path)

@@ -266,9 +266,7 @@ def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
 
 
 def get_image_paths(
-    data_root: Path,
-    stokes: list[str],
-    epoch: list[int],
+    data_root: Path, stokes: list[str], epoch: list[int], image_type: str = "IMAGES"
 ) -> list[Generator[Path, None, None]]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
@@ -280,6 +278,8 @@ def get_image_paths(
         Stokes parameter(s) whose images to locate.
     epoch : list[int]
         Epoch(s) whose images to locate.
+    image_type : str, optional
+        Directory to list images from, defaults to "IMAGES".
 
     Returns
     -------
@@ -291,7 +291,7 @@ def get_image_paths(
 
     # Iterate over each Stokes parameter
     for parameter in stokes:
-        image_root = Path(data_root / f"STOKES{parameter}_IMAGES").resolve()
+        image_root = Path(data_root / f"STOKES{parameter}_{image_type}").resolve()
         logger.debug(f"Image Root for Stokes {parameter}: {image_root}")
 
         # If epoch is not provided, process all epochs
@@ -301,6 +301,36 @@ def get_image_paths(
         else:
             for n in epoch:
                 image_path_glob_list.append(image_root.glob(f"epoch_{n}/*.fits"))
+
+        # Check for processed data if Stokes V
+        if parameter == "V":
+            # Get list of Stokes I processed image paths as str
+            # NOTE image_type may change in future development
+            processed_stokes_i = [
+                str(path)
+                for ipgl in get_image_paths(
+                    data_root, ["I"], epoch, image_type="CROPPED"
+                )
+                for path in list(ipgl)
+            ]
+
+            # Check that each Stokes V image has been processed as Stokes I
+            for epoch_list in image_path_glob_list:
+                for image_path_v in epoch_list:
+                    # Get expected path of processed corresponding Stokes I image
+                    split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
+                    str_path_i = (
+                        split_str_path_v[0] + "STOKESI_CROPPED" + split_str_path_v[1]
+                    )
+
+                    # If processed path is not found, terminate run
+                    if str_path_i not in processed_stokes_i:
+                        raise FileNotFoundError(
+                            "Expected post-processed Stokes I image "
+                            + f"{str_path_i} for Stokes V post-processing."
+                        )
+
+    # Return resulting image path list
     return image_path_glob_list
 
 
@@ -658,6 +688,7 @@ def run(
         # Apply corrections to field of passed image
         corrected = corrections.correct_field(
             outdir=out_root,
+            stokes=stokes_dir,
             vast_corrections_root=corrections_path,
             image_path=image_path,
             overwrite=overwrite,

@@ -65,7 +65,9 @@ def main(
     create_moc: Optional[bool] = typer.Option(
         None, help=("Create MOC files based on cropped images")
     ),
-    compress: Optional[bool] = typer.Option(None, help=("Compress all FITS files")),
+    compress: Optional[bool] = typer.Option(
+        None, help=("Compress all processed FITS files")
+    ),
     overwrite: Optional[bool] = typer.Option(
         None,
         help=("Overwrite existing cropped data"),
