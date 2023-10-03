@@ -8,8 +8,9 @@ processes ASKAP-VAST observation data.
 ## Features
 
 * Code base in `Python 3.9.x`
-* Crops and corrects images
-* Generates MOCs
+* Crops and corrects FITS images
+* Crops and corrects catalogues
+* Generates MOCs and STMOCs
 
 ## Installation
 1. Clone this repository onto your local machine. 
@@ -35,23 +36,63 @@ poetry install
 poetry shell
 ```
 
-## Testing
-# TODO WRITE
-1. Download data
+## Usage
+This project is separated by module. The following modules are available by
+command. 
+- `link_neighbours`
+- `convolve_neighbours`
+- `swarp_neighbours`
+- `selavy_prepare`
+- `crop_fields`
 
-<!-- ## Usage
-1. To be written -->
+To run the main program, run
+```
+vast_post_processing --data-root <DIRECTORY>
+```
+
+## Testing
+The test suite expects at least one image observation, and its corresponding
+data files. To check for the existence and organisation of the test data, run
+the data test subsuite. 
+
+1. Follow the installation instructions above, and if not already entered, enter
+   the `vast-post-processing` environment with 
+```
+poetry shell
+```
+2. Test for local test data existence with 
+```
+pytest tests/data/test_data.py
+```
+3. If all tests pass, proceed to develop your own tests. Otherwise, your test
+data directory is not initialised or configured correctly. Run the
+`pull_data` script with 
+```
+pull_test_data
+```
+This process will take several minutes. 
+
+Note this script requires `ssh` access to the `vast-data` virtual system. [Read
+here for more
+information](https://github.com/askap-vast/vast-project/wiki/Nimbus:-SSH-&-Downloading-Data). 
+
+You can edit various settings and which observations to pull in
+`tests/data/pull_config.yaml`.
+
+4. After test data has been downloaded, the fixtures found in the various
+`conftest.py` files will resolve, and all current tests should pass. Future
+tests can now be implemented as well.
 
 ## Contributors
 
-* Andrew O'Brien – [Department of Physics, University of Wisconsin-Milwaukee](https://uwm.edu/physics/research/astronomy-gravitation-cosmology/)
-* Dougal Dobie – [Centre for Astrophysics and Supercomputing, Swinburne
-  University of
-  Technology](https://www.swinburne.edu.au/research/our-research/access-our-research/find-a-researcher-or-supervisor/researcher-profile/?id=ddobie)
-* Akash Anumarlapudi - [Department of Physics, University of
-  Wisconsin-Milwaukee](https://uwm.edu/physics/people/anumarlapudi-akash/) 
-* Mubdi Rahman - [Sidrat Research](https://www.sidratresearch.com/)
-* Hansen Jiang - [Sidrat Research](https://www.sidratresearch.com/)
+|Contributor|Organisation|Department|
+|:---|:---|:---|
+|[Dougal Dobie](https://github.com/ddobie)|[Swinburne University of Technology](https://www.swinburne.edu.au/research/our-research/access-our-research/find-a-researcher-or-supervisor/researcher-profile/?id=ddobie)|[Centre for Astrophysics and Supercomputing](https://www.swinburne.edu.au/research/centres-groups-clinics/centre-for-astrophysics-supercomputing/)|
+|[Andrew O'Brien](https://github.com/marxide)|[University of Wisconsin-Milwaukee](https://uwm.edu/physics/people/obrien-andrew/)|[Center for Gravitation, Cosmology & Astrophysics](https://cgca.uwm.edu/people.html)|
+|[Akash Anumarlapudi](https://github.com/AkashA98)|[University of Wisconsin-Milwaukee](https://uwm.edu/physics/people/anumarlapudi-akash/)|[Center for Gravitation, Cosmology & Astrophysics](https://cgca.uwm.edu/people.html)|
+|[Mubdi Rahman](https://github.com/mubdi)|[Sidrat Research](https://sidratresearch.com/whoarewe.html)||
+|[Hansen Jiang](https://github.com/hansenjiang)|[Sidrat Research](https://sidratresearch.com/whoarewe.html)||
+
 
 <!-- ## Acknowledgements
 
