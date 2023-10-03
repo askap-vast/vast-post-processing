@@ -72,7 +72,7 @@ def get_field_and_sbid(image_path: Path) -> Tuple[str, int]:
 
 
 def write_git_hash():
-    """Write current git hash to file in package data directory."""
+    """Write current git hash to file in package's data directory."""
     # Get git hash of current branch's latest commit
     git_hash = (
         subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
@@ -130,7 +130,7 @@ def read_git_hash() -> str:
                     )
                     return "HASH_INVALID"
 
-            # File containing more than one nonempty line is invalid
+            # File containing more or less than one nonempty line is invalid
             else:
                 if len(lines) == 0:
                     logger.warning(f"Git hash file {path_str} empty.")

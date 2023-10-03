@@ -1,0 +1,14 @@
+test_data_root: "test-data"
+overwrite: false
+release: true
+pull:
+  - field: "0334-37"
+    sbid: "50801"
+    epoch: "38"
+    stokes: "I"
+    full: false
+  - field: "0345-31"
+    sbid: "50802"
+    epoch: "38"
+    stokes: "I"
+    full: false

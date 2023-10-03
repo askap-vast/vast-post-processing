@@ -39,6 +39,13 @@ def main(
         file_okay=False,
         dir_okay=True,
     ),
+    corrections_path: Optional[Path] = typer.Option(
+        None,
+        help=("Path to locate corresponding reference catalogues"),
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
     stokes: Optional[List[str]] = typer.Option(
         None,
         help=("Stokes parameter to use (I, Q, U, V)."),
@@ -58,7 +65,9 @@ def main(
     create_moc: Optional[bool] = typer.Option(
         None, help=("Create MOC files based on cropped images")
     ),
-    compress: Optional[bool] = typer.Option(None, help=("Compress all FITS files")),
+    compress: Optional[bool] = typer.Option(
+        None, help=("Compress all processed FITS files")
+    ),
     overwrite: Optional[bool] = typer.Option(
         None,
         help=("Overwrite existing cropped data"),
@@ -76,6 +85,7 @@ def main(
         config_file,
         data_root,
         out_root,
+        corrections_path,
         stokes,
         epoch,
         crop_size,
