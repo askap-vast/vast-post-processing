@@ -116,7 +116,6 @@ def setup_configuration_variable(
                     raise ValueError(f"{epoch} is not a valid epoch.")
 
         # If variable is crop size, test that it is a possible angle
-        # TODO ensure correct typing with u.deg
         elif name == "crop_size":
             if (value <= 0.0) or (value > 360.0):
                 raise ValueError(f"{value} is not a valid crop angle.")
@@ -272,7 +271,7 @@ def get_image_paths(
     verbose: bool,
     debug: bool,
     image_type: str = "IMAGES",
-) -> list[Generator[Path, None, None]]:
+) -> list[Path]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
     Parameters
@@ -292,51 +291,73 @@ def get_image_paths(
 
     Returns
     -------
-    list[Generator[Path, None, None]]
+    list[Path]
         Paths to matching images.
     """
     # Initialize empty list of paths
-    image_path_glob_list: list[Generator[Path, None, None]] = []
+    image_paths: list[Path] = []
 
     # Iterate over each Stokes parameter
     for parameter in stokes:
+        num_paths = len(image_paths)
+
         # Display progress if requested
         if verbose:
             str_epochs = (", ").join([str(e) for e in epoch])
             logger.info(
                 f"Getting image paths for Stokes {parameter} "
-                + f"and epoch(s) {str_epochs}"
+                + (
+                    f"in all available epochs."
+                    if len(epoch) == 0
+                    else f"and epoch(s) {str_epochs}"
+                )
             )
 
+        # Define image directory root and display if requested
         image_root = Path(data_root / f"STOKES{parameter}_{image_type}").resolve()
-        logger.debug(f"Image Root for Stokes {parameter}: {image_root}")
+        if debug:
+            logger.debug(f"Image Root for Stokes {parameter}: {image_root}")
 
         # If epoch is not provided, process all epochs
         if len(epoch) == 0:
-            image_path_glob_list.append(image_root.glob(f"epoch_*/*.fits"))
+            for image_path in image_root.glob(f"epoch_*/*.fits"):
+                image_paths.append(image_path)
         # Otherwise, only process provided epoch(s)
         else:
             for n in epoch:
-                image_path_glob_list.append(image_root.glob(f"epoch_{n}/*.fits"))
+                for image_path in image_root.glob(f"epoch_{n}/*.fits"):
+                    image_paths.append(image_path)
+
+        # Skip parameter if no images are found
+        if len(image_paths) - num_paths == 0:
+            if debug:
+                logger.debug(f"No images found for Stokes {parameter}. Skipping.")
+            break
 
         # Check for processed data if Stokes V
         if parameter == "V":
             # Display progress if requested
             if verbose:
-                logger.info("Checking corresponding Stokes I have been processed.")
+                logger.info(
+                    "Checking corresponding Stokes I files have been processed."
+                )
 
             # Get list of Stokes I processed image paths as str
             # NOTE image_type may change in future development
             processed_stokes_i = [
-                str(path)
-                for ipgl in get_image_paths(
-                    data_root, ["I"], epoch, image_type="CROPPED"
+                str(image_path)
+                for image_path in get_image_paths(
+                    data_root,
+                    ["I"],
+                    epoch,
+                    image_type="CROPPED",
+                    verbose=False,
+                    debug=False,
                 )
-                for path in list(ipgl)
             ]
 
             # Check that each Stokes V image has been processed as Stokes I
-            for epoch_list in image_path_glob_list:
+            for epoch_list in image_paths:
                 for image_path_v in epoch_list:
                     # Get expected path of processed corresponding Stokes I image
                     split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
@@ -352,7 +373,7 @@ def get_image_paths(
                         )
 
     # Return resulting image path list
-    return image_path_glob_list
+    return image_paths
 
 
 ## Pipeline
@@ -752,8 +773,13 @@ def run(
         data_root=data_root, stokes=stokes, epoch=epoch, verbose=verbose, debug=debug
     )
 
+    # Display paths if requested
+    if debug:
+        main_logger.debug("All discovered image paths:")
+        main_logger.debug(image_paths)
+
     # Iterate over all FITS files to run post-processing
-    for image_path in chain.from_iterable(image_paths):
+    for image_path in image_paths:
         main_logger.info(f"Working on {image_path}...")
         stokes_dir = misc.get_stokes_parameter(image_path)
         epoch_dir = misc.get_epoch_directory(image_path)
