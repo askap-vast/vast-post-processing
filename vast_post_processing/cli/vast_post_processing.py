@@ -2,18 +2,29 @@
 
 All commands here can be optional since they can also be set via the
 configuration files.
-
-
 """
 
+
+# Imports
+
+
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List  # Typer only accepts typing.List, not native list
+
 import typer
 
 from vast_post_processing import core
 
 
+# Constants
+
+
 app = typer.Typer()
+"""Typer app for this module.
+"""
+
+
+# Functions
 
 
 @app.command()

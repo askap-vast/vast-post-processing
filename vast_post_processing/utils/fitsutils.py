@@ -1,12 +1,12 @@
-"""FITS utilities for VAST Post-Processing.
+"""Utilities for FITS files. 
 """
+
 
 # Imports
 
-from astropy.time import Time, TimeDelta
-from astropy.io import fits
 
-from . import misc
+from astropy.io import fits
+from astropy.time import Time, TimeDelta
 
 
 # Functions

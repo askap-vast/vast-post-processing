@@ -1,10 +1,29 @@
-from loguru import logger
+"""Run corrections on image files.
+"""
+
+
+# Imports
+
+
+import sys
+import logging
 from pathlib import Path
 from typing import Optional
-from uncertainties import ufloat
-import typer, sys
+
+import typer
 
 from vast_post_processing.corrections import correct_files
+
+
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
+
+
+# Functions
 
 
 def main(
@@ -115,6 +134,7 @@ def main(
     # configure logger
     if not verbose:
         # replace the default sink
+        # TODO logging alternative
         logger.remove()
         logger.add(sys.stderr, level="INFO")
     correct_files(

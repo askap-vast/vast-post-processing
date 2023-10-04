@@ -1,23 +1,43 @@
-"""Finds neighbouring observations.
+"""Find neighbouring observations.
+
+Requires link_neighbours to be run first.
 """
 
-from dataclasses import dataclass, astuple
-from pathlib import Path
+
+# Imports
+
+
 import re
-from typing import Optional, Tuple
+import logging
+from pathlib import Path
+from functools import partial
+from dataclasses import dataclass, astuple, fields
+from typing import Optional
+
+import typer
+
+import numpy as np
+import pandas as pd
+from racs_tools import beamcon_2D
+from radio_beam import Beam
+from radio_beam.utils import BeamError
 
 from astropy.coordinates import SkyCoord, Angle
 from astropy.io import fits
 from astropy.time import Time
 import astropy.units as u
 import astropy.wcs
-from loguru import logger
 import mocpy
-import numpy as np
-import pandas as pd
-from racs_tools import beamcon_2D
-from radio_beam import Beam
-from radio_beam.utils import BeamError
+
+from vast_post_processing.cli._util import get_pool, _get_worker_name
+
+
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
 
 
 RE_SBID = re.compile(r"\.SB(\d+)\.")
@@ -33,6 +53,9 @@ Field name is searched by looking for `.VAST_XXXX±XXY.`, where `X` can be any
 digit, and `Y` is an optional character. `VAST` may also be substituted for
 `RACS`.
 """
+
+
+# Classes
 
 
 class UnknownFilenameConvention(Exception):
@@ -132,7 +155,27 @@ class VastOverlap:
     delta_t_days: float
 
 
-def get_sbid_and_field_from_filename(filename: str) -> Tuple[int, str]:
+@dataclass
+class WorkerArgs:
+    image_path: Path
+    output_dir_path: Path
+    target_beam: Beam
+    mode: str
+    suffix: str = "sm"
+    prefix: Optional[str] = None
+    cutoff: Optional[float] = None
+    dry_run: bool = False
+
+    def __iter__(self):
+        # Makes the class fields iterable so they can be unpacked
+        # e.g. func(*args) where args is a WorkerArgs object.
+        return (getattr(self, field.name) for field in fields(self))
+
+
+# Functions
+
+
+def get_sbid_and_field_from_filename(filename: str) -> tuple[int, str]:
     """Search a filename of an observation for its SBID and field name.
 
     Parameters
@@ -142,7 +185,7 @@ def get_sbid_and_field_from_filename(filename: str) -> Tuple[int, str]:
 
     Returns
     -------
-    Tuple[int, str]
+    tuple[int, str]
         SBID and field name found by this method.
 
     Raises
@@ -549,47 +592,15 @@ def convolve_image(
         logger.debug(f"Restoring NaNs for {image_path} ...")
         datadict["newimage"][nan_mask] = np.nan
         beamcon_2D.savefile(datadict, output_filename, str(output_dir_path))
+        # TODO logging alternative
         logger.success(f"Wrote smoothed image for {image_path}.")
         return output_dir_path / output_filename
     else:
         return None
 
 
-# Separated logic
-
-"""Requires setup_neighbours.py to be run first.
-"""
-from dataclasses import dataclass, fields
-from functools import partial
-from pathlib import Path
-from typing import Optional, List
-
-from loguru import logger
-from racs_tools import beamcon_2D
-from radio_beam import Beam
-import typer
-
-from vast_post_processing.cli._util import get_pool, _get_worker_name
-
-
-@dataclass
-class WorkerArgs:
-    image_path: Path
-    output_dir_path: Path
-    target_beam: Beam
-    mode: str
-    suffix: str = "sm"
-    prefix: Optional[str] = None
-    cutoff: Optional[float] = None
-    dry_run: bool = False
-
-    def __iter__(self):
-        # Makes the class fields iterable so they can be unpacked
-        # e.g. func(*args) where args is a WorkerArgs object.
-        return (getattr(self, field.name) for field in fields(self))
-
-
 def worker(args: WorkerArgs, mpi: bool = False, n_proc: int = 1):
+    # TODO logging alternative
     with logger.contextualize(worker_name=_get_worker_name(mpi=mpi, n_proc=n_proc)):
         return convolve_image(*args)
 
@@ -600,7 +611,7 @@ def convolve_neighbours(
     mpi: bool = False,
     max_images: Optional[int] = None,
     racs: bool = False,
-    field_list: Optional[List[str]] = typer.Option(None, "--field"),
+    field_list: Optional[list[str]] = typer.Option(None, "--field"),
 ):
     # neighbour_data_dir has the structure:
     # <neighbour_data_dir>/<field>/inputs contains the input FITS images

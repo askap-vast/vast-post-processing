@@ -1,26 +1,43 @@
+"""Crop image files and catalogues.
+"""
+
+
+# Imports
+
+
 import warnings
+import logging
+from pathlib import Path
+from itertools import chain
+from datetime import datetime
+from typing import Optional, Union, Generator
+
+import matplotlib.pyplot as plt
+
+from astropy.io import fits
+from astropy.io.votable import parse
+from astropy.io.votable.tree import Param, VOTableFile, Table
+
+from astropy.time import Time
+import astropy.wcs as wcs
+from astropy.wcs import WCS
+from astropy.wcs.wcs import FITSFixedWarning
+from astropy.coordinates import SkyCoord
 
 import astropy.units as u
-import astropy.wcs as wcs
-import matplotlib.pyplot as plt
+from astropy.nddata.utils import Cutout2D
+from mocpy import MOC, STMOC
 
 from vast_post_processing.utils import fitsutils
 
-from astropy.io import fits
-from astropy.coordinates import SkyCoord
-from astropy.io.votable import parse
-from astropy.wcs import WCS
-from astropy.nddata.utils import Cutout2D
-from astropy.time import Time
-from astropy.wcs.wcs import FITSFixedWarning
-from astropy.io.votable.tree import Param, VOTableFile
 
-from loguru import logger
-from mocpy import MOC, STMOC
-from datetime import datetime
-from typing import Optional, Union, Generator
-from pathlib import Path
-from itertools import chain
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
+
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
@@ -52,8 +69,8 @@ def get_field_centre(header: fits.header.Header):
 def crop_hdu(
     hdu: fits.hdu.image.PrimaryHDU,
     field_centre: SkyCoord,
-    size: Optional[u.quantity.Quantity] = 6.3 * u.deg,
-    rotation: Optional[u.quantity.Quantity] = 0.0 * u.deg,
+    size: Optional[u.Quantity] = 6.3 * u.deg,
+    rotation: Optional[u.Quantity] = 0.0 * u.deg,
 ):
     """Crop the data and update the header of a FITS image HDU
 
@@ -96,9 +113,7 @@ def crop_hdu(
     return hdu
 
 
-def _add_votable_params(
-    votable: VOTableFile, field_centre: SkyCoord, size: u.quantity.Quantity
-):
+def _add_votable_params(votable: VOTableFile, field_centre: SkyCoord, size: u.Quantity):
     """Add crop parameter information to a VOTable.
 
     Parameters
@@ -143,7 +158,7 @@ def crop_catalogue(
     vot: VOTableFile,
     cropped_hdu: fits.PrimaryHDU,
     field_centre: SkyCoord,
-    size: u.quantity.Quantity,
+    size: u.Quantity,
 ):
     """Crop the catalogue based on the coverage of the cropped HDU
 
@@ -164,7 +179,7 @@ def crop_catalogue(
         The cropped VOTable.
     """
     logger.debug("Cropping catalogue")
-    votable = vot.get_first_table()
+    votable: Table = vot.get_first_table()
 
     cropped_wcs = WCS(cropped_hdu.header, naxis=2)
 
@@ -238,7 +253,7 @@ def moc_to_stmoc(moc: MOC, hdu: fits.hdu.image.PrimaryHDU):
 
 def run_full_crop(
     data_root: Union[str, Path],
-    crop_size: u.quantity.Quantity,
+    crop_size: u.Quantity,
     epoch: Union[str, int, list],
     stokes: str,
     out_root: Optional[Union[str, Path]] = None,
@@ -251,7 +266,7 @@ def run_full_crop(
     ----------
     data_root : Union[str, Path]
         The path to the root data directory.
-    crop_size : u.quantity.Quantity,
+    crop_size : u.Quantity,
         The size of each side of the square crop.
     epoch : Union[str, int, list]
         The epoch number/identifier(s) to include.
@@ -369,12 +384,14 @@ def run_full_crop(
         )
 
         if components_outfile.exists() and not overwrite:
+            # TODO logging alternative
             logger.critical(f"{components_outfile} exists, not overwriting")
         else:
             components_vot.to_xml(str(components_outfile))
             logger.debug(f"Wrote {components_outfile}")
 
         if islands_outfile.exists() and not overwrite:
+            # TODO logging alternative
             logger.critical(f"{components_outfile} exists, not overwriting")
         else:
             components_vot.to_xml(str(islands_outfile))

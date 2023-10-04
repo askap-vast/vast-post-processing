@@ -1,22 +1,42 @@
+"""Utilities to set up logging. 
 """
-Logging Setup Functions
-"""
+
+
+# Imports
+
 
 import logging
 import logging.handlers
 import time
 
+
+# Constants
+
+
 # Setting Logger Rotation Settings
 LOGGER_MAX_BYTES = 1000000
+"""Maximum number of bytes for the log to contain.
+Rollover occurs when this amount is reached in one log.
+"""
+
+
 LOGGER_BACKUP_COUNT = 4
+"""Maximum number of backup log files. 
+When rollover occurs, new files with number suffices up to this amount will be
+created.
+"""
+
+
+# Classes
 
 
 class UTCFormatter(logging.Formatter):
-    """
-    Creating a logging formatter that uses UTC
-    """
+    """Logging formatter which uses UTC."""
 
     converter = time.gmtime
+
+
+# Functions
 
 
 def create_logger(filename: str, level: str = "WARNING"):

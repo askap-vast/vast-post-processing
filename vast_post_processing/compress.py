@@ -5,9 +5,10 @@
 # Imports
 
 
+from datetime import datetime
+
 from astropy.io import fits
 from astropy.wcs import WCS
-from datetime import datetime
 
 
 # Functions

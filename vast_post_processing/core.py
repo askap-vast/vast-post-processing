@@ -768,7 +768,7 @@ def run(
             verbose=verbose,
             debug=debug,
         )
-        
+
         # Apply corrections to field of passed image
         corrected = corrections.correct_field(
             outdir=out_root,

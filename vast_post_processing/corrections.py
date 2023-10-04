@@ -1,4 +1,4 @@
-"""Applies various corrections to FITS images. 
+"""Apply various corrections to FITS image files. 
 """
 
 
@@ -7,10 +7,9 @@
 
 import sys
 import warnings
-from loguru import logger
-
-import csv
+import logging
 from pathlib import Path
+import csv
 from uncertainties import ufloat
 from uncertainties.core import AffineScalarFunc
 from typing import Generator, Tuple, Optional
@@ -19,7 +18,7 @@ import numpy as np
 
 from astropy.io import fits
 from astropy.io.votable import parse
-from astropy.io.votable.tree import Param
+from astropy.io.votable.tree import Param, VOTableFile, Table
 from astropy.wcs import WCS, FITSFixedWarning
 from astropy.coordinates import SkyCoord, Angle
 import astropy.units as u
@@ -30,6 +29,14 @@ from vast_post_processing.crossmatch import (
     calculate_positional_offsets,
     calculate_flux_offsets,
 )
+
+
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
 
 
 # Functions
@@ -248,7 +255,7 @@ def shift_and_scale_image(
 
     # Open image
     image_hdul = fits.open(image_path)
-    image_hdu = image_hdul[0]
+    image_hdu: fits.PrimaryHDU = image_hdul[0]
 
     # do the flux scaling, but check that the data is in Jy
     if image_hdu.header["BUNIT"] == "Jy/beam":
@@ -347,7 +354,7 @@ def shift_and_scale_catalog(
 
     # Open catalog
     votablefile = parse(catalog_path)
-    votable = votablefile.get_first_table()
+    votable: Table = votablefile.get_first_table()
 
     # Correct coordinate columns
     ra_deg = votable.array["col_ra_deg_cont"] * u.deg
@@ -659,6 +666,7 @@ def correct_field(
                         corrected_hdu.writeto(str(output_path), overwrite=True)
                     else:
                         corrected_hdu.writeto(str(output_path))
+                    # TODO logging alternative
                     logger.success(f"Writing corrected image to: {output_path}.")
                     corrected_hdu.close()
                 else:
@@ -692,6 +700,7 @@ def correct_field(
                         corrected_catalog.to_xml(output_path.as_posix())
                     else:
                         corrected_catalog.to_xml(output_path.as_posix())
+                    # TODO logging alternative
                     logger.success(f"Writing corrected catalogue: {output_path}.")
                 else:
                     corrected_catalogs.append(corrected_catalog)
@@ -743,6 +752,7 @@ def correct_files(
     # configure logger
     if not verbose:
         # replace the default sink
+        # TODO logging alternative
         logger.remove()
         logger.add(sys.stderr, level="INFO")
 
