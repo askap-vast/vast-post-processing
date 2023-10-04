@@ -384,14 +384,12 @@ def run_full_crop(
         )
 
         if components_outfile.exists() and not overwrite:
-            # TODO logging alternative
             logger.critical(f"{components_outfile} exists, not overwriting")
         else:
             components_vot.to_xml(str(components_outfile))
             logger.debug(f"Wrote {components_outfile}")
 
         if islands_outfile.exists() and not overwrite:
-            # TODO logging alternative
             logger.critical(f"{components_outfile} exists, not overwriting")
         else:
             components_vot.to_xml(str(islands_outfile))

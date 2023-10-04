@@ -666,7 +666,6 @@ def correct_field(
                         corrected_hdu.writeto(str(output_path), overwrite=True)
                     else:
                         corrected_hdu.writeto(str(output_path))
-                    # TODO logging alternative
                     logger.success(f"Writing corrected image to: {output_path}.")
                     corrected_hdu.close()
                 else:
@@ -700,7 +699,6 @@ def correct_field(
                         corrected_catalog.to_xml(output_path.as_posix())
                     else:
                         corrected_catalog.to_xml(output_path.as_posix())
-                    # TODO logging alternative
                     logger.success(f"Writing corrected catalogue: {output_path}.")
                 else:
                     corrected_catalogs.append(corrected_catalog)

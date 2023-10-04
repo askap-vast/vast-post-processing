@@ -592,7 +592,6 @@ def convolve_image(
         logger.debug(f"Restoring NaNs for {image_path} ...")
         datadict["newimage"][nan_mask] = np.nan
         beamcon_2D.savefile(datadict, output_filename, str(output_dir_path))
-        # TODO logging alternative
         logger.success(f"Wrote smoothed image for {image_path}.")
         return output_dir_path / output_filename
     else:
