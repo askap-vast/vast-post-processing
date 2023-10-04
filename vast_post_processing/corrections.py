@@ -667,9 +667,7 @@ def correct_field(
                     else:
                         corrected_hdu.writeto(str(output_path))
                     logger.success(f"Writing corrected image to: {output_path}.")
-                    corrected_hdu.close()
-                else:
-                    corrected_hdus.append(corrected_hdu)
+                corrected_hdus.append(corrected_hdu)
 
         # Do the same for catalog files
         corrected_catalogs = []
@@ -700,8 +698,7 @@ def correct_field(
                     else:
                         corrected_catalog.to_xml(output_path.as_posix())
                     logger.success(f"Writing corrected catalogue: {output_path}.")
-                else:
-                    corrected_catalogs.append(corrected_catalog)
+                corrected_catalogs.append(corrected_catalog)
         logger.info(
             f"Successfully corrected the images and catalogs for {image_path.as_posix()}"
         )

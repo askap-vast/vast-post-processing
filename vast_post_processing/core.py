@@ -805,7 +805,10 @@ def run(
             verbose=verbose,
             debug=debug,
         )
-        main_logger.debug(corrected)
+
+        # Display corrected files if requested
+        if debug:
+            main_logger.debug(corrected)
 
         # Skip images skipped by previous step
         if (corrected is None) or (corrected == ([], [])):
