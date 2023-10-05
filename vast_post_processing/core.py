@@ -238,35 +238,6 @@ def setup_configuration(
     return tuple(variables)
 
 
-def setup_logger(verbose: bool, debug: bool, filename: str) -> logging.Logger:
-    """Set up logging functionality for this module.
-
-    Parameters
-    ----------
-    verbose : bool
-        Flag to display program status and progress to output.
-    debug : bool
-        Flag to display program errors and actions to output.
-    filename : str
-        Filename of log file.
-
-    Returns
-    -------
-    logging.Logger
-        The main Logger object for this module.
-    """
-    # Set up logging level
-    logging_level = "WARNING"
-    if verbose:
-        logging_level = "INFO"
-    if debug:
-        logging_level = "DEBUG"
-    main_logger = logutils.create_logger(filename, logging_level)
-
-    # Return logger object
-    return main_logger
-
-
 def get_image_paths(
     data_root: Path,
     stokes: list[str],
@@ -764,13 +735,8 @@ def run(
         debug=debug,
     )
 
-    # Log filename as UTC time at run in ISO-8601
-    log_filename = (
-        datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
-    )
-
     # Set up logger
-    main_logger = setup_logger(verbose=verbose, debug=debug, filename=log_filename)
+    main_logger = logutils.setup_logger(verbose=verbose, debug=debug)
 
     # Record all local variables to logger
     main_logger.debug("All Runtime Local Variables:")

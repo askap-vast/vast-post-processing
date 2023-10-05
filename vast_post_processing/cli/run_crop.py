@@ -14,7 +14,8 @@ import typer
 
 import astropy.units as u
 
-import vast_post_processing.crop as vpc
+from vast_post_processing import crop
+from vast_post_processing.utils import logutils
 
 
 # Constants
@@ -77,24 +78,18 @@ def main(
         False, help=("Create MOC files based on cropped images")
     ),
 ):
-    # configure logger
-    if not verbose:
-        # replace the default sink
-        # TODO logging alternative
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
-    if debug:
-        # replace the default sink
-        # TODO logging alternative
-        logger.remove()
-        logger.add(sys.stderr, level="DEBUG")
+    # Configure logger
+    logger = logutils.setup_logger(verbose, debug, module="crop")
 
+    # Set out_root as data_root if not configured
     if out_root is None:
         out_root = data_root
 
+    # Display local variables
+    logger.debug("All runtime variables:")
     logger.debug(locals())
 
-    vpc.run_full_crop(
+    crop.run_full_crop(
         data_root, crop_size * u.deg, epoch, stokes, out_root, create_moc, overwrite
     )
 

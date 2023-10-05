@@ -279,10 +279,6 @@ def run_full_crop(
         Whether or not to create cropped MOC files, by default False.
     overwrite: bool, optional
         Whether or not to overwrite existing files, by default False.
-
-    Returns
-    -------
-    None
     """
     if out_root is None:
         out_root = data_root

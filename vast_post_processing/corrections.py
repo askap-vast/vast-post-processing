@@ -23,12 +23,13 @@ from astropy.wcs import WCS, FITSFixedWarning
 from astropy.coordinates import SkyCoord, Angle
 import astropy.units as u
 
-from vast_post_processing.catalogs import Catalog
-from vast_post_processing.crossmatch import (
+from .catalogs import Catalog
+from .crossmatch import (
     crossmatch_qtables,
     calculate_positional_offsets,
     calculate_flux_offsets,
 )
+from .utils import logutils
 
 
 # Constants
@@ -723,6 +724,7 @@ def correct_files(
     overwrite: bool = False,
     skip_on_missing=False,
     verbose: bool = False,
+    debug: bool = False,
 ):
     """Read astrometric and flux corrections produced by vast-xmatch and apply them to
     VAST images and catalogues in vast-data. See https://github.com/marxide/vast-xmatch.
@@ -743,13 +745,10 @@ def correct_files(
         outdir (str, optional): The stem of the output directory to write the files to
         overwrite (bool, optional): Overwrite the existing files?. Defaults to False.
         verbose (bool, optional): Show more log messages. Defaults to False.
+        debug (bool, optional): Show debugging messages. Defaults to False.
     """
-    # configure logger
-    if not verbose:
-        # replace the default sink
-        # TODO logging alternative
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
+    # Configure logger
+    logger = logutils.setup_logger(verbose, debug, module="correct")
 
     # Read all the epochs
     if epoch is None or len(epoch) == 0:

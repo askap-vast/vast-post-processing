@@ -13,6 +13,7 @@ from typing import Optional
 import typer
 
 from vast_post_processing.corrections import correct_files
+from vast_post_processing.utils import logutils
 
 
 # Constants
@@ -126,17 +127,16 @@ def main(
         "we skip the entire epoch or just that one files? Defaults to skipping just that file.",
     ),
     verbose: bool = False,
+    debug: bool = False,
 ):
     """
     Read astrometric and flux corrections produced by vast-xmatch and apply them to
     VAST images and catalogues in vast-data. See https://github.com/marxide/vast-xmatch.
     """
-    # configure logger
-    if not verbose:
-        # replace the default sink
-        # TODO logging alternative
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
+    # Configure logger
+    logger = logutils.setup_logger(verbose, debug, module="correct")
+
+    # Correct files
     correct_files(
         vast_tile_data_root=vast_tile_data_root,
         vast_corrections_root=vast_corrections_root,
@@ -154,6 +154,7 @@ def main(
         overwrite=overwrite,
         skip_on_missing=skip_on_missing,
         verbose=verbose,
+        debug=debug,
     )
 
 

@@ -7,7 +7,7 @@
 
 import logging
 import logging.handlers
-import time
+import datetime, time
 
 
 # Classes
@@ -20,6 +20,45 @@ class UTCFormatter(logging.Formatter):
 
 
 # Functions
+
+
+def setup_logger(verbose: bool, debug: bool, module: str = "full") -> logging.Logger:
+    """Set up logging functionality for this module.
+
+    Parameters
+    ----------
+    verbose : bool
+        Flag to display program status and progress to output.
+    debug : bool
+        Flag to display program errors and actions to output.
+    module : str, optional
+        Name of output subdirectory indicating which module is being run.
+        Defaults to "full", referring to the full core run.
+
+    Returns
+    -------
+    logging.Logger
+        The main Logger object for this module.
+    """
+    from .. import DATA_SUBDIRECTORIES
+
+    # Log filename as UTC time at run, in ISO-8601
+    log_filename = (
+        datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
+    )
+
+    # Set up logging level
+    logging_level = "WARNING"
+    if verbose:
+        logging_level = "INFO"
+    if debug:
+        logging_level = "DEBUG"
+
+    # Create and return logger object
+    main_logger = create_logger(
+        DATA_SUBDIRECTORIES[module] / log_filename, logging_level
+    )
+    return main_logger
 
 
 def create_logger(filename: str, level: str = "WARNING"):
