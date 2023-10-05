@@ -599,9 +599,11 @@ def convolve_image(
 
 
 def worker(args: WorkerArgs, mpi: bool = False, n_proc: int = 1):
-    # TODO logging alternative
-    with logger.contextualize(worker_name=_get_worker_name(mpi=mpi, n_proc=n_proc)):
-        return convolve_image(*args)
+    # Add worker name as extra
+    logger = logging.LoggerAdapter(
+        extra={"worker_name": _get_worker_name(mpi=mpi, n_proc=n_proc)}
+    )
+    return convolve_image(*args)
 
 
 def convolve_neighbours(

@@ -303,63 +303,67 @@ def selavy_combined(
 def worker(
     args: tuple[list[str], str, Path, Path, Path], mpi: bool = False, n_proc: int = 1
 ):
-    # TODO logging alternative
-    with logger.contextualize(worker_name=_get_worker_name(mpi=mpi, n_proc=n_proc)):
-        swarp_cmd: list[str]
-        field_name: str
-        output_mosaic_path: Path
-        output_weight_path: Path
-        central_image_path: Path
+    # Add worker name as extra
+    logger = logging.LoggerAdapter(
+        extra={"worker_name": _get_worker_name(mpi=mpi, n_proc=n_proc)}
+    )
+    swarp_cmd: list[str]
+    field_name: str
+    output_mosaic_path: Path
+    output_weight_path: Path
+    central_image_path: Path
 
-        (
-            swarp_cmd,
-            field_name,
-            output_mosaic_path,
-            output_weight_path,
-            central_image_path,
-        ) = args
-        logger.debug(f"worker args: {args}")
+    (
+        swarp_cmd,
+        field_name,
+        output_mosaic_path,
+        output_weight_path,
+        central_image_path,
+    ) = args
+    logger.debug(f"worker args: {args}")
 
-        config_path = Path(swarp_cmd[2])
-        field_name = config_path.parent.name
-        try:
-            logger.debug(f"SWarping {field_name} ...")
-            _ = subprocess.run(swarp_cmd, check=True)
-        except subprocess.CalledProcessError as e:
-            logger.error(
-                f"Error while calling SWarp for {field_name}. Return code: {e.returncode}"
-            )
-            logger.debug(e.cmd)
-            raise e
-        add_degenerate_axes(output_mosaic_path, central_image_path)
-        add_degenerate_axes(output_weight_path, central_image_path)
-        mask_weightless_pixels(output_mosaic_path, output_weight_path)
-        logger.info(f"SWarp completed for {field_name}.")
+    config_path = Path(swarp_cmd[2])
+    field_name = config_path.parent.name
+    try:
+        logger.debug(f"SWarping {field_name} ...")
+        _ = subprocess.run(swarp_cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error(
+            f"Error while calling SWarp for {field_name}. Return code: {e.returncode}"
+        )
+        logger.debug(e.cmd)
+        raise e
+    add_degenerate_axes(output_mosaic_path, central_image_path)
+    add_degenerate_axes(output_weight_path, central_image_path)
+    mask_weightless_pixels(output_mosaic_path, output_weight_path)
+    logger.info(f"SWarp completed for {field_name}.")
 
 
 def test_worker(
     args: tuple[list[str], str, Path, Path, Path], mpi: bool = False, n_proc: int = 1
 ):
-    # TODO logging alternative
-    with logger.contextualize(worker_name=_get_worker_name(mpi=mpi, n_proc=n_proc)):
-        swarp_cmd: list[str]
-        field_name: str
-        output_mosaic_path: Path
-        output_weight_path: Path
-        central_image_path: Path
+    # Add worker name as extra
+    logger = logging.LoggerAdapter(
+        extra={"worker_name": _get_worker_name(mpi=mpi, n_proc=n_proc)}
+    )
+    swarp_cmd: list[str]
+    field_name: str
+    output_mosaic_path: Path
+    output_weight_path: Path
+    central_image_path: Path
 
-        (
-            swarp_cmd,
-            field_name,
-            output_mosaic_path,
-            output_weight_path,
-            central_image_path,
-        ) = args
-        logger.debug(f"worker args: {args}")
+    (
+        swarp_cmd,
+        field_name,
+        output_mosaic_path,
+        output_weight_path,
+        central_image_path,
+    ) = args
+    logger.debug(f"worker args: {args}")
 
-        config_path = Path(swarp_cmd[2])
-        field_name = config_path.parent.name
-        logger.debug(f"Would SWarp {field_name}")
+    config_path = Path(swarp_cmd[2])
+    field_name = config_path.parent.name
+    logger.debug(f"Would SWarp {field_name}")
 
 
 def swarp(
