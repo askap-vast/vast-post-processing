@@ -1,7 +1,7 @@
-# User
+# VPP
 *.ipynb
-vast_post_processing.log
 *.githash
+vast_post_processing/data/*/*.log
 
 .*/
 *.sif

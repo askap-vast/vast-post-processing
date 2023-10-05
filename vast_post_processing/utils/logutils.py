@@ -56,7 +56,7 @@ def setup_logger(verbose: bool, debug: bool, module: str = "full") -> logging.Lo
 
     # Create and return logger object
     main_logger = create_logger(
-        DATA_SUBDIRECTORIES[module] / log_filename, logging_level
+        str(DATA_SUBDIRECTORIES[module] / log_filename), logging_level
     )
     return main_logger
 
@@ -97,7 +97,7 @@ def create_logger(filename: str, level: str = "WARNING"):
     )
 
     # Add handler for file
-    handler = logging.handlers.FileHandler(filename=filename)
+    handler = logging.FileHandler(filename=filename + ".log")
     handler.setFormatter(loggingFormatter)
     handler.setLevel(level)
 
