@@ -5,11 +5,18 @@ behind logs and configuration files. If the --delete-all option is used, the dir
 passed to this script along with all contents are indiscriminately deleted recursively.
 """
 
+
+# Import
+
+
 from pathlib import Path
 
 import typer
 
 from vast_post_processing.utils import fileutils
+
+
+# Functions
 
 
 def main(neighbour_data_dir: Path, delete_all: bool = False):

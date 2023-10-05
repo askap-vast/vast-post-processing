@@ -1,15 +1,32 @@
-from loguru import logger
-from pathlib import Path
-from typing import Tuple, Union, Dict, Optional
-from urllib.parse import quote
+"""Functions and classes for VAST catalogues. 
+"""
 
-from astropy.coordinates import SkyCoord
-from astropy.table import Table, QTable, join
-import astropy.units as u
+
+# Imports
+
+
+import logging
+from pathlib import Path
+from urllib.parse import quote
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 
-SELAVY_COLUMN_UNITS = {
+import astropy.units as u
+from astropy.coordinates import SkyCoord
+from astropy.table import Table, QTable, join
+
+
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
+
+
+SELAVY_COLUMN_UNITS: dict[str, u.Quantity] = {
     "ra_deg_cont": u.deg,
     "dec_deg_cont": u.deg,
     "ra_err": u.arcsec,
@@ -24,8 +41,11 @@ SELAVY_COLUMN_UNITS = {
     "pos_ang_err": u.deg,
     "rms_image": u.mJy / u.beam,
 }
+"""Units of each column in a Selavy catalogue, as a dict. 
+"""
 
-AEGEAN_COLUMN_MAP = {
+
+AEGEAN_COLUMN_MAP: dict[str, tuple[str, u.Quantity]] = {
     # aegean name: (selavy name, aegean unit)
     "ra": ("ra_deg_cont", u.deg),
     "dec": ("dec_deg_cont", u.deg),
@@ -41,16 +61,22 @@ AEGEAN_COLUMN_MAP = {
     "err_pa": ("pos_ang_err", u.deg),
     "local_rms": ("rms_image", u.Jy / u.beam),
 }
+"""Mapping of Selavy catalogue columns to their Aegean counterparts, along with
+the corresponding Aegean units.
+"""
+
+
+# Functions
 
 
 def _convert_selavy_columns_to_quantites(
-    qt: QTable, units: Dict[str, u.Unit] = SELAVY_COLUMN_UNITS
+    qt: QTable, units: dict[str, u.Unit] = SELAVY_COLUMN_UNITS
 ) -> QTable:
     """Takes in a selavy component table and adds units to respective quantities
 
     Args:
         qt (QTable): the component catalog
-        units (Dict[str, u.Unit], optional): The dictionary with parameters and
+        units (dict[str, u.Unit], optional): The dictionary with parameters and
         their units. Defaults to SELAVY_COLUMN_UNITS.
 
     Returns:
@@ -164,6 +190,9 @@ def read_aegean_csv(catalog_path: Path) -> QTable:
     return qt
 
 
+# Classes
+
+
 class Catalog:
     """Class to make a catalog object from the selavy/Aegean files. This
        is then used for catalog matching between the referecne catalog and
@@ -178,7 +207,7 @@ class Catalog:
     def __init__(
         self,
         path: Path,
-        psf: Optional[Tuple[float, float]] = None,
+        psf: Optional[tuple[float, float]] = None,
         input_format: str = "selavy",
         condon: bool = True,
         flux_limit: float = 0,
@@ -191,7 +220,7 @@ class Catalog:
 
         Args:
             path (Path): path to the component file (selavy/aegean supported right now)
-            psf (Optional[Tuple[float, float]], optional): The major and minor axis dimensions
+            psf (Optional[tuple[float, float]], optional): The major and minor axis dimensions
                 in arcsec. Defaults to None. Used to calculate condon errors
             input_format (str, optional): are the component files selavy or aegean generated?.
                 Defaults to "selavy".

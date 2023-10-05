@@ -1,4 +1,4 @@
-"""Applies various corrections to FITS images. 
+"""Apply various corrections to FITS image files. 
 """
 
 
@@ -7,10 +7,9 @@
 
 import sys
 import warnings
-from loguru import logger
-
-import csv
+import logging
 from pathlib import Path
+import csv
 from uncertainties import ufloat
 from uncertainties.core import AffineScalarFunc
 from typing import Generator, Tuple, Optional
@@ -19,17 +18,26 @@ import numpy as np
 
 from astropy.io import fits
 from astropy.io.votable import parse
-from astropy.io.votable.tree import Param
+from astropy.io.votable.tree import Param, VOTableFile, Table
 from astropy.wcs import WCS, FITSFixedWarning
 from astropy.coordinates import SkyCoord, Angle
 import astropy.units as u
 
-from vast_post_processing.catalogs import Catalog
-from vast_post_processing.crossmatch import (
+from .catalogs import Catalog
+from .crossmatch import (
     crossmatch_qtables,
     calculate_positional_offsets,
     calculate_flux_offsets,
 )
+from .utils import logutils
+
+
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
 
 
 # Functions
@@ -248,7 +256,7 @@ def shift_and_scale_image(
 
     # Open image
     image_hdul = fits.open(image_path)
-    image_hdu = image_hdul[0]
+    image_hdu: fits.PrimaryHDU = image_hdul[0]
 
     # do the flux scaling, but check that the data is in Jy
     if image_hdu.header["BUNIT"] == "Jy/beam":
@@ -347,7 +355,7 @@ def shift_and_scale_catalog(
 
     # Open catalog
     votablefile = parse(catalog_path)
-    votable = votablefile.get_first_table()
+    votable: Table = votablefile.get_first_table()
 
     # Correct coordinate columns
     ra_deg = votable.array["col_ra_deg_cont"] * u.deg
@@ -660,9 +668,7 @@ def correct_field(
                     else:
                         corrected_hdu.writeto(str(output_path))
                     logger.success(f"Writing corrected image to: {output_path}.")
-                    corrected_hdu.close()
-                else:
-                    corrected_hdus.append(corrected_hdu)
+                corrected_hdus.append(corrected_hdu)
 
         # Do the same for catalog files
         corrected_catalogs = []
@@ -693,8 +699,7 @@ def correct_field(
                     else:
                         corrected_catalog.to_xml(output_path.as_posix())
                     logger.success(f"Writing corrected catalogue: {output_path}.")
-                else:
-                    corrected_catalogs.append(corrected_catalog)
+                corrected_catalogs.append(corrected_catalog)
         logger.info(
             f"Successfully corrected the images and catalogs for {image_path.as_posix()}"
         )
@@ -719,6 +724,7 @@ def correct_files(
     overwrite: bool = False,
     skip_on_missing=False,
     verbose: bool = False,
+    debug: bool = False,
 ):
     """Read astrometric and flux corrections produced by vast-xmatch and apply them to
     VAST images and catalogues in vast-data. See https://github.com/marxide/vast-xmatch.
@@ -739,12 +745,10 @@ def correct_files(
         outdir (str, optional): The stem of the output directory to write the files to
         overwrite (bool, optional): Overwrite the existing files?. Defaults to False.
         verbose (bool, optional): Show more log messages. Defaults to False.
+        debug (bool, optional): Show debugging messages. Defaults to False.
     """
-    # configure logger
-    if not verbose:
-        # replace the default sink
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
+    # Configure logger
+    logger = logutils.setup_logger(verbose, debug, module="correct")
 
     # Read all the epochs
     if epoch is None or len(epoch) == 0:

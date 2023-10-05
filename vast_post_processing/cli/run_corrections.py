@@ -1,10 +1,30 @@
-from loguru import logger
+"""Run corrections on image files.
+"""
+
+
+# Imports
+
+
+import sys
+import logging
 from pathlib import Path
 from typing import Optional
-from uncertainties import ufloat
-import typer, sys
+
+import typer
 
 from vast_post_processing.corrections import correct_files
+from vast_post_processing.utils import logutils
+
+
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
+
+
+# Functions
 
 
 def main(
@@ -107,16 +127,16 @@ def main(
         "we skip the entire epoch or just that one files? Defaults to skipping just that file.",
     ),
     verbose: bool = False,
+    debug: bool = False,
 ):
     """
     Read astrometric and flux corrections produced by vast-xmatch and apply them to
     VAST images and catalogues in vast-data. See https://github.com/marxide/vast-xmatch.
     """
-    # configure logger
-    if not verbose:
-        # replace the default sink
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
+    # Configure logger
+    logger = logutils.setup_logger(verbose, debug, module="correct")
+
+    # Correct files
     correct_files(
         vast_tile_data_root=vast_tile_data_root,
         vast_corrections_root=vast_corrections_root,
@@ -134,6 +154,7 @@ def main(
         overwrite=overwrite,
         skip_on_missing=skip_on_missing,
         verbose=verbose,
+        debug=debug,
     )
 
 

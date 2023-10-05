@@ -1,13 +1,24 @@
-"""
-Utility Functions for Files
+"""Utilities for files.
 """
 
-# Move cleanup functions/logic here
 
+# Imports
+
+
+import logging
 from pathlib import Path
 from shutil import rmtree
 
-from loguru import logger
+
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
+
+
+# Functions
 
 
 def cleanup_directory(directory: Path):

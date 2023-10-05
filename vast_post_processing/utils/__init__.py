@@ -1,6 +1,9 @@
-#
-# Utility functions for VAST Post-processing
-#
+"""Utility modules for the vast_post_processing program.
+"""
+
+
+# Imports
+
 
 from . import fileutils
 from . import fitsutils

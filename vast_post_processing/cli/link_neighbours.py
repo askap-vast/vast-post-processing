@@ -1,11 +1,27 @@
+"""Link neighbouring sources. 
+"""
+
+
+# Import
+
+
 from pathlib import Path
 from typing import Optional
+
 import typer
 
 from vast_post_processing import neighbours
 
 
+# Constants
+
+
 app = typer.Typer()
+"""Typer app for this module.
+"""
+
+
+# Functions
 
 
 @app.command()

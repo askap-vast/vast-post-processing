@@ -8,16 +8,15 @@
 import logging
 from pathlib import Path
 from importlib import resources
-from itertools import chain
 import yaml
-from typing import Union, Optional, Generator
+import datetime
+from typing import Union, Optional
 
 from astropy.io import fits
 from astropy.io.votable.tree import VOTableFile
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 
-# TODO from . import compress
 from . import crop, corrections
 from .compress import compress_hdu
 from .utils import misc, logutils, fitsutils
@@ -31,9 +30,11 @@ DATA_DIRECTORY: Path = resources.files(__package__) / "data"
 configuration for a run.
 """
 
+
 NEWEST_EPOCH: int = 42
 """Newest epoch whose data is available on the VAST data server.
 """
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 """Global reference to the logger for this module.
@@ -116,7 +117,6 @@ def setup_configuration_variable(
                     raise ValueError(f"{epoch} is not a valid epoch.")
 
         # If variable is crop size, test that it is a possible angle
-        # TODO ensure correct typing with u.deg
         elif name == "crop_size":
             if (value <= 0.0) or (value > 360.0):
                 raise ValueError(f"{value} is not a valid crop angle.")
@@ -238,33 +238,6 @@ def setup_configuration(
     return tuple(variables)
 
 
-def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
-    """Set up logging functionality for this module.
-
-    Parameters
-    ----------
-    verbose : bool
-        Flag to display program status and progress to output.
-    debug : bool
-        Flag to display program errors and actions to output.
-
-    Returns
-    -------
-    logging.Logger
-        The main Logger object for this module.
-    """
-    # Set up logging level
-    logging_level = "INFO"
-    if verbose:
-        logging_level = "WARNING"
-    if debug:
-        logging_level = "DEBUG"
-    main_logger = logutils.create_logger("vast_post_processing.log", logging_level)
-
-    # Return logger object
-    return main_logger
-
-
 def get_image_paths(
     data_root: Path,
     stokes: list[str],
@@ -272,7 +245,7 @@ def get_image_paths(
     verbose: bool,
     debug: bool,
     image_type: str = "IMAGES",
-) -> list[Generator[Path, None, None]]:
+) -> list[Path]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
     Parameters
@@ -292,51 +265,67 @@ def get_image_paths(
 
     Returns
     -------
-    list[Generator[Path, None, None]]
+    list[Path]
         Paths to matching images.
     """
     # Initialize empty list of paths
-    image_path_glob_list: list[Generator[Path, None, None]] = []
+    image_paths: list[Path] = []
 
     # Iterate over each Stokes parameter
     for parameter in stokes:
-        # Display progress if requested
-        if verbose:
-            str_epochs = (", ").join([str(e) for e in epoch])
-            logger.info(
-                f"Getting image paths for Stokes {parameter} "
-                + f"and epoch(s) {str_epochs}"
-            )
+        num_paths = len(image_paths)
 
+        # Display progress if requested
+        str_epochs = (", ").join([str(e) for e in epoch])
+        logger.info(
+            f"Getting image paths for Stokes {parameter} "
+            + (
+                f"in all available epochs."
+                if len(epoch) == 0
+                else f"and epoch(s) {str_epochs}"
+            )
+        )
+
+        # Define image directory root and display if requested
         image_root = Path(data_root / f"STOKES{parameter}_{image_type}").resolve()
         logger.debug(f"Image Root for Stokes {parameter}: {image_root}")
 
         # If epoch is not provided, process all epochs
         if len(epoch) == 0:
-            image_path_glob_list.append(image_root.glob(f"epoch_*/*.fits"))
+            for image_path in image_root.glob(f"epoch_*/*.fits"):
+                image_paths.append(image_path)
         # Otherwise, only process provided epoch(s)
         else:
             for n in epoch:
-                image_path_glob_list.append(image_root.glob(f"epoch_{n}/*.fits"))
+                for image_path in image_root.glob(f"epoch_{n}/*.fits"):
+                    image_paths.append(image_path)
+
+        # Skip parameter if no images are found
+        if len(image_paths) - num_paths == 0:
+            logger.debug(f"No images found for Stokes {parameter}. Skipping.")
+            break
 
         # Check for processed data if Stokes V
         if parameter == "V":
             # Display progress if requested
-            if verbose:
-                logger.info("Checking corresponding Stokes I have been processed.")
+            logger.info("Checking corresponding Stokes I files have been processed.")
 
             # Get list of Stokes I processed image paths as str
             # NOTE image_type may change in future development
             processed_stokes_i = [
-                str(path)
-                for ipgl in get_image_paths(
-                    data_root, ["I"], epoch, image_type="CROPPED"
+                str(image_path)
+                for image_path in get_image_paths(
+                    data_root,
+                    ["I"],
+                    epoch,
+                    image_type="CROPPED",
+                    verbose=False,
+                    debug=False,
                 )
-                for path in list(ipgl)
             ]
 
             # Check that each Stokes V image has been processed as Stokes I
-            for epoch_list in image_path_glob_list:
+            for epoch_list in image_paths:
                 for image_path_v in epoch_list:
                     # Get expected path of processed corresponding Stokes I image
                     split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
@@ -352,7 +341,7 @@ def get_image_paths(
                         )
 
     # Return resulting image path list
-    return image_path_glob_list
+    return image_paths
 
 
 ## Pipeline
@@ -394,8 +383,7 @@ def get_corresponding_paths(
         corresponding to the image given by `image_path`.
     """
     # Display progress if requested
-    if verbose:
-        logger.info(f"Getting paths to data files corresponding to {image_path}")
+    logger.info(f"Getting paths to data files corresponding to {image_path}")
 
     # Resolve paths to RMS and background images
     rms_path = Path(
@@ -416,13 +404,12 @@ def get_corresponding_paths(
     islands_path = selavy_dir / islands_name
 
     # Display paths if requested
-    if debug:
-        logger.debug(
-            f"Noise Map: {rms_path}\n"
-            + f"Mean Map: {bkg_path}\n"
-            + f"Components: {components_path}\n"
-            + f"Islands: {islands_path}\n"
-        )
+    logger.debug(
+        f"Noise Map: {rms_path}\n"
+        + f"Mean Map: {bkg_path}\n"
+        + f"Components: {components_path}\n"
+        + f"Islands: {islands_path}\n"
+    )
 
     # If any of these paths are missing, terminate this run
     if not rms_path.exists():
@@ -487,14 +474,12 @@ def crop_image(
         Field centre of image, and cropped (and compressed, if requested) image.
     """
     # Display list of HDU if requested
-    if debug:
-        logger.debug(f"corrected_fits: {corrected_fits}")
+    logger.debug(f"corrected_fits: {corrected_fits}")
 
     # Iterate over each image to crop and write to a new directory
     for i, path in enumerate((rms_path, bkg_path, image_path)):
         # Display progress if requested
-        if verbose:
-            logger.info(f"Cropping {path}")
+        logger.info(f"Cropping {path}")
 
         # Locate directory to store cropped data, and create if nonexistent
         # TODO what suffix should we use?
@@ -504,8 +489,7 @@ def crop_image(
         fits_output_dir.mkdir(parents=True, exist_ok=True)
 
         # Display progress if requested
-        if verbose:
-            logger.info(f"Using fits_output_dir: {fits_output_dir}")
+        logger.info(f"Using fits_output_dir: {fits_output_dir}")
 
         # Crop image data
         outfile = fits_output_dir / path.name
@@ -521,8 +505,7 @@ def crop_image(
         fitsutils.update_header_history(processed_hdu.header)
 
         # Display progress if requested
-        if verbose:
-            logger.info(f"Wrote {outfile}")
+        logger.info(f"Wrote {outfile}")
 
     # Return field centre and processed HDU
     return field_centre, processed_hdu
@@ -580,8 +563,7 @@ def crop_catalogs(
         outfile = cat_output_dir / path.name
 
         # Display path if requested
-        if debug:
-            logger.debug(f"{outfile}")
+        logger.debug(f"{outfile}")
 
         # VOTable to be corrected is the first in the list of catalogues
         vot = corrected_cats[i]
@@ -597,8 +579,7 @@ def crop_catalogs(
             vot.to_xml(str(outfile))
 
             # Display progress if requested
-            if verbose:
-                logger.info(f"Wrote {outfile}")
+            logger.info(f"Wrote {outfile}")
 
 
 def create_mocs(
@@ -633,8 +614,7 @@ def create_mocs(
         Flag to display errors to output.
     """
     # Display progress if requested
-    if verbose:
-        logger.info(f"Generating MOC for {image_path}")
+    logger.info(f"Generating MOC for {image_path}")
 
     # Define path to MOC output file
     moc_dir = f"STOKES{stokes}_MOC_CROPPED"
@@ -648,8 +628,7 @@ def create_mocs(
     moc.write(moc_outfile, overwrite=overwrite)
 
     # Display progress if requested
-    if verbose:
-        logger.debug(f"Wrote {moc_outfile}")
+    logger.debug(f"Wrote {moc_outfile}")
 
     # Define path to STMOC output file
     stmoc_filename = image_path.name.replace(".fits", ".stmoc.fits")
@@ -660,8 +639,7 @@ def create_mocs(
     stmoc.write(stmoc_outfile, overwrite=overwrite)
 
     # Display progress if requested
-    if verbose:
-        logger.debug(f"Wrote {stmoc_outfile}")
+    logger.debug(f"Wrote {stmoc_outfile}")
 
 
 ## Main
@@ -741,7 +719,7 @@ def run(
     )
 
     # Set up logger
-    main_logger = setup_logger(verbose=verbose, debug=debug)
+    main_logger = logutils.setup_logger(verbose=verbose, debug=debug)
 
     # Record all local variables to logger
     main_logger.debug("All Runtime Local Variables:")
@@ -752,8 +730,12 @@ def run(
         data_root=data_root, stokes=stokes, epoch=epoch, verbose=verbose, debug=debug
     )
 
+    # Display paths if requested
+    main_logger.debug("All discovered image paths:")
+    main_logger.debug(image_paths)
+
     # Iterate over all FITS files to run post-processing
-    for image_path in chain.from_iterable(image_paths):
+    for image_path in image_paths:
         main_logger.info(f"Working on {image_path}...")
         stokes_dir = misc.get_stokes_parameter(image_path)
         epoch_dir = misc.get_epoch_directory(image_path)
@@ -768,7 +750,7 @@ def run(
             verbose=verbose,
             debug=debug,
         )
-        
+
         # Apply corrections to field of passed image
         corrected = corrections.correct_field(
             outdir=out_root,
@@ -779,6 +761,8 @@ def run(
             verbose=verbose,
             debug=debug,
         )
+
+        # Display corrected files if requested
         main_logger.debug(corrected)
 
         # Skip images skipped by previous step

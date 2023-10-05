@@ -9,24 +9,70 @@ Example
 where <epoch> is 1-13 (no "x" suffixes).
 """
 
-from dataclasses import dataclass
-from itertools import product
+
+# Imports
+
+
 import os
-from pathlib import Path
-from typing import Any, Dict
 import warnings
+import logging
+import subprocess
+
+from dataclasses import dataclass
+from functools import partial
+from itertools import product
+from pathlib import Path
+from typing import Any, Optional
+
+import numpy as np
 
 from astropy.io import fits
 from astropy import wcs
-from loguru import logger
-import numpy as np
+
+from vast_post_processing.cli._util import get_pool, _get_worker_name
+
+
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
 
 
 slurm_job_id = os.environ.get("SLURM_JOB_ID", "no-slurm")
-"""str : The job ID of this program in SLURM.
-
-Defaults to "no-slurm" if not running in SLURM. 
+"""Job ID of this program in SLURM, by default "no-slurm" if not running in
+SLURM.
 """
+
+
+COPY_FITS_KEYWORDS = [
+    # beam and units
+    "BMAJ",
+    "BMIN",
+    "BPA",
+    "BTYPE",
+    "BUNIT",
+    # ASKAP metadata
+    "TELESCOP",
+    "PROJECT",
+    "SBID",
+    # other observation metadata
+    "TIMESYS",
+    "DATE-OBS",
+    "DATE-BEG",
+    "DATE-END",
+    "TELAPSE",
+    "DURATION",
+    "TIMEUNIT",
+    "RESTFREQ",
+]
+"""FITS header cards to be copied from the first input image to the output
+mosaic. 
+"""
+
+
+# Classes
 
 
 @dataclass(frozen=True)
@@ -58,30 +104,7 @@ class CentralImageNotFound(Exception):
     pass
 
 
-COPY_FITS_KEYWORDS = [
-    # beam and units
-    "BMAJ",
-    "BMIN",
-    "BPA",
-    "BTYPE",
-    "BUNIT",
-    # ASKAP metadata
-    "TELESCOP",
-    "PROJECT",
-    "SBID",
-    # other observation metadata
-    "TIMESYS",
-    "DATE-OBS",
-    "DATE-BEG",
-    "DATE-END",
-    "TELAPSE",
-    "DURATION",
-    "TIMEUNIT",
-    "RESTFREQ",
-]
-"""list of str : FITS header cards to be copied from the first input image to
-the output mosaic. 
-"""
+# Functions
 
 
 def get_image_geometry(image: Path) -> ImageGeometry:
@@ -164,8 +187,8 @@ def add_degenerate_axes(image_path: Path, reference_image_path: Path):
         reference_image_path
     ) as hdul_ref:
         # Set variables as PrimaryHDU for both image and reference
-        hdu = hdul[0]
-        hdu_ref = hdul_ref[0]
+        hdu: fits.PrimaryHDU = hdul[0]
+        hdu_ref: fits.PrimaryHDU = hdul_ref[0]
 
         # Only add degenerate axes if they aren't already added
         if hdu.data.ndim == 2:
@@ -198,22 +221,14 @@ def mask_weightless_pixels(image_path: Path, weights_path: Path):
         weights_path
     ) as hdul_weights:
         # Set variables as PrimaryHDU for both image and weight
-        hdu = hdul[0]
-        hdu_weights = hdul_weights[0]
+        hdu: fits.PrimaryHDU = hdul[0]
+        hdu_weights: fits.PrimaryHDU = hdul_weights[0]
 
         # Replace pixels that have zero weight with NaN
         hdu.data[hdu_weights.data == 0] = np.nan
 
         # Output operation to log
         logger.info(f"Masked weightless pixels in {image_path}.")
-
-
-# Logic separation
-
-from pathlib import Path
-from typing import Optional, List
-
-from loguru import logger
 
 
 def write_selavy_files(
@@ -259,7 +274,7 @@ def selavy_combined(
     sbatch_template_path: Path,
     stokes: str,
     racs: bool,
-    field_list: Optional[List[str]],
+    field_list: Optional[list[str]],
 ):
     glob_expr = "RACS_*" if racs else "VAST_*"
     for field_path in neighbour_data_dir.glob(glob_expr):
@@ -285,77 +300,70 @@ def selavy_combined(
             continue
 
 
-from functools import partial
-import os
-import subprocess
-
-from loguru import logger
-
-from vast_post_processing.cli._util import get_pool, _get_worker_name
-
-# configure logging
-# logger.remove()  # remove default log sink
-# logger.add(sys.stderr, level="DEBUG", enqueue=True)
-
-
 def worker(
     args: tuple[list[str], str, Path, Path, Path], mpi: bool = False, n_proc: int = 1
 ):
-    with logger.contextualize(worker_name=_get_worker_name(mpi=mpi, n_proc=n_proc)):
-        swarp_cmd: list[str]
-        field_name: str
-        output_mosaic_path: Path
-        output_weight_path: Path
-        central_image_path: Path
+    # Add worker name as extra
+    logger = logging.LoggerAdapter(
+        extra={"worker_name": _get_worker_name(mpi=mpi, n_proc=n_proc)}
+    )
+    swarp_cmd: list[str]
+    field_name: str
+    output_mosaic_path: Path
+    output_weight_path: Path
+    central_image_path: Path
 
-        (
-            swarp_cmd,
-            field_name,
-            output_mosaic_path,
-            output_weight_path,
-            central_image_path,
-        ) = args
-        logger.debug(f"worker args: {args}")
+    (
+        swarp_cmd,
+        field_name,
+        output_mosaic_path,
+        output_weight_path,
+        central_image_path,
+    ) = args
+    logger.debug(f"worker args: {args}")
 
-        config_path = Path(swarp_cmd[2])
-        field_name = config_path.parent.name
-        try:
-            logger.debug(f"SWarping {field_name} ...")
-            _ = subprocess.run(swarp_cmd, check=True)
-        except subprocess.CalledProcessError as e:
-            logger.error(
-                f"Error while calling SWarp for {field_name}. Return code: {e.returncode}"
-            )
-            logger.debug(e.cmd)
-            raise e
-        add_degenerate_axes(output_mosaic_path, central_image_path)
-        add_degenerate_axes(output_weight_path, central_image_path)
-        mask_weightless_pixels(output_mosaic_path, output_weight_path)
-        logger.info(f"SWarp completed for {field_name}.")
+    config_path = Path(swarp_cmd[2])
+    field_name = config_path.parent.name
+    try:
+        logger.debug(f"SWarping {field_name} ...")
+        _ = subprocess.run(swarp_cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error(
+            f"Error while calling SWarp for {field_name}. Return code: {e.returncode}"
+        )
+        logger.debug(e.cmd)
+        raise e
+    add_degenerate_axes(output_mosaic_path, central_image_path)
+    add_degenerate_axes(output_weight_path, central_image_path)
+    mask_weightless_pixels(output_mosaic_path, output_weight_path)
+    logger.info(f"SWarp completed for {field_name}.")
 
 
 def test_worker(
     args: tuple[list[str], str, Path, Path, Path], mpi: bool = False, n_proc: int = 1
 ):
-    with logger.contextualize(worker_name=_get_worker_name(mpi=mpi, n_proc=n_proc)):
-        swarp_cmd: list[str]
-        field_name: str
-        output_mosaic_path: Path
-        output_weight_path: Path
-        central_image_path: Path
+    # Add worker name as extra
+    logger = logging.LoggerAdapter(
+        extra={"worker_name": _get_worker_name(mpi=mpi, n_proc=n_proc)}
+    )
+    swarp_cmd: list[str]
+    field_name: str
+    output_mosaic_path: Path
+    output_weight_path: Path
+    central_image_path: Path
 
-        (
-            swarp_cmd,
-            field_name,
-            output_mosaic_path,
-            output_weight_path,
-            central_image_path,
-        ) = args
-        logger.debug(f"worker args: {args}")
+    (
+        swarp_cmd,
+        field_name,
+        output_mosaic_path,
+        output_weight_path,
+        central_image_path,
+    ) = args
+    logger.debug(f"worker args: {args}")
 
-        config_path = Path(swarp_cmd[2])
-        field_name = config_path.parent.name
-        logger.debug(f"Would SWarp {field_name}")
+    config_path = Path(swarp_cmd[2])
+    field_name = config_path.parent.name
+    logger.debug(f"Would SWarp {field_name}")
 
 
 def swarp(

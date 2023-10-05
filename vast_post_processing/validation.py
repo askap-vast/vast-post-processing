@@ -1,5 +1,2 @@
-"""
-
-Validation generation code 
-
+"""Generate estimations for the validation process.
 """

@@ -1,6 +1,9 @@
-#
-# The CLI bindings for VAST Post-processing
-#
+"""CLI bindings for VAST Post-Processing modules.
+"""
+
+
+# Imports
+
 
 from . import _util
 from . import cleanup

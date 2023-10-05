@@ -1,12 +1,32 @@
+"""Cross-match sources in VAST image observations.
+"""
+
+
+# Imports
+
+
+import logging
 from typing import Tuple
-from loguru import logger
-from astropy.coordinates import SkyCoord, Angle, match_coordinates_sky
-from astropy.table import QTable, join, join_skycoord
-import astropy.units as u
+
 import numpy as np
 from scipy import odr
 
+from astropy.coordinates import SkyCoord, Angle, match_coordinates_sky
+from astropy.table import QTable, join, join_skycoord
+import astropy.units as u
+
 from vast_post_processing.catalogs import Catalog
+
+
+# Constants
+
+
+logger = logging.getLogger(__name__)
+"""Global reference to the logger for this project.
+"""
+
+
+# Functions
 
 
 def median_abs_deviation(data):

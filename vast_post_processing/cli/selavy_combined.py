@@ -4,6 +4,11 @@ a Pawsey system with ASKAPsoft/Selavy installed. This script will generate the r
 Selavy parset and SLURM sbatch script. Note that the sbatch scripts need to be submitted
 to the SLURM queue externally - this script may not have access to the SLURM executables.
 """
+
+
+# Imports
+
+
 from pathlib import Path
 from typing import Optional, List
 
@@ -12,7 +17,15 @@ import typer
 from vast_post_processing import combine
 
 
+# Constants
+
+
 app = typer.Typer()
+"""Typer app for this module.
+"""
+
+
+# Functions
 
 
 @app.command()

@@ -1,5 +1,10 @@
 """Requires setup_neighbours.py to be run first.
 """
+
+
+# Imports
+
+
 from pathlib import Path
 from typing import Optional, List
 
@@ -8,7 +13,15 @@ import typer
 from vast_post_processing import neighbours
 
 
+# Constants
+
+
 app = typer.Typer()
+"""Typer app for this module.
+"""
+
+
+# Functions
 
 
 @app.command()

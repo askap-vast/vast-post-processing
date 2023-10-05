@@ -1,20 +1,22 @@
 """Miscellaneous utilities for VAST Post-Processing.
 """
 
+
 # Imports
+
 
 import logging
 import subprocess
 from pathlib import Path
 from importlib import resources
 from re import fullmatch
-from typing import Tuple
 
 
 # Constants
 
+
 logger = logging.getLogger(__name__)
-"""Global reference to the logger for this module.
+"""Global reference to the logger for this project.
 """
 
 
@@ -53,7 +55,7 @@ def get_epoch_directory(image_path: Path) -> str:
     return image_path.parent.name
 
 
-def get_field_and_sbid(image_path: Path) -> Tuple[str, int]:
+def get_field_and_sbid(image_path: Path) -> tuple[str, int]:
     """Get the field and SBID of an image, given its path.
 
     Parameters
@@ -63,7 +65,7 @@ def get_field_and_sbid(image_path: Path) -> Tuple[str, int]:
 
     Returns
     -------
-    Tuple[str, int]
+    tuple[str, int]
         Field and SBID for this observation.
     """
     _, _, field, sbid_str, *_ = image_path.name.split(".")
