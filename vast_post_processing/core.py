@@ -8,16 +8,15 @@
 import logging
 from pathlib import Path
 from importlib import resources
-from itertools import chain
 import yaml
-from typing import Union, Optional, Generator
+import datetime
+from typing import Union, Optional
 
 from astropy.io import fits
 from astropy.io.votable.tree import VOTableFile
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 
-# TODO from . import compress
 from . import crop, corrections
 from .compress import compress_hdu
 from .utils import misc, logutils, fitsutils
@@ -31,9 +30,11 @@ DATA_DIRECTORY: Path = resources.files(__package__) / "data"
 configuration for a run.
 """
 
+
 NEWEST_EPOCH: int = 42
 """Newest epoch whose data is available on the VAST data server.
 """
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 """Global reference to the logger for this module.
@@ -237,7 +238,7 @@ def setup_configuration(
     return tuple(variables)
 
 
-def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
+def setup_logger(verbose: bool, debug: bool, filename: str) -> logging.Logger:
     """Set up logging functionality for this module.
 
     Parameters
@@ -246,6 +247,8 @@ def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
         Flag to display program status and progress to output.
     debug : bool
         Flag to display program errors and actions to output.
+    filename : str
+        Filename of log file.
 
     Returns
     -------
@@ -253,12 +256,12 @@ def setup_logger(verbose: bool, debug: bool) -> logging.Logger:
         The main Logger object for this module.
     """
     # Set up logging level
-    logging_level = "INFO"
+    logging_level = "WARNING"
     if verbose:
-        logging_level = "WARNING"
+        logging_level = "INFO"
     if debug:
         logging_level = "DEBUG"
-    main_logger = logutils.create_logger("vast_post_processing.log", logging_level)
+    main_logger = logutils.create_logger(filename, logging_level)
 
     # Return logger object
     return main_logger
@@ -761,8 +764,13 @@ def run(
         debug=debug,
     )
 
+    # Log filename as UTC time at run in ISO-8601
+    log_filename = (
+        datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
+    )
+
     # Set up logger
-    main_logger = setup_logger(verbose=verbose, debug=debug)
+    main_logger = setup_logger(verbose=verbose, debug=debug, filename=log_filename)
 
     # Record all local variables to logger
     main_logger.debug("All Runtime Local Variables:")

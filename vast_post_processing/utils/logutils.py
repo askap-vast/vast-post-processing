@@ -10,23 +10,6 @@ import logging.handlers
 import time
 
 
-# Constants
-
-
-# Setting Logger Rotation Settings
-LOGGER_MAX_BYTES = 1000000
-"""Maximum number of bytes for the log to contain.
-Rollover occurs when this amount is reached in one log.
-"""
-
-
-LOGGER_BACKUP_COUNT = 4
-"""Maximum number of backup log files. 
-When rollover occurs, new files with number suffices up to this amount will be
-created.
-"""
-
-
 # Classes
 
 
@@ -41,22 +24,21 @@ class UTCFormatter(logging.Formatter):
 
 def create_logger(filename: str, level: str = "WARNING"):
     """
-    Create a central rotating file logger with the appropriate
-    formatting and dates in UTC
+    Create a central file logger with appropriate formatting and dates in UTC.
 
     Parameters
     ----------
     filename : str
-        Filename of output log file
+        Filename of output log file.
     level : str, optional
-        Logging level to output, by default "WARNING"
+        Logging level to output, by default "WARNING".
 
     Returns
     -------
     logger
         Logger object
     """
-
+    # Check level is recognized
     level = level.upper()
     assert level in {
         "CRITICAL",
@@ -69,19 +51,18 @@ def create_logger(filename: str, level: str = "WARNING"):
     # Add global logging level success
     add_logging_level("SUCCESS", logging.INFO + 5)
 
+    # Add formatter for file
     loggingFormatter = UTCFormatter(
         fmt="%(asctime)-20s %(levelname)-8s %(message)s [%(name)s]",
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
 
-    handler = logging.handlers.RotatingFileHandler(
-        filename=filename, maxBytes=LOGGER_MAX_BYTES, backupCount=LOGGER_BACKUP_COUNT
-    )
+    # Add handler for file
+    handler = logging.handlers.FileHandler(filename=filename)
     handler.setFormatter(loggingFormatter)
     handler.setLevel(level)
 
-    # Adding Stream Handler
-
+    # Add formatter for output
     streamloggingFormatter = UTCFormatter(
         fmt=(
             "\033[0;31m%(asctime)-20s\033[39m %(levelname)-8s "
@@ -90,17 +71,16 @@ def create_logger(filename: str, level: str = "WARNING"):
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
 
+    # Add handler for output
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(streamloggingFormatter)
     stream_handler.setLevel(level)
 
-    # Adding to Logger
-
+    # Add handlers to logger object and return
     logger = logging.getLogger()
     logger.addHandler(handler)
     logger.addHandler(stream_handler)
     logger.setLevel(level)
-
     return logger
 
 
