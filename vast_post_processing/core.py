@@ -276,21 +276,19 @@ def get_image_paths(
         num_paths = len(image_paths)
 
         # Display progress if requested
-        if verbose:
-            str_epochs = (", ").join([str(e) for e in epoch])
-            logger.info(
-                f"Getting image paths for Stokes {parameter} "
-                + (
-                    f"in all available epochs."
-                    if len(epoch) == 0
-                    else f"and epoch(s) {str_epochs}"
-                )
+        str_epochs = (", ").join([str(e) for e in epoch])
+        logger.info(
+            f"Getting image paths for Stokes {parameter} "
+            + (
+                f"in all available epochs."
+                if len(epoch) == 0
+                else f"and epoch(s) {str_epochs}"
             )
+        )
 
         # Define image directory root and display if requested
         image_root = Path(data_root / f"STOKES{parameter}_{image_type}").resolve()
-        if debug:
-            logger.debug(f"Image Root for Stokes {parameter}: {image_root}")
+        logger.debug(f"Image Root for Stokes {parameter}: {image_root}")
 
         # If epoch is not provided, process all epochs
         if len(epoch) == 0:
@@ -304,17 +302,13 @@ def get_image_paths(
 
         # Skip parameter if no images are found
         if len(image_paths) - num_paths == 0:
-            if debug:
-                logger.debug(f"No images found for Stokes {parameter}. Skipping.")
+            logger.debug(f"No images found for Stokes {parameter}. Skipping.")
             break
 
         # Check for processed data if Stokes V
         if parameter == "V":
             # Display progress if requested
-            if verbose:
-                logger.info(
-                    "Checking corresponding Stokes I files have been processed."
-                )
+            logger.info("Checking corresponding Stokes I files have been processed.")
 
             # Get list of Stokes I processed image paths as str
             # NOTE image_type may change in future development
@@ -389,8 +383,7 @@ def get_corresponding_paths(
         corresponding to the image given by `image_path`.
     """
     # Display progress if requested
-    if verbose:
-        logger.info(f"Getting paths to data files corresponding to {image_path}")
+    logger.info(f"Getting paths to data files corresponding to {image_path}")
 
     # Resolve paths to RMS and background images
     rms_path = Path(
@@ -411,13 +404,12 @@ def get_corresponding_paths(
     islands_path = selavy_dir / islands_name
 
     # Display paths if requested
-    if debug:
-        logger.debug(
-            f"Noise Map: {rms_path}\n"
-            + f"Mean Map: {bkg_path}\n"
-            + f"Components: {components_path}\n"
-            + f"Islands: {islands_path}\n"
-        )
+    logger.debug(
+        f"Noise Map: {rms_path}\n"
+        + f"Mean Map: {bkg_path}\n"
+        + f"Components: {components_path}\n"
+        + f"Islands: {islands_path}\n"
+    )
 
     # If any of these paths are missing, terminate this run
     if not rms_path.exists():
@@ -482,14 +474,12 @@ def crop_image(
         Field centre of image, and cropped (and compressed, if requested) image.
     """
     # Display list of HDU if requested
-    if debug:
-        logger.debug(f"corrected_fits: {corrected_fits}")
+    logger.debug(f"corrected_fits: {corrected_fits}")
 
     # Iterate over each image to crop and write to a new directory
     for i, path in enumerate((rms_path, bkg_path, image_path)):
         # Display progress if requested
-        if verbose:
-            logger.info(f"Cropping {path}")
+        logger.info(f"Cropping {path}")
 
         # Locate directory to store cropped data, and create if nonexistent
         # TODO what suffix should we use?
@@ -499,8 +489,7 @@ def crop_image(
         fits_output_dir.mkdir(parents=True, exist_ok=True)
 
         # Display progress if requested
-        if verbose:
-            logger.info(f"Using fits_output_dir: {fits_output_dir}")
+        logger.info(f"Using fits_output_dir: {fits_output_dir}")
 
         # Crop image data
         outfile = fits_output_dir / path.name
@@ -516,8 +505,7 @@ def crop_image(
         fitsutils.update_header_history(processed_hdu.header)
 
         # Display progress if requested
-        if verbose:
-            logger.info(f"Wrote {outfile}")
+        logger.info(f"Wrote {outfile}")
 
     # Return field centre and processed HDU
     return field_centre, processed_hdu
@@ -575,8 +563,7 @@ def crop_catalogs(
         outfile = cat_output_dir / path.name
 
         # Display path if requested
-        if debug:
-            logger.debug(f"{outfile}")
+        logger.debug(f"{outfile}")
 
         # VOTable to be corrected is the first in the list of catalogues
         vot = corrected_cats[i]
@@ -592,8 +579,7 @@ def crop_catalogs(
             vot.to_xml(str(outfile))
 
             # Display progress if requested
-            if verbose:
-                logger.info(f"Wrote {outfile}")
+            logger.info(f"Wrote {outfile}")
 
 
 def create_mocs(
@@ -628,8 +614,7 @@ def create_mocs(
         Flag to display errors to output.
     """
     # Display progress if requested
-    if verbose:
-        logger.info(f"Generating MOC for {image_path}")
+    logger.info(f"Generating MOC for {image_path}")
 
     # Define path to MOC output file
     moc_dir = f"STOKES{stokes}_MOC_CROPPED"
@@ -643,8 +628,7 @@ def create_mocs(
     moc.write(moc_outfile, overwrite=overwrite)
 
     # Display progress if requested
-    if verbose:
-        logger.debug(f"Wrote {moc_outfile}")
+    logger.debug(f"Wrote {moc_outfile}")
 
     # Define path to STMOC output file
     stmoc_filename = image_path.name.replace(".fits", ".stmoc.fits")
@@ -655,8 +639,7 @@ def create_mocs(
     stmoc.write(stmoc_outfile, overwrite=overwrite)
 
     # Display progress if requested
-    if verbose:
-        logger.debug(f"Wrote {stmoc_outfile}")
+    logger.debug(f"Wrote {stmoc_outfile}")
 
 
 ## Main
@@ -748,9 +731,8 @@ def run(
     )
 
     # Display paths if requested
-    if debug:
-        main_logger.debug("All discovered image paths:")
-        main_logger.debug(image_paths)
+    main_logger.debug("All discovered image paths:")
+    main_logger.debug(image_paths)
 
     # Iterate over all FITS files to run post-processing
     for image_path in image_paths:
@@ -781,8 +763,7 @@ def run(
         )
 
         # Display corrected files if requested
-        if debug:
-            main_logger.debug(corrected)
+        main_logger.debug(corrected)
 
         # Skip images skipped by previous step
         if (corrected is None) or (corrected == ([], [])):
