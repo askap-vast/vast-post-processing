@@ -240,11 +240,11 @@ def moc_to_stmoc(moc: MOC, hdu: fits.hdu.image.PrimaryHDU):
     """
     if "DATE-BEG" not in hdu.header.keys() or "DATE-END" not in hdu.header.keys():
         logger.debug("DATE-BEG or DATE-END missing from header keys - adding")
-        header = fitsutils.update_header_datetimes(hdu.header)
+        fitsutils.update_header_datetimes(hdu.header)
         logger.debug("Added to header keys:")
         logger.debug(f"{hdu.header['DATE-BEG']}, {hdu.header['DATE-END']}")
-    else:
-        header = hdu.header
+    
+    header = hdu.header
 
     start = Time([header["DATE-BEG"]])
     end = Time([header["DATE-END"]])
