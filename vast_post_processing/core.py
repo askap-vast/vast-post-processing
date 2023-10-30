@@ -323,8 +323,10 @@ def get_image_paths(
                     debug=False,
                 )
             ]
+            logger.debug("Processed Stokes I images: {processed_stokes_i}")
 
             # Check that each Stokes V image has been processed as Stokes I
+            logger.debug(image_paths)
             for epoch_list in image_paths:
                 for image_path_v in epoch_list:
                     # Get expected path of processed corresponding Stokes I image
