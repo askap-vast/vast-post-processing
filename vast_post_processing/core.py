@@ -495,6 +495,8 @@ def crop_image(
         outfile = fits_output_dir / path.name
         hdu = corrected_fits[i]
         hdul = None
+        logger.debug(hdu)
+        logger.debug(type(hdu))
         if type(hdu) is fits.HDUList:
             hdul = hdu
             hdu = hdul[0]
@@ -506,6 +508,8 @@ def crop_image(
         processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
         
         if hdul is not None:
+            # This is a temporary workaround
+            # We really should handle this properly.
             logger.warning(f"{path} contains multiple HDU elements"
                            f" - dropping all but the first"
                            )
