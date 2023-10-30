@@ -323,7 +323,7 @@ def get_image_paths(
                     debug=False,
                 )
             ]
-            logger.debug("Processed Stokes I images: {processed_stokes_i}")
+            logger.debug(f"Processed Stokes I images: {processed_stokes_i}")
 
             # Check that each Stokes V image has been processed as Stokes I
             logger.debug(image_paths)
@@ -332,7 +332,7 @@ def get_image_paths(
                 # Get expected path of processed corresponding Stokes I image
                 split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
                 str_path_i = (
-                    split_str_path_v[0] + "STOKESI_IMAGES_CROPPED" + split_str_path_v[1]
+                    split_str_path_v[0] + "STOKESI_IMAGES_CROPPED" + split_str_path_v[1].replace("image.v", "image.i")
                 )
 
                 # If processed path is not found, terminate run
