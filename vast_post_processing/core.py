@@ -787,6 +787,7 @@ def run(
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
+            compress=compress,
         )
 
         # Crop catalogues
