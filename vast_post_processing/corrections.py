@@ -305,6 +305,8 @@ def shift_and_scale_image(
         in both directions given by RAOFF and DECOFF using a model\
         RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
     )
+    
+    logger.debug(image_hdul[0].header['HISTORY'])
 
     return image_hdul
 
