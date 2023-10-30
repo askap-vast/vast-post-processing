@@ -790,7 +790,7 @@ def run(
             corrected_fits, corrected_cats = corrected[0], corrected[1]
 
         # Crop corrected images
-        field_centre, cropped_hdu, corrected_cats = crop_image(
+        field_centre, cropped_hdu = crop_image(
             out_root=out_root,
             image_path=image_path,
             epoch_dir=epoch_dir,
