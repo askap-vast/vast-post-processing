@@ -778,6 +778,7 @@ def run(
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
+            write_output=False
         )
 
         # Display corrected files if requested
