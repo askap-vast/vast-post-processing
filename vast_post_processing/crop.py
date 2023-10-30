@@ -351,7 +351,10 @@ def run_full_crop(
                 fits_output_dir.mkdir(parents=True)
 
             outfile = fits_output_dir / path.name
+            logger.debug(f"Opening path: {path}")
             hdu = fits.open(path)[0]
+            logger.debug("Opened hdu:")
+            logger.debug(hdu)
             field_centre = get_field_centre(hdu.header)
             cropped_hdu = crop_hdu(hdu, field_centre, size=crop_size)
             cropped_hdu.writeto(outfile, overwrite=overwrite)
