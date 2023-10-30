@@ -200,12 +200,13 @@ def vast_xmatch_qc(
         with open(csv_output_path, mode="a", newline="") as f:
             # Output instructions to logger
             logger.info(
-                "Writing corrections CSV. To correct positions, add the corrections to"
-                " the original source positions i.e. RA' = RA + ra_correction /"
-                " cos(Dec). To correct fluxes, add the additive correction and multiply"
-                " the result by the multiplicative correction i.e. S' ="
-                " flux_peak_correction_multiplicative(S +"
-                " flux_peak_correction_additive)."
+                f"Writing corrections CSV to {csv_output_path}."
+                f" To correct positions, add the corrections to"
+                f" the original source positions i.e. RA' = RA + ra_correction /"
+                f" cos(Dec). To correct fluxes, add the additive correction and multiply"
+                f" the result by the multiplicative correction i.e. S' ="
+                f" flux_peak_correction_multiplicative(S +"
+                f" flux_peak_correction_additive)."
             )
 
             # Write row to file
