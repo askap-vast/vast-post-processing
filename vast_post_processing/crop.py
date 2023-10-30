@@ -238,7 +238,7 @@ def moc_to_stmoc(moc: MOC, hdu: fits.hdu.image.PrimaryHDU):
     stmoc : mocpy.moc.STMOC
         The resulting STMOC.
     """
-    if "DATE-BEG" not in hdu.header.keys or "DATE-END" not in hdu.header.keys:
+    if "DATE-BEG" not in hdu.header.keys() or "DATE-END" not in hdu.header.keys():
         header = fitsutils.update_header_datetimes(hdu.header)
     else:
         header = hdu.header
