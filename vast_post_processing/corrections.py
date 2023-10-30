@@ -306,8 +306,6 @@ def shift_and_scale_image(
         RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
     )
     
-    logger.debug(image_hdul[0].header['HISTORY'])
-
     return image_hdul
 
 

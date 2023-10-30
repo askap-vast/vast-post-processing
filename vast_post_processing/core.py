@@ -434,7 +434,7 @@ def crop_image(
     epoch_dir: str,
     rms_path: Path,
     bkg_path: Path,
-    corrected_fits: list[fits.PrimaryHDU],
+    corrected_fits: list[Union[fits.PrimaryHDU,fits.HDUList]],
     crop_size: u.Quantity,
     compress: bool,
     overwrite: bool,
@@ -494,11 +494,21 @@ def crop_image(
         # Crop image data
         outfile = fits_output_dir / path.name
         hdu = corrected_fits[i]
+        hdul = None
+        if type(hdu) is fits.HDUList:
+            hdul = hdu
+            hdu = hdul[0]
+            
         field_centre = crop.get_field_centre(hdu.header)
         cropped_hdu = crop.crop_hdu(hdu, field_centre, size=crop_size)
 
         # Compress image if requested
         processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
+        
+        if hdul is not None:
+            logger.warning(f"{path} contains multiple HDU elements"
+                           f" - dropping all but the first"
+                           )
 
         # Write processed image to disk and update history
         processed_hdu.writeto(outfile, overwrite=overwrite)
