@@ -318,7 +318,7 @@ def get_image_paths(
                     data_root,
                     ["I"],
                     epoch,
-                    image_type="CROPPED",
+                    image_type="IMAGES_CROPPED",
                     verbose=False,
                     debug=False,
                 )
@@ -330,7 +330,7 @@ def get_image_paths(
                     # Get expected path of processed corresponding Stokes I image
                     split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
                     str_path_i = (
-                        split_str_path_v[0] + "STOKESI_CROPPED" + split_str_path_v[1]
+                        split_str_path_v[0] + "STOKESI_IMAGES_CROPPED" + split_str_path_v[1]
                     )
 
                     # If processed path is not found, terminate run
