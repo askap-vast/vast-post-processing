@@ -46,6 +46,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 ## Setup
 
+processed_suffix = "PROCESSED"
+
 
 def setup_configuration_variable(
     name: str,
@@ -318,7 +320,7 @@ def get_image_paths(
                     data_root,
                     ["I"],
                     epoch,
-                    image_type="IMAGES_CROPPED",
+                    image_type=f"IMAGES_{processed_suffix}",
                     verbose=False,
                     debug=False,
                 )
@@ -332,7 +334,7 @@ def get_image_paths(
                 # Get expected path of processed corresponding Stokes I image
                 split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
                 str_path_i = (
-                    split_str_path_v[0] + "STOKESI_IMAGES_CROPPED" + split_str_path_v[1].replace("image.v", "image.i")
+                    split_str_path_v[0] + f"STOKESI_IMAGES_{processed_suffix}" + split_str_path_v[1].replace("image.v", "image.i")
                 )
 
                 # If processed path is not found, terminate run
@@ -486,7 +488,7 @@ def crop_image(
         # Locate directory to store cropped data, and create if nonexistent
         # TODO what suffix should we use?
         # TODO reorganize path handling
-        stokes_dir = f"{path.parent.parent.name}_CROPPED"
+        stokes_dir = f"{path.parent.parent.name}_{processed_suffix}"
         fits_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
         fits_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -569,7 +571,7 @@ def crop_catalogs(
     """
     # Locate directory to store cropped data, and create if nonexistent
     # TODO what suffix should we use? SEE ABOVE
-    stokes_dir = f"{components_path.parent.parent.name}_CROPPED"
+    stokes_dir = f"{components_path.parent.parent.name}_{processed_suffix}"
     cat_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
     cat_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -633,7 +635,7 @@ def create_mocs(
     logger.info(f"Generating MOC for {image_path}")
 
     # Define path to MOC output file
-    moc_dir = f"STOKES{stokes}_MOC_CROPPED"
+    moc_dir = f"STOKES{stokes}_MOC_{processed_suffix}"
     moc_output_dir = Path(out_root / moc_dir / epoch_dir).resolve()
     moc_output_dir.mkdir(parents=True, exist_ok=True)
     moc_filename = image_path.name.replace(".fits", ".moc.fits")
