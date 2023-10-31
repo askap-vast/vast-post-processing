@@ -738,6 +738,10 @@ def run(
 
     # Set up logger
     main_logger = logutils.setup_logger(verbose=verbose, debug=debug)
+    
+    if stokes != 'I' and create_moc:
+        main_logger.warning("Stokes != I, so setting create_moc=False")
+        create_moc = False
 
     # Record all local variables to logger
     main_logger.debug("All Runtime Local Variables:")
