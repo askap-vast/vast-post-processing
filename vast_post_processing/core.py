@@ -753,8 +753,9 @@ def run(
     main_logger.debug(image_paths)
 
     # Iterate over all FITS files to run post-processing
-    for image_path in image_paths:
-        main_logger.info(f"Working on {image_path}...")
+    n_images = len(image_paths)
+    for i, image_path in enumerate(image_paths):
+        main_logger.info(f"Working on {image_path} ({i}/{n_images})...")
         stokes_dir = misc.get_stokes_parameter(image_path)
         epoch_dir = misc.get_epoch_directory(image_path)
         field, sbid = misc.get_field_and_sbid(image_path)
