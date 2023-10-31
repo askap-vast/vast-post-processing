@@ -670,6 +670,7 @@ def correct_field(
             corrections_df = pd.read_csv(csv_file)
             _, _, field, sbid, *_ = image_path.name.split(".")
             field = field.split('_')[1]
+            logger.debug("Getting corrections for field={field} and SBID={sbid}")
             corrections_row = corrections_df.query(f"field=='{field}' & sbid=='{sbid}'")
             dra_median_value = corrections_row['dra_median']
             ddec_median_value = corrections_row['ddec_median']
