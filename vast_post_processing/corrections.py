@@ -197,6 +197,25 @@ def vast_xmatch_qc(
         sbid = catalog.sbid if catalog.sbid is not None else ""
 
         # Write new file if nonexistent, append otherwise
+        if not csv_output_path.is_file():
+            with open(csv_output_path, mode="a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(
+                    [
+                        'field',
+                        'epoch',
+                        'sbid',
+                        'dra_median',
+                        'ddec_median',
+                        'dra_madfm',
+                        'ddec_madfm',
+                        'flux_corr_mult_mean',
+                        'flux_corr_add_mean',
+                        'flux_corr_mult_std',
+                        'flux_corr_add_std',
+                        'num_ref_sources',
+                    ]
+                )
         with open(csv_output_path, mode="a", newline="") as f:
             # Output instructions to logger
             logger.info(
