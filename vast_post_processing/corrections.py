@@ -672,6 +672,7 @@ def correct_field(
             field = field.split('_')[1]
             logger.debug(f"Getting corrections for field={field} and SBID={sbid}")
             corrections_row = corrections_df.query(f"field=='{field}' & sbid=='{sbid}'")
+            logger.debug(corrections_row)
             dra_median_value = corrections_row['dra_median']
             ddec_median_value = corrections_row['ddec_median']
             flux_corr_mult = corrections_row['flux_corr_mult_mean']
