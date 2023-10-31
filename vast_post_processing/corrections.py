@@ -609,11 +609,6 @@ def correct_field(
     if not epoch_corr_dir.is_dir():
         epoch_corr_dir.mkdir()
 
-    # TODO Stokes V correction - assume Stokes I has already been corrected
-    if stokes == "V":
-        logger.warning("Stokes V correction not yet implemented.")
-        return None
-
     # check for auxiliary files
     skip, aux_files = check_for_files(image_path=image_path)
     skip |= ref_file is None
