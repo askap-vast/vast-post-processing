@@ -9,6 +9,8 @@ import logging
 import logging.handlers
 import datetime, time
 
+from pathlib import Path
+
 
 # Classes
 
@@ -97,6 +99,10 @@ def create_logger(filename: str, level: str = "WARNING"):
     )
 
     # Add handler for file
+    log_path = Path(filename+".log")
+    log_dir = log_path.parent
+    if not log_dir.is_dir():
+        log_dir.mkdir(parents=True)
     handler = logging.FileHandler(filename=filename + ".log")
     handler.setFormatter(loggingFormatter)
     handler.setLevel(level)

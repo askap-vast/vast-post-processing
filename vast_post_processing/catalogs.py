@@ -272,7 +272,7 @@ class Catalog:
         if psf is not None:
             self.psf_major, self.psf_minor = psf * u.arcsec
             logger.debug(
-                f"Using user provided PSF for {self.path}: {self.psf_major}, {self.psf_minor}."
+                f"Using user provided PSF for {self.path}: {self.psf_major:.1f}, {self.psf_minor:.1f}."
             )
         else:
             logger.warning(

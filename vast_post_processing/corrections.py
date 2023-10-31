@@ -15,6 +15,7 @@ from uncertainties.core import AffineScalarFunc
 from typing import Generator, Tuple, Optional
 
 import numpy as np
+import pandas as pd
 
 from astropy.io import fits
 from astropy.io.votable import parse
@@ -156,7 +157,7 @@ def vast_xmatch_qc(
     mask &= xmatch_qt["has_siblings_reference"] == 0
     data = xmatch_qt[mask]
     logger.info(
-        f"{len(data):.2f} crossmatched sources remaining"
+        f"{len(data):.0f} crossmatched sources remaining"
         + f"({(len(data) / len(xmatch_qt)) * 100:.2f}%).",
     )
 
@@ -197,15 +198,35 @@ def vast_xmatch_qc(
         sbid = catalog.sbid if catalog.sbid is not None else ""
 
         # Write new file if nonexistent, append otherwise
+        if not csv_output_path.is_file():
+            with open(csv_output_path, mode="a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(
+                    [
+                        'field',
+                        'epoch',
+                        'sbid',
+                        'dra_median',
+                        'ddec_median',
+                        'dra_madfm',
+                        'ddec_madfm',
+                        'flux_corr_mult_mean',
+                        'flux_corr_add_mean',
+                        'flux_corr_mult_std',
+                        'flux_corr_add_std',
+                        'num_ref_sources',
+                    ]
+                )
         with open(csv_output_path, mode="a", newline="") as f:
             # Output instructions to logger
             logger.info(
-                "Writing corrections CSV. To correct positions, add the corrections to"
-                " the original source positions i.e. RA' = RA + ra_correction /"
-                " cos(Dec). To correct fluxes, add the additive correction and multiply"
-                " the result by the multiplicative correction i.e. S' ="
-                " flux_peak_correction_multiplicative(S +"
-                " flux_peak_correction_additive)."
+                f"Writing corrections CSV to {csv_output_path}."
+                f" To correct positions, add the corrections to"
+                f" the original source positions i.e. RA' = RA + ra_correction /"
+                f" cos(Dec). To correct fluxes, add the additive correction and multiply"
+                f" the result by the multiplicative correction i.e. S' ="
+                f" flux_peak_correction_multiplicative(S +"
+                f" flux_peak_correction_additive)."
             )
 
             # Write row to file
@@ -305,7 +326,7 @@ def shift_and_scale_image(
         in both directions given by RAOFF and DECOFF using a model\
         RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
     )
-
+    
     return image_hdul
 
 
@@ -483,16 +504,17 @@ def get_psf_from_image(image_path: str):
     return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
 
 
-def check_for_files(image_path: str):
-    """Helper function to cehck for bkg/noise maps and the component/island
+def check_for_files(image_path: str, stokes: str = 'I'):
+    """Helper function to check for bkg/noise maps and the component/island
        catalogs given the image file
 
     Args:
         image_path (str): Path to the image file
+        stokes (str): Stokes parameter
     """
     # get rms and background images
     rms_root = Path(
-        image_path.parent.as_posix().replace("STOKESI_IMAGES", "STOKESI_RMSMAPS")
+        image_path.parent.as_posix().replace(f"STOKES{stokes}_IMAGES", f"STOKES{stokes}_RMSMAPS")
     )
     rms_path = rms_root / f"noiseMap.{image_path.name}"
     bkg_path = rms_root / f"meanMap.{image_path.name}"
@@ -588,13 +610,8 @@ def correct_field(
     if not epoch_corr_dir.is_dir():
         epoch_corr_dir.mkdir()
 
-    # TODO Stokes V correction - assume Stokes I has already been corrected
-    if stokes == "V":
-        logger.warning("Stokes V correction not yet implemented.")
-        return None
-
     # check for auxiliary files
-    skip, aux_files = check_for_files(image_path=image_path)
+    skip, aux_files = check_for_files(image_path=image_path, stokes=stokes)
     skip |= ref_file is None
     bkg_path, rms_path, component_file, island_file = aux_files
     if skip:
@@ -610,41 +627,63 @@ def correct_field(
         crossmatch_file = epoch_corr_dir / fname
         csv_file = epoch_corr_dir / "all_fields_corrections.csv"
 
-        # Get the psf measurements to estimate errors follwoing Condon 1997
-        if len(psf_ref) > 0:
-            psf_reference = psf_ref
+        if stokes == 'I':
+            # Get the psf measurements to estimate errors follwoing Condon 1997
+            if len(psf_ref) > 0:
+                psf_reference = psf_ref
+            else:
+                psf_reference = get_psf_from_image(ref_file)
+
+            if len(psf) > 0:
+                psf_image = psf
+            else:
+                psf_image = get_psf_from_image(image_path.as_posix())
+
+            (
+                dra_median_value,
+                ddec_median_value,
+                flux_corr_mult,
+                flux_corr_add,
+            ) = vast_xmatch_qc(
+                reference_catalog_path=ref_file,
+                catalog_path=component_file.as_posix(),
+                radius=Angle(radius * u.arcsec),
+                condon=condon,
+                psf_reference=psf_reference,
+                psf=psf_image,
+                fix_m=False,
+                fix_b=False,
+                flux_limit=flux_limit,
+                snr_limit=snr_limit,
+                nneighbor=nneighbor,
+                apply_flux_limit=apply_flux_limit,
+                select_point_sources=select_point_sources,
+                crossmatch_output=crossmatch_file,
+                csv_output=csv_file,
+            )
+            
+            flux_corr_mult = flux_corr_mult.n
+            flux_corr_add = flux_corr_add.n
+            dra_median_value = dra_median_value.item()
+            ddec_median_value = ddec_median_value.item()
         else:
-            psf_reference = get_psf_from_image(ref_file)
-
-        if len(psf) > 0:
-            psf_image = psf
-        else:
-            psf_image = get_psf_from_image(image_path.as_posix())
-
-        (
-            dra_median_value,
-            ddec_median_value,
-            flux_corr_mult,
-            flux_corr_add,
-        ) = vast_xmatch_qc(
-            reference_catalog_path=ref_file,
-            catalog_path=component_file.as_posix(),
-            radius=Angle(radius * u.arcsec),
-            condon=condon,
-            psf_reference=psf_reference,
-            psf=psf_image,
-            fix_m=False,
-            fix_b=False,
-            flux_limit=flux_limit,
-            snr_limit=snr_limit,
-            nneighbor=nneighbor,
-            apply_flux_limit=apply_flux_limit,
-            select_point_sources=select_point_sources,
-            crossmatch_output=crossmatch_file,
-            csv_output=csv_file,
-        )
-
-        # get corrections
+            corrections_df = pd.read_csv(csv_file)
+            _, _, field, sbid, *_ = image_path.name.split(".")
+            field = field.split('_')[1]
+            logger.debug(f"Getting corrections for field={field} and SBID={sbid}")
+            corrections_row = corrections_df.query(f"field=='{field}' & sbid=='{sbid}'")
+            logger.debug(corrections_row)
+            dra_median_value = corrections_row['dra_median'].iloc[0]
+            ddec_median_value = corrections_row['ddec_median'].iloc[0]
+            flux_corr_mult = corrections_row['flux_corr_mult_mean'].iloc[0]
+            flux_corr_add = corrections_row['flux_corr_add_mean'].iloc[0]
+            
+        logger.debug("Applying corrections:")
+        logger.debug(f"dra_median_value = {dra_median_value}")
+        logger.debug(f"ddec_median_value = {ddec_median_value}")
+        logger.debug(f"flux_corr_mult = {flux_corr_mult}")
+        logger.debug(f"flux_corr_add = {flux_corr_add}")
+        
         corrected_hdus = []
         for path in (image_path, rms_path, bkg_path):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
@@ -655,10 +694,10 @@ def correct_field(
             else:
                 corrected_hdu = shift_and_scale_image(
                     path,
-                    flux_scale=flux_corr_mult.n,
-                    flux_offset_mJy=flux_corr_add.n,
-                    ra_offset_arcsec=dra_median_value.item(),
-                    dec_offset_arcsec=ddec_median_value.item(),
+                    flux_scale=flux_corr_mult,
+                    flux_offset_mJy=flux_corr_add,
+                    ra_offset_arcsec=dra_median_value,
+                    dec_offset_arcsec=ddec_median_value,
                 )
                 if write_output:
                     output_dir.mkdir(parents=True, exist_ok=True)
@@ -682,10 +721,10 @@ def correct_field(
             else:
                 corrected_catalog = shift_and_scale_catalog(
                     path,
-                    flux_scale=flux_corr_mult.n,
-                    flux_offset_mJy=flux_corr_add.n,
-                    ra_offset_arcsec=dra_median_value.item(),
-                    dec_offset_arcsec=ddec_median_value.item(),
+                    flux_scale=flux_corr_mult,
+                    flux_offset_mJy=flux_corr_add,
+                    ra_offset_arcsec=dra_median_value,
+                    dec_offset_arcsec=ddec_median_value,
                 )
                 if write_output:
                     output_dir.mkdir(parents=True, exist_ok=True)

@@ -46,6 +46,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 ## Setup
 
+processed_suffix = "PROCESSED"
+
 
 def setup_configuration_variable(
     name: str,
@@ -318,27 +320,29 @@ def get_image_paths(
                     data_root,
                     ["I"],
                     epoch,
-                    image_type="CROPPED",
+                    image_type=f"IMAGES_{processed_suffix}",
                     verbose=False,
                     debug=False,
                 )
             ]
+            logger.debug(f"Processed Stokes I images: {processed_stokes_i}")
 
             # Check that each Stokes V image has been processed as Stokes I
-            for epoch_list in image_paths:
-                for image_path_v in epoch_list:
-                    # Get expected path of processed corresponding Stokes I image
-                    split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
-                    str_path_i = (
-                        split_str_path_v[0] + "STOKESI_CROPPED" + split_str_path_v[1]
-                    )
+            logger.debug(image_paths)
+            #for epoch_list in image_paths:
+            for image_path_v in image_paths:
+                # Get expected path of processed corresponding Stokes I image
+                split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
+                str_path_i = (
+                    split_str_path_v[0] + f"STOKESI_IMAGES_{processed_suffix}" + split_str_path_v[1].replace("image.v", "image.i")
+                )
 
-                    # If processed path is not found, terminate run
-                    if str_path_i not in processed_stokes_i:
-                        raise FileNotFoundError(
-                            "Expected post-processed Stokes I image "
-                            + f"{str_path_i} for Stokes V post-processing."
-                        )
+                # If processed path is not found, terminate run
+                if str_path_i not in processed_stokes_i:
+                    raise FileNotFoundError(
+                        "Expected post-processed Stokes I image "
+                        + f"{str_path_i} for Stokes V post-processing."
+                    )
 
     # Return resulting image path list
     return image_paths
@@ -434,7 +438,7 @@ def crop_image(
     epoch_dir: str,
     rms_path: Path,
     bkg_path: Path,
-    corrected_fits: list[fits.PrimaryHDU],
+    corrected_fits: list[Union[fits.PrimaryHDU,fits.HDUList]],
     crop_size: u.Quantity,
     compress: bool,
     overwrite: bool,
@@ -484,7 +488,7 @@ def crop_image(
         # Locate directory to store cropped data, and create if nonexistent
         # TODO what suffix should we use?
         # TODO reorganize path handling
-        stokes_dir = f"{path.parent.parent.name}_CROPPED"
+        stokes_dir = f"{path.parent.parent.name}_{processed_suffix}"
         fits_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
         fits_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -494,11 +498,25 @@ def crop_image(
         # Crop image data
         outfile = fits_output_dir / path.name
         hdu = corrected_fits[i]
+        hdul = None
+        logger.debug(hdu)
+        logger.debug(type(hdu))
+        if type(hdu) is fits.HDUList:
+            hdul = hdu
+            hdu = hdul[0]
+            
         field_centre = crop.get_field_centre(hdu.header)
         cropped_hdu = crop.crop_hdu(hdu, field_centre, size=crop_size)
 
         # Compress image if requested
         processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
+        
+        if hdul is not None:
+            # This is a temporary workaround
+            # We really should handle this properly.
+            logger.warning(f"{path} contains multiple HDU elements"
+                           f" - dropping all but the first"
+                           )
 
         # Write processed image to disk and update history
         processed_hdu.writeto(outfile, overwrite=overwrite)
@@ -553,7 +571,7 @@ def crop_catalogs(
     """
     # Locate directory to store cropped data, and create if nonexistent
     # TODO what suffix should we use? SEE ABOVE
-    stokes_dir = f"{components_path.parent.parent.name}_CROPPED"
+    stokes_dir = f"{components_path.parent.parent.name}_{processed_suffix}"
     cat_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
     cat_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -617,7 +635,7 @@ def create_mocs(
     logger.info(f"Generating MOC for {image_path}")
 
     # Define path to MOC output file
-    moc_dir = f"STOKES{stokes}_MOC_CROPPED"
+    moc_dir = f"STOKES{stokes}_MOC_{processed_suffix}"
     moc_output_dir = Path(out_root / moc_dir / epoch_dir).resolve()
     moc_output_dir.mkdir(parents=True, exist_ok=True)
     moc_filename = image_path.name.replace(".fits", ".moc.fits")
@@ -720,6 +738,10 @@ def run(
 
     # Set up logger
     main_logger = logutils.setup_logger(verbose=verbose, debug=debug)
+    
+    if stokes != 'I' and create_moc:
+        main_logger.warning("Stokes != I, so setting create_moc=False")
+        create_moc = False
 
     # Record all local variables to logger
     main_logger.debug("All Runtime Local Variables:")
@@ -735,8 +757,9 @@ def run(
     main_logger.debug(image_paths)
 
     # Iterate over all FITS files to run post-processing
-    for image_path in image_paths:
-        main_logger.info(f"Working on {image_path}...")
+    n_images = len(image_paths)
+    for i, image_path in enumerate(image_paths):
+        main_logger.info(f"Working on {image_path} ({i}/{n_images})...")
         stokes_dir = misc.get_stokes_parameter(image_path)
         epoch_dir = misc.get_epoch_directory(image_path)
         field, sbid = misc.get_field_and_sbid(image_path)
@@ -760,6 +783,7 @@ def run(
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
+            write_output=False
         )
 
         # Display corrected files if requested
@@ -776,7 +800,7 @@ def run(
             corrected_fits, corrected_cats = corrected[0], corrected[1]
 
         # Crop corrected images
-        field_centre, cropped_hdu, corrected_cats = crop_image(
+        field_centre, cropped_hdu = crop_image(
             out_root=out_root,
             image_path=image_path,
             epoch_dir=epoch_dir,
@@ -787,6 +811,7 @@ def run(
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
+            compress=compress,
         )
 
         # Crop catalogues
