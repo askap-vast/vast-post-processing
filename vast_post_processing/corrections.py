@@ -673,17 +673,17 @@ def correct_field(
             logger.debug(f"Getting corrections for field={field} and SBID={sbid}")
             corrections_row = corrections_df.query(f"field=='{field}' & sbid=='{sbid}'")
             logger.debug(corrections_row)
-            dra_median_value = corrections_row['dra_median']
-            ddec_median_value = corrections_row['ddec_median']
-            flux_corr_mult = corrections_row['flux_corr_mult_mean']
-            flux_corr_add = corrections_row['flux_corr_add_mean']
+            dra_median_value = corrections_row['dra_median'].iloc[0]
+            ddec_median_value = corrections_row['ddec_median'].iloc[0]
+            flux_corr_mult = corrections_row['flux_corr_mult_mean'].iloc[0]
+            flux_corr_add = corrections_row['flux_corr_add_mean'].iloc[0]
             
-        # get corrections
         logger.debug("Applying corrections:")
         logger.debug(f"dra_median_value = {dra_median_value}")
         logger.debug(f"ddec_median_value = {ddec_median_value}")
         logger.debug(f"flux_corr_mult = {flux_corr_mult}")
         logger.debug(f"flux_corr_add = {flux_corr_add}")
+        
         corrected_hdus = []
         for path in (image_path, rms_path, bkg_path):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
