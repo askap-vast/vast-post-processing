@@ -504,16 +504,17 @@ def get_psf_from_image(image_path: str):
     return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
 
 
-def check_for_files(image_path: str):
-    """Helper function to cehck for bkg/noise maps and the component/island
+def check_for_files(image_path: str, stokes: str = 'I'):
+    """Helper function to check for bkg/noise maps and the component/island
        catalogs given the image file
 
     Args:
         image_path (str): Path to the image file
+        stokes (str): Stokes parameter
     """
     # get rms and background images
     rms_root = Path(
-        image_path.parent.as_posix().replace("STOKESI_IMAGES", "STOKESI_RMSMAPS")
+        image_path.parent.as_posix().replace(f"STOKES{stokes}_IMAGES", f"STOKES{stokes}_RMSMAPS")
     )
     rms_path = rms_root / f"noiseMap.{image_path.name}"
     bkg_path = rms_root / f"meanMap.{image_path.name}"
@@ -610,7 +611,7 @@ def correct_field(
         epoch_corr_dir.mkdir()
 
     # check for auxiliary files
-    skip, aux_files = check_for_files(image_path=image_path)
+    skip, aux_files = check_for_files(image_path=image_path, stokes=stokes)
     skip |= ref_file is None
     bkg_path, rms_path, component_file, island_file = aux_files
     if skip:
