@@ -55,7 +55,7 @@ def get_field_centre(header: fits.header.Header):
     field_centre : astropy.coordinates.SkyCoord
         Centre of the field
     """
-    logger.debug("Finding field centre")
+    logger.debug("Finding field centre...")
     w = WCS(header, naxis=2)
     size_x = header["NAXIS1"]
     size_y = header["NAXIS2"]
@@ -92,7 +92,7 @@ def crop_hdu(
     """
     if rotation != 0.0 * u.deg:
         raise NotImplementedError("Rotation handling is not yet available")
-    logger.debug("Cropping HDU")
+    logger.debug("Cropping HDU...")
     wcs = WCS(hdu.header, naxis=2)
 
     data = hdu.data
@@ -178,7 +178,7 @@ def crop_catalogue(
     votable : astropy.io.votable
         The cropped VOTable.
     """
-    logger.debug("Cropping catalogue")
+    logger.debug("Cropping catalogue...")
     votable: Table = vot.get_first_table()
 
     cropped_wcs = WCS(cropped_hdu.header, naxis=2)
@@ -208,7 +208,7 @@ def wcs_to_moc(cropped_hdu: fits.hdu.image.PrimaryHDU):
     moc : mocpy.moc.MOC
         The MOC describing the coverage of the provided HDU.
     """
-    logger.debug("Creating MOC")
+    logger.debug("Creating MOC...")
 
     cropped_wcs = WCS(cropped_hdu.header, naxis=2)
 
@@ -289,7 +289,7 @@ def run_full_crop(
     image_path_glob_list: list[Generator[Path, None, None]] = []
 
     image_root = data_root / f"STOKES{stokes}_IMAGES"
-    logger.debug(image_root)
+    logger.debug(f"Image root: {image_root}")
 
     if type(epoch) is int:
         epoch = list(epoch)
