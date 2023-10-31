@@ -156,7 +156,7 @@ def vast_xmatch_qc(
     mask &= xmatch_qt["has_siblings_reference"] == 0
     data = xmatch_qt[mask]
     logger.info(
-        f"{len(data):.2f} crossmatched sources remaining"
+        f"{len(data):.0f} crossmatched sources remaining"
         + f"({(len(data) / len(xmatch_qt)) * 100:.2f}%).",
     )
 
