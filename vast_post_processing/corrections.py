@@ -15,6 +15,7 @@ from uncertainties.core import AffineScalarFunc
 from typing import Generator, Tuple, Optional
 
 import numpy as np
+import pandas as pd
 
 from astropy.io import fits
 from astropy.io.votable import parse
@@ -630,40 +631,54 @@ def correct_field(
         crossmatch_file = epoch_corr_dir / fname
         csv_file = epoch_corr_dir / "all_fields_corrections.csv"
 
-        # Get the psf measurements to estimate errors follwoing Condon 1997
-        if len(psf_ref) > 0:
-            psf_reference = psf_ref
+        if stokes == 'I':
+            # Get the psf measurements to estimate errors follwoing Condon 1997
+            if len(psf_ref) > 0:
+                psf_reference = psf_ref
+            else:
+                psf_reference = get_psf_from_image(ref_file)
+
+            if len(psf) > 0:
+                psf_image = psf
+            else:
+                psf_image = get_psf_from_image(image_path.as_posix())
+
+            (
+                dra_median_value,
+                ddec_median_value,
+                flux_corr_mult,
+                flux_corr_add,
+            ) = vast_xmatch_qc(
+                reference_catalog_path=ref_file,
+                catalog_path=component_file.as_posix(),
+                radius=Angle(radius * u.arcsec),
+                condon=condon,
+                psf_reference=psf_reference,
+                psf=psf_image,
+                fix_m=False,
+                fix_b=False,
+                flux_limit=flux_limit,
+                snr_limit=snr_limit,
+                nneighbor=nneighbor,
+                apply_flux_limit=apply_flux_limit,
+                select_point_sources=select_point_sources,
+                crossmatch_output=crossmatch_file,
+                csv_output=csv_file,
+            )
+            
+            flux_corr_mult = flux_corr_mult.n
+            flux_corr_add = flux_corr_add.n
+            dra_median_value = dra_median_value.item()
+            ddec_median_value = ddec_median_value.item()
         else:
-            psf_reference = get_psf_from_image(ref_file)
-
-        if len(psf) > 0:
-            psf_image = psf
-        else:
-            psf_image = get_psf_from_image(image_path.as_posix())
-
-        (
-            dra_median_value,
-            ddec_median_value,
-            flux_corr_mult,
-            flux_corr_add,
-        ) = vast_xmatch_qc(
-            reference_catalog_path=ref_file,
-            catalog_path=component_file.as_posix(),
-            radius=Angle(radius * u.arcsec),
-            condon=condon,
-            psf_reference=psf_reference,
-            psf=psf_image,
-            fix_m=False,
-            fix_b=False,
-            flux_limit=flux_limit,
-            snr_limit=snr_limit,
-            nneighbor=nneighbor,
-            apply_flux_limit=apply_flux_limit,
-            select_point_sources=select_point_sources,
-            crossmatch_output=crossmatch_file,
-            csv_output=csv_file,
-        )
-
+            corrections_df = pd.read_csv(csv_file)
+            _, _, field, sbid, *_ = image_path.name.split(".")
+            corrections_row = corrections_df.query(f"field=={field} & sbid=={sbid}")
+            dra_median_value = corrections_row['dra_median']
+            ddec_median_value = corrections_row['ddec_median']
+            flux_corr_mult = corrections_row['flux_corr_mult_mean']
+            flux_corr_add = corrections_row['flux_corr_add_mean']
+            
         # get corrections
         corrected_hdus = []
         for path in (image_path, rms_path, bkg_path):
@@ -675,10 +690,10 @@ def correct_field(
             else:
                 corrected_hdu = shift_and_scale_image(
                     path,
-                    flux_scale=flux_corr_mult.n,
-                    flux_offset_mJy=flux_corr_add.n,
-                    ra_offset_arcsec=dra_median_value.item(),
-                    dec_offset_arcsec=ddec_median_value.item(),
+                    flux_scale=flux_corr_mult,
+                    flux_offset_mJy=flux_corr_add,
+                    ra_offset_arcsec=dra_median_value,
+                    dec_offset_arcsec=ddec_median_value,
                 )
                 if write_output:
                     output_dir.mkdir(parents=True, exist_ok=True)
@@ -702,10 +717,10 @@ def correct_field(
             else:
                 corrected_catalog = shift_and_scale_catalog(
                     path,
-                    flux_scale=flux_corr_mult.n,
-                    flux_offset_mJy=flux_corr_add.n,
-                    ra_offset_arcsec=dra_median_value.item(),
-                    dec_offset_arcsec=ddec_median_value.item(),
+                    flux_scale=flux_corr_mult,
+                    flux_offset_mJy=flux_corr_add,
+                    ra_offset_arcsec=dra_median_value,
+                    dec_offset_arcsec=ddec_median_value,
                 )
                 if write_output:
                     output_dir.mkdir(parents=True, exist_ok=True)
