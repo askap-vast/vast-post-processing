@@ -679,6 +679,11 @@ def correct_field(
             flux_corr_add = corrections_row['flux_corr_add_mean']
             
         # get corrections
+        logger.debug("Applying corrections:")
+        logger.debug(f"dra_median_value = {dra_median_value}")
+        logger.debug(f"ddec_median_value = {ddec_median_value}")
+        logger.debug(f"flux_corr_mult = {flux_corr_mult}")
+        logger.debug(f"flux_corr_add = {flux_corr_add}")
         corrected_hdus = []
         for path in (image_path, rms_path, bkg_path):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
