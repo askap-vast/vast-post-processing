@@ -513,8 +513,8 @@ def crop_image(
             processed_hdu = fits.HDUList(hdus=[processed_hdu, hdul[1:]])
 
         # Write processed image to disk and update history
-        processed_hdu.writeto(outfile, overwrite=overwrite)
         fitsutils.update_header_history(processed_hdu.header)
+        processed_hdu.writeto(outfile, overwrite=overwrite)
 
         # Display progress if requested
         logger.info(f"Wrote {outfile}")
