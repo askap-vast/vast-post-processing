@@ -304,7 +304,7 @@ def get_image_paths(
 
         # Skip parameter if no images are found
         if len(image_paths) - num_paths == 0:
-            logger.debug(f"No images found for Stokes {parameter}. Skipping.")
+            logger.warning(f"No images found for Stokes {parameter}. Skipping.")
             break
 
         # Check for processed data if Stokes V
@@ -508,12 +508,17 @@ def crop_image(
 
         # Compress image if requested
         processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
+        fitsutils.update_header_history(processed_hdu.header)
         
         if hdul is not None:
-            processed_hdu = fits.HDUList(hdus=[processed_hdu, hdul[1:]])
+            primary_hdu = fits.PrimaryHDU()
+            hdus = [primary_hdu, processed_hdu]
+            if len(hdul) > 0:
+                hdus.extend(hdul[1:])
+            
+            processed_hdu = fits.HDUList(hdus=hdus)
 
         # Write processed image to disk and update history
-        fitsutils.update_header_history(processed_hdu.header)
         processed_hdu.writeto(outfile, overwrite=overwrite)
 
         # Display progress if requested
@@ -807,12 +812,16 @@ def run(
             debug=debug,
             compress=compress,
         )
+        if type(cropped_hdu) == fits.HDUList:
+            cropped_image_hdu = cropped_hdu[1]
+        else:
+            cropped_image_hdu = cropped_hdu
 
         # Crop catalogues
         crop_catalogs(
             out_root=out_root,
             epoch_dir=epoch_dir,
-            cropped_hdu=cropped_hdu,
+            cropped_hdu=cropped_image_hdu,
             field_centre=field_centre,
             components_path=components_path,
             islands_path=islands_path,
@@ -830,7 +839,7 @@ def run(
                 image_path=image_path,
                 stokes=stokes_dir,
                 epoch_dir=epoch_dir,
-                cropped_hdu=cropped_hdu,
+                cropped_hdu=cropped_image_hdu,
                 overwrite=overwrite,
                 verbose=verbose,
                 debug=debug,
