@@ -815,7 +815,7 @@ def run(
             compress=compress,
         )
         if type(cropped_hdu) == fits.HDUList:
-            cropped_image_hdu = cropped_hdu[1]
+            cropped_image_hdu = cropped_hdu[1] # image HDU is the 1th element because of dummy PrimaryHDU
         else:
             cropped_image_hdu = cropped_hdu
 
