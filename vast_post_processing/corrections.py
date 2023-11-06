@@ -278,7 +278,6 @@ def shift_and_scale_image(
     # Open image
     hdul = fits.open(image_path)
     image_hdu: fits.PrimaryHDU = hdul[0]
-    beam_hdu = hdul[1]
 
     # do the flux scaling, but check that the data is in Jy
     if image_hdu.header["BUNIT"] == "Jy/beam":
@@ -316,16 +315,6 @@ def shift_and_scale_image(
     )
     w.wcs.crval[0:2] = np.array([crval_offset.ra.deg, crval_offset.dec.deg])
     newheader = w.to_header()
-    
-    # Update beam table
-    beam_ras = beam_hdu.data['RA']*u.deg
-    beam_decs = beam_hdu.data['DEC']*u.deg
-    
-    beam_ras_corrected = beam_ras+ra_offset_arcsec * u.arcsec / np.cos(crval.dec)
-    beam_decs_corrected = beam_ras+dec_offset_arcsec * u.arcsec
-    
-    beam_hdu.data['RA'] = beam_ras_corrected
-    beam_hdu.data['DEC'] = beam_decs_corrected
 
     # Update header with new WCS and record offsets
     image_hdu.header.update(newheader)
@@ -338,14 +327,26 @@ def shift_and_scale_image(
         RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
     )
     
-    beam_hdu.header["RAOFF"] = ra_offset_arcsec
-    beam_hdu.header["DECOFF"] = dec_offset_arcsec
+    # Update beam table
+    if len(hdul) > 1:
+        beam_hdu = hdul[1]
+        beam_ras = beam_hdu.data['RA']*u.deg
+        beam_decs = beam_hdu.data['DEC']*u.deg
+        
+        beam_ras_corrected = beam_ras+ra_offset_arcsec * u.arcsec / np.cos(crval.dec)
+        beam_decs_corrected = beam_ras+dec_offset_arcsec * u.arcsec
+        
+        beam_hdu.data['RA'] = beam_ras_corrected
+        beam_hdu.data['DEC'] = beam_decs_corrected
+        
+        beam_hdu.header["RAOFF"] = ra_offset_arcsec
+        beam_hdu.header["DECOFF"] = dec_offset_arcsec
 
-    beam_hdu.header.add_history(
-        "Beam positions have been corrected for astrometric position by an \
-        offset in both directions given by RAOFF and DECOFF using a model\
-        RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
-    )
+        beam_hdu.header.add_history(
+            "Beam positions have been corrected for astrometric position by an \
+            offset in both directions given by RAOFF and DECOFF using a model\
+            RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
+        )
     
     return hdul
 
