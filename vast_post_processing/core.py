@@ -511,7 +511,9 @@ def crop_image(
         fitsutils.update_header_history(processed_hdu.header)
         
         if hdul is not None:
-            primary_hdu = fits.PrimaryHDU()
+            # astropy fits requires the 0th element of a HDUList to be a
+            # PrimaryHDU object. So we add a dummy one...
+            primary_hdu = fits.PrimaryHDU() 
             hdus = [primary_hdu, processed_hdu]
             if len(hdul) > 0:
                 hdus.extend(hdul[1:])
