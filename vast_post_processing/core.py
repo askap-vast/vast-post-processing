@@ -497,26 +497,20 @@ def crop_image(
 
         # Crop image data
         outfile = fits_output_dir / path.name
-        hdu = corrected_fits[i]
+        image_hdu = corrected_fits[i]
         hdul = None
-        logger.debug(hdu)
-        logger.debug(type(hdu))
-        if type(hdu) is fits.HDUList:
-            hdul = hdu
-            hdu = hdul[0]
+        if type(image_hdu) is fits.HDUList:
+            hdul = image_hdu
+            image_hdu = hdul[0]
             
-        field_centre = crop.get_field_centre(hdu.header)
-        cropped_hdu = crop.crop_hdu(hdu, field_centre, size=crop_size)
+        field_centre = crop.get_field_centre(image_hdu.header)
+        cropped_hdu = crop.crop_hdu(image_hdu, field_centre, size=crop_size)
 
         # Compress image if requested
         processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
         
         if hdul is not None:
-            # This is a temporary workaround
-            # We really should handle this properly.
-            logger.warning(f"{path} contains multiple HDU elements"
-                           f" - dropping all but the first"
-                           )
+            processed_hdu = fits.HDUList(hdus=[processed_hdu, hdul[1:]])
 
         # Write processed image to disk and update history
         processed_hdu.writeto(outfile, overwrite=overwrite)
