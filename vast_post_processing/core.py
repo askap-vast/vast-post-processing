@@ -304,7 +304,7 @@ def get_image_paths(
 
         # Skip parameter if no images are found
         if len(image_paths) - num_paths == 0:
-            logger.debug(f"No images found for Stokes {parameter}. Skipping.")
+            logger.warning(f"No images found for Stokes {parameter}. Skipping.")
             break
 
         # Check for processed data if Stokes V
@@ -497,30 +497,31 @@ def crop_image(
 
         # Crop image data
         outfile = fits_output_dir / path.name
-        hdu = corrected_fits[i]
+        image_hdu = corrected_fits[i]
         hdul = None
-        logger.debug(hdu)
-        logger.debug(type(hdu))
-        if type(hdu) is fits.HDUList:
-            hdul = hdu
-            hdu = hdul[0]
+        if type(image_hdu) is fits.HDUList:
+            hdul = image_hdu
+            image_hdu = hdul[0]
             
-        field_centre = crop.get_field_centre(hdu.header)
-        cropped_hdu = crop.crop_hdu(hdu, field_centre, size=crop_size)
+        field_centre = crop.get_field_centre(image_hdu.header)
+        cropped_hdu = crop.crop_hdu(image_hdu, field_centre, size=crop_size)
 
         # Compress image if requested
         processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
+        fitsutils.update_header_history(processed_hdu.header)
         
         if hdul is not None:
-            # This is a temporary workaround
-            # We really should handle this properly.
-            logger.warning(f"{path} contains multiple HDU elements"
-                           f" - dropping all but the first"
-                           )
+            # astropy fits requires the 0th element of a HDUList to be a
+            # PrimaryHDU object. So we add a dummy one...
+            primary_hdu = fits.PrimaryHDU() 
+            hdus = [primary_hdu, processed_hdu]
+            if len(hdul) > 0:
+                hdus.extend(hdul[1:])
+            
+            processed_hdu = fits.HDUList(hdus=hdus)
 
         # Write processed image to disk and update history
         processed_hdu.writeto(outfile, overwrite=overwrite)
-        fitsutils.update_header_history(processed_hdu.header)
 
         # Display progress if requested
         logger.info(f"Wrote {outfile}")
@@ -813,12 +814,16 @@ def run(
             debug=debug,
             compress=compress,
         )
+        if type(cropped_hdu) == fits.HDUList:
+            cropped_image_hdu = cropped_hdu[1] # image HDU is the 1th element because of dummy PrimaryHDU
+        else:
+            cropped_image_hdu = cropped_hdu
 
         # Crop catalogues
         crop_catalogs(
             out_root=out_root,
             epoch_dir=epoch_dir,
-            cropped_hdu=cropped_hdu,
+            cropped_hdu=cropped_image_hdu,
             field_centre=field_centre,
             components_path=components_path,
             islands_path=islands_path,
@@ -836,7 +841,7 @@ def run(
                 image_path=image_path,
                 stokes=stokes_dir,
                 epoch_dir=epoch_dir,
-                cropped_hdu=cropped_hdu,
+                cropped_hdu=cropped_image_hdu,
                 overwrite=overwrite,
                 verbose=verbose,
                 debug=debug,
