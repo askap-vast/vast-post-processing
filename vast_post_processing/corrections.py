@@ -203,18 +203,18 @@ def vast_xmatch_qc(
                 writer = csv.writer(f)
                 writer.writerow(
                     [
-                        'field',
-                        'epoch',
-                        'sbid',
-                        'dra_median',
-                        'ddec_median',
-                        'dra_madfm',
-                        'ddec_madfm',
-                        'flux_corr_mult_mean',
-                        'flux_corr_add_mean',
-                        'flux_corr_mult_std',
-                        'flux_corr_add_std',
-                        'num_ref_sources',
+                        "field",
+                        "epoch",
+                        "sbid",
+                        "dra_median",
+                        "ddec_median",
+                        "dra_madfm",
+                        "ddec_madfm",
+                        "flux_corr_mult_mean",
+                        "flux_corr_add_mean",
+                        "flux_corr_mult_std",
+                        "flux_corr_add_std",
+                        "num_ref_sources",
                     ]
                 )
         with open(csv_output_path, mode="a", newline="") as f:
@@ -326,19 +326,19 @@ def shift_and_scale_image(
         in both directions given by RAOFF and DECOFF using a model\
         RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
     )
-    
+
     # Update beam table
     if len(hdul) > 1:
         beam_hdu = hdul[1]
-        beam_ras = beam_hdu.data['RA']*u.deg
-        beam_decs = beam_hdu.data['DEC']*u.deg
-        
-        beam_ras_corrected = beam_ras+ra_offset_arcsec * u.arcsec / np.cos(crval.dec)
-        beam_decs_corrected = beam_ras+dec_offset_arcsec * u.arcsec
-        
-        beam_hdu.data['RA'] = beam_ras_corrected
-        beam_hdu.data['DEC'] = beam_decs_corrected
-        
+        beam_ras = beam_hdu.data["RA"] * u.deg
+        beam_decs = beam_hdu.data["DEC"] * u.deg
+
+        beam_ras_corrected = beam_ras + ra_offset_arcsec * u.arcsec / np.cos(crval.dec)
+        beam_decs_corrected = beam_decs + dec_offset_arcsec * u.arcsec
+
+        beam_hdu.data["RA"] = beam_ras_corrected
+        beam_hdu.data["DEC"] = beam_decs_corrected
+
         beam_hdu.header["RAOFF"] = ra_offset_arcsec
         beam_hdu.header["DECOFF"] = dec_offset_arcsec
 
@@ -347,7 +347,7 @@ def shift_and_scale_image(
             offset in both directions given by RAOFF and DECOFF using a model\
             RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
         )
-    
+
     return hdul
 
 
@@ -525,7 +525,7 @@ def get_psf_from_image(image_path: str):
     return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
 
 
-def check_for_files(image_path: str, stokes: str = 'I'):
+def check_for_files(image_path: str, stokes: str = "I"):
     """Helper function to check for bkg/noise maps and the component/island
        catalogs given the image file
 
@@ -535,7 +535,9 @@ def check_for_files(image_path: str, stokes: str = 'I'):
     """
     # get rms and background images
     rms_root = Path(
-        image_path.parent.as_posix().replace(f"STOKES{stokes}_IMAGES", f"STOKES{stokes}_RMSMAPS")
+        image_path.parent.as_posix().replace(
+            f"STOKES{stokes}_IMAGES", f"STOKES{stokes}_RMSMAPS"
+        )
     )
     rms_path = rms_root / f"noiseMap.{image_path.name}"
     bkg_path = rms_root / f"meanMap.{image_path.name}"
@@ -648,7 +650,7 @@ def correct_field(
         crossmatch_file = epoch_corr_dir / fname
         csv_file = epoch_corr_dir / "all_fields_corrections.csv"
 
-        if stokes == 'I':
+        if stokes == "I":
             # Get the psf measurements to estimate errors follwoing Condon 1997
             if len(psf_ref) > 0:
                 psf_reference = psf_ref
@@ -682,7 +684,7 @@ def correct_field(
                 crossmatch_output=crossmatch_file,
                 csv_output=csv_file,
             )
-            
+
             flux_corr_mult = flux_corr_mult.n
             flux_corr_add = flux_corr_add.n
             dra_median_value = dra_median_value.item()
@@ -690,21 +692,21 @@ def correct_field(
         else:
             corrections_df = pd.read_csv(csv_file)
             _, _, field, sbid, *_ = image_path.name.split(".")
-            field = field.split('_')[1]
+            field = field.split("_")[1]
             logger.debug(f"Getting corrections for field={field} and SBID={sbid}")
             corrections_row = corrections_df.query(f"field=='{field}' & sbid=='{sbid}'")
             logger.debug(corrections_row)
-            dra_median_value = corrections_row['dra_median'].iloc[0]
-            ddec_median_value = corrections_row['ddec_median'].iloc[0]
-            flux_corr_mult = corrections_row['flux_corr_mult_mean'].iloc[0]
-            flux_corr_add = corrections_row['flux_corr_add_mean'].iloc[0]
-            
+            dra_median_value = corrections_row["dra_median"].iloc[0]
+            ddec_median_value = corrections_row["ddec_median"].iloc[0]
+            flux_corr_mult = corrections_row["flux_corr_mult_mean"].iloc[0]
+            flux_corr_add = corrections_row["flux_corr_add_mean"].iloc[0]
+
         logger.debug("Applying corrections:")
         logger.debug(f"dra_median_value = {dra_median_value}")
         logger.debug(f"ddec_median_value = {ddec_median_value}")
         logger.debug(f"flux_corr_mult = {flux_corr_mult}")
         logger.debug(f"flux_corr_add = {flux_corr_add}")
-        
+
         corrected_hdus = []
         for path in (image_path, rms_path, bkg_path):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
