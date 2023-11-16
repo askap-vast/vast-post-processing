@@ -249,7 +249,14 @@ def vast_xmatch_qc(
             )
 
     # Return positional medians and flux corrections
-    return dra_median_value, ddec_median_value, flux_corr_mult, flux_corr_add
+    return (
+        dra_median_value,
+        dra_madfm_value,
+        ddec_median_value,
+        ddec_madfm_value,
+        flux_corr_mult,
+        flux_corr_add,
+    )
 
 
 def shift_and_scale_image(
@@ -354,9 +361,13 @@ def shift_and_scale_image(
 def shift_and_scale_catalog(
     catalog_path: Path,
     flux_scale: float = 1.0,
+    flux_scale_err: float = 0.0,
     flux_offset_mJy: float = 0.0,
+    flux_offset_mJy_err: float = 0.0,
     ra_offset_arcsec: float = 0.0,
+    ra_offset_arcsec_err: float = 0.0,
     dec_offset_arcsec: float = 0.0,
+    dec_offset_arcsec_err: float = 0.0,
 ):
     """Apply astrometric and flux corrections to a catalog.
 
@@ -375,6 +386,12 @@ def shift_and_scale_catalog(
         "col_flux_peak",
         "col_flux_int",
     )
+
+    FLUX_ERR_COLS = (
+        "col_flux_peak_err",
+        "col_flux_int_err",
+    )
+
     COMPONENT_FLUX_COLS = (
         "col_rms_fit_gauss",
         "col_rms_image",
@@ -401,12 +418,24 @@ def shift_and_scale_catalog(
 
     # Correct coordinate columns
     ra_deg = votable.array["col_ra_deg_cont"] * u.deg
+    ra_err = votable.array["col_ra_err"] * u.arcsec
     dec_deg = votable.array["col_dec_deg_cont"] * u.deg
+    dec_err = votable.array["col_dec_err"] * u.arcsec
     coords_corrected = SkyCoord(
         ra=ra_deg + ra_offset_arcsec * u.arcsec / np.cos(dec_deg),
         dec=dec_deg + dec_offset_arcsec * u.arcsec,
         unit="deg",
     )
+
+    # Add position corrections
+    ra_err_corrected = (
+        ra_err**2 + (ra_offset_arcsec_err * u.arcsec) ** 2 / np.cos(dec_deg) ** 2
+    ) ** 0.5
+    ra_err_corrected = ra_err_corrected.to(u.arcsec)
+
+    dec_err_corrected = (dec_err**2 + (dec_offset_arcsec_err * u.arcsec) ** 2) ** 0.5
+    dec_err_corrected = dec_err_corrected.to(u.arcsec)
+
     votable.array["col_ra_deg_cont"] = np.ma.array(
         coords_corrected.ra.deg, mask=votable.array["col_ra_deg_cont"].mask
     )
@@ -423,13 +452,27 @@ def shift_and_scale_catalog(
         ),
         mask=votable.array["col_dec_dms_cont"].mask,
     )
+    votable.array["col_ra_err"] = np.ma.array(
+        ra_err_corrected, mask=votable.array["col_ra_err"].mask
+    )
+    votable.array["col_dec_err"] = np.ma.array(
+        dec_err_corrected, mask=votable.array["col_dec_err"].mask
+    )
 
     # Correct flux columns
     cols = (
         FLUX_COLS + ISLAND_FLUX_COLS if is_island else FLUX_COLS + COMPONENT_FLUX_COLS
     )
+
     for col in cols:
-        votable.array[col] = flux_scale * (votable.array[col] + flux_offset_mJy)
+        votable.array[col] = flux_scale * votable.array[col] + flux_offset_mJy
+
+    for i in range(len(FLUX_ERR_COLS)):
+        votable.array[FLUX_ERR_COLS[i]] = (
+            flux_scale_err**2 * votable.array[FLUX_COLS[i]] ** 2
+            + flux_scale**2 * votable.array[FLUX_ERR_COLS[i]] ** 2
+            + flux_offset_mJy_err**2
+        ) ** 0.5
 
     # Add in the corrections to the votable
     flux_scl_param = Param(
@@ -440,11 +483,30 @@ def shift_and_scale_catalog(
         datatype="float",
         unit=None,
     )
+
+    flux_scl_err_param = Param(
+        votable=votablefile,
+        ID="FluxScaleErr",
+        name="FluxScaleErr",
+        value=flux_scale_err,
+        datatype="float",
+        unit=None,
+    )
+
     flux_off_param = Param(
         votable=votablefile,
         ID="FluxOffset",
         name="FluxOffset",
         value=flux_offset_mJy,
+        datatype="float",
+        unit=u.mJy,
+    )
+
+    flux_off_err_param = Param(
+        votable=votablefile,
+        ID="FluxOffsetErr",
+        name="FluxOffsetErr",
+        value=flux_offset_mJy_err,
         datatype="float",
         unit=u.mJy,
     )
@@ -458,6 +520,15 @@ def shift_and_scale_catalog(
         unit=u.arcsec,
     )
 
+    ra_offset_err_param = Param(
+        votable=votablefile,
+        ID="RAOffsetErr",
+        name="RAOffsetErr",
+        value=ra_offset_arcsec_err,
+        datatype="float",
+        unit=u.arcsec,
+    )
+
     dec_offset_param = Param(
         votable=votablefile,
         ID="DECOffset",
@@ -467,8 +538,26 @@ def shift_and_scale_catalog(
         unit=u.arcsec,
     )
 
+    dec_offset_err_param = Param(
+        votable=votablefile,
+        ID="DECOffsetErr",
+        name="DECOffsetErr",
+        value=dec_offset_arcsec_err,
+        datatype="float",
+        unit=u.arcsec,
+    )
+
     votablefile.params.extend(
-        [ra_offset_param, dec_offset_param, flux_scl_param, flux_off_param]
+        [
+            ra_offset_param,
+            ra_offset_err_param,
+            dec_offset_param,
+            dec_offset_err_param,
+            flux_scl_param,
+            flux_scl_err_param,
+            flux_off_param,
+            flux_off_err_param,
+        ]
     )
 
     return votablefile
@@ -664,7 +753,9 @@ def correct_field(
 
             (
                 dra_median_value,
+                dra_median_std,
                 ddec_median_value,
+                ddec_median_std,
                 flux_corr_mult,
                 flux_corr_add,
             ) = vast_xmatch_qc(
@@ -685,10 +776,14 @@ def correct_field(
                 csv_output=csv_file,
             )
 
-            flux_corr_mult = flux_corr_mult.n
-            flux_corr_add = flux_corr_add.n
+            flux_corr_mult_value = flux_corr_mult.n
+            flux_corr_mult_std = flux_corr_mult.s
+            flux_corr_add_value = flux_corr_add.n
+            flux_corr_add_std = flux_corr_add.s
             dra_median_value = dra_median_value.item()
+            dra_median_std = dra_median_std.item()
             ddec_median_value = ddec_median_value.item()
+            ddec_median_std = ddec_median_std.item()
         else:
             corrections_df = pd.read_csv(csv_file)
             _, _, field, sbid, *_ = image_path.name.split(".")
@@ -697,9 +792,13 @@ def correct_field(
             corrections_row = corrections_df.query(f"field=='{field}' & sbid=='{sbid}'")
             logger.debug(corrections_row)
             dra_median_value = corrections_row["dra_median"].iloc[0]
+            dra_median_std = corrections_df["dra_madfm"].iloc[0]
             ddec_median_value = corrections_row["ddec_median"].iloc[0]
+            ddec_median_std = corrections_row["ddec_madfm"].iloc[0]
             flux_corr_mult = corrections_row["flux_corr_mult_mean"].iloc[0]
             flux_corr_add = corrections_row["flux_corr_add_mean"].iloc[0]
+            flux_corr_mult_std = corrections_row["flux_corr_mult_std"].iloc[0]
+            flux_corr_add_std = corrections_row["flux_corr_mult_std"].iloc[0]
 
         logger.debug("Applying corrections:")
         logger.debug(f"dra_median_value = {dra_median_value}")
@@ -744,10 +843,14 @@ def correct_field(
             else:
                 corrected_catalog = shift_and_scale_catalog(
                     path,
-                    flux_scale=flux_corr_mult,
-                    flux_offset_mJy=flux_corr_add,
+                    flux_scale=flux_corr_mult_value,
+                    flux_scale_err=flux_corr_mult_std,
+                    flux_offset_mJy=flux_corr_add_value,
+                    flux_offset_mJy_err=flux_corr_add_std,
                     ra_offset_arcsec=dra_median_value,
+                    ra_offset_arcsec_err=dra_median_std,
                     dec_offset_arcsec=ddec_median_value,
+                    dec_offset_arcsec_err=ddec_median_std,
                 )
                 if write_output:
                     output_dir.mkdir(parents=True, exist_ok=True)
