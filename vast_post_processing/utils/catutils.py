@@ -11,8 +11,8 @@ from astropy.io.votable.tree import Param
 
 
 def add_hash_to_cat(vot):
-    """Update FITS history to document usage of this program, as well as the git
-    hash of the installed version.
+    """Update VOTable params to document usage of this program, as well as
+     the git hash of the installed version.
 
     Parameters
     ----------
