@@ -19,7 +19,7 @@ from astropy import units as u
 
 from . import crop, corrections
 from .compress import compress_hdu
-from .utils import misc, logutils, fitsutils
+from .utils import misc, logutils, fitsutils, catutils
 
 
 # Constants
@@ -590,6 +590,9 @@ def crop_catalogs(
         # This uses the last cropped hdu from the previous for loop
         # which should be the image file, but doesn't actually matter
         cropped_vot = crop.crop_catalogue(vot, cropped_hdu, field_centre, crop_size)
+        
+        # Add git hash
+        catutils.add_hash_to_cat(cropped_vot)
 
         # Overwrite if flag active and output to logger
         if outfile.exists() and not overwrite:
