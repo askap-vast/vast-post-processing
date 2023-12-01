@@ -44,7 +44,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 # Functions
 
 
-## Setup
+# Setup
 
 processed_suffix = "PROCESSED"
 
@@ -203,9 +203,11 @@ def setup_configuration(
         Valid configuration settings for this run.
     """
     # Load in default configuration
-    default_config = yaml.safe_load(open(DATA_DIRECTORY / "default_config.yaml"))
+    default_config = yaml.safe_load(
+        open(DATA_DIRECTORY / "default_config.yaml"))
 
-    # Load in user configuration if passed and valid, otherwise create empty dict
+    # Load in user configuration if passed and valid, otherwise create empty
+    # dict
     if (config_file) and (Path(config_file).suffix == ".yaml"):
         user_config = yaml.safe_load(open(Path(config_file)))
 
@@ -325,7 +327,8 @@ def get_image_paths(
         # Check for processed data if Stokes V
         if parameter == "V":
             # Display progress if requested
-            logger.info("Checking corresponding Stokes I files have been processed.")
+            logger.info(
+                "Checking corresponding Stokes I files have been processed.")
 
             # Get list of Stokes I processed image paths as str
             # NOTE image_type may change in future development
@@ -344,7 +347,7 @@ def get_image_paths(
 
             # Check that each Stokes V image has been processed as Stokes I
             logger.debug(image_paths)
-            #for epoch_list in image_paths:
+            # for epoch_list in image_paths:
             for image_path_v in image_paths:
                 # Get expected path of processed corresponding Stokes I image
                 split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
@@ -363,7 +366,7 @@ def get_image_paths(
     return image_paths
 
 
-## Pipeline
+# Pipeline
 
 
 def get_corresponding_paths(
@@ -453,7 +456,7 @@ def crop_image(
     epoch_dir: str,
     rms_path: Path,
     bkg_path: Path,
-    corrected_fits: list[Union[fits.PrimaryHDU,fits.HDUList]],
+    corrected_fits: list[Union[fits.PrimaryHDU, fits.HDUList]],
     crop_size: u.Quantity,
     compress: bool,
     overwrite: bool,
@@ -523,22 +526,22 @@ def crop_image(
         if type(image_hdu) is fits.HDUList:
             hdul = image_hdu
             image_hdu = hdul[0]
-            
+
         field_centre = crop.get_field_centre(image_hdu.header)
         cropped_hdu = crop.crop_hdu(image_hdu, field_centre, size=crop_size)
 
         # Compress image if requested
         processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
         fitsutils.update_header_history(processed_hdu.header)
-        
+
         if hdul is not None:
             # astropy fits requires the 0th element of a HDUList to be a
             # PrimaryHDU object. So we add a dummy one...
-            primary_hdu = fits.PrimaryHDU() 
+            primary_hdu = fits.PrimaryHDU()
             hdus = [primary_hdu, processed_hdu]
             if len(hdul) > 0:
                 hdus.extend(hdul[1:])
-            
+
             processed_hdu = fits.HDUList(hdus=hdus)
 
         # Write processed image to disk and update history
@@ -616,8 +619,9 @@ def crop_catalogs(
 
         # This uses the last cropped hdu from the previous for loop
         # which should be the image file, but doesn't actually matter
-        cropped_vot = crop.crop_catalogue(vot, cropped_hdu, field_centre, crop_size)
-        
+        cropped_vot = crop.crop_catalogue(
+            vot, cropped_hdu, field_centre, crop_size)
+
         # Add git hash
         catutils.add_hash_to_cat(cropped_vot)
 
@@ -683,7 +687,8 @@ def create_mocs(
     stmoc_filename = image_path.name.replace(".fits", ".stmoc.fits")
     stmoc_outfile = moc_output_dir / stmoc_filename
 
-    # Wrute STMOC to output file from cropped image and MOC and output to logger
+    # Wrute STMOC to output file from cropped image and MOC and output to
+    # logger
     stmoc = crop.moc_to_stmoc(moc, cropped_hdu)
     stmoc.write(stmoc_outfile, overwrite=overwrite)
 
@@ -691,7 +696,7 @@ def create_mocs(
     logger.debug(f"Wrote {stmoc_outfile}")
 
 
-## Main
+# Main
 
 
 def run(
@@ -787,7 +792,7 @@ def run(
 
     # Set up logger
     main_logger = logutils.setup_logger(verbose=verbose, debug=debug)
-    
+
     if stokes != ['I'] and stokes != 'I' and create_moc:
         main_logger.warning("Stokes != I, so setting create_moc=False")
         create_moc = False
@@ -864,7 +869,8 @@ def run(
             compress=compress,
         )
         if type(cropped_hdu) == fits.HDUList:
-            cropped_image_hdu = cropped_hdu[1] # image HDU is the 1th element because of dummy PrimaryHDU
+            # image HDU is the 1th element because of dummy PrimaryHDU
+            cropped_image_hdu = cropped_hdu[1]
         else:
             cropped_image_hdu = cropped_hdu
 

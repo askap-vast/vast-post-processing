@@ -1,4 +1,4 @@
-"""Command Line Interface for VAST Post-processing. 
+"""Command Line Interface for VAST Post-processing.
 
 All commands here can be optional since they can also be set via the
 configuration files.
@@ -9,7 +9,8 @@ configuration files.
 
 
 from pathlib import Path
-from typing import Optional, List  # Typer only accepts typing.List, not native list
+# Typer only accepts typing.List, not native list
+from typing import Optional, List
 
 import typer
 
