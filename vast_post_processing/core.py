@@ -444,6 +444,7 @@ def crop_image(
     overwrite: bool,
     verbose: bool,
     debug: bool,
+    file_extension_add: str = 'processed',
 ) -> tuple[SkyCoord, fits.PrimaryHDU]:
     """Crop and compress data corresponding to image data.
 
@@ -471,6 +472,8 @@ def crop_image(
         Flag to display status and progress to output.
     debug : bool
         Flag to display errors to output.
+    file_extension : str
+        File extension to use for output data - replaces `.fits`
 
     Returns
     -------
@@ -496,7 +499,10 @@ def crop_image(
         logger.info(f"Using fits_output_dir: {fits_output_dir}")
 
         # Crop image data
-        outfile = fits_output_dir / path.name
+        if file_extension is None or file_extension == "":
+            file_extension = '.fits'
+        out_name = path.name.replace(".fits", file_extension)
+        outfile = fits_output_dir / out_name
         image_hdu = corrected_fits[i]
         hdul = None
         if type(image_hdu) is fits.HDUList:
