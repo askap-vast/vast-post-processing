@@ -79,6 +79,19 @@ def main(
     compress: Optional[bool] = typer.Option(
         None, help=("Compress all processed FITS files")
     ),
+    directory_suffix: Optional[str] = typer.Option(
+        None, help=("Suffix to use for processed data directories. For "
+                    "example, passing 'PROCESSED' results in images being "
+                    "output to `STOKESI_IMAGES_PROCESSED`.")
+    ),
+    cat_extension: Optional[str] = typer.Option(
+        None, help=("Extension to use for catalogue files. For example "
+                    "'.processed.xml'.")
+    ),
+    fits_extension: Optional[str] = typer.Option(
+        None, help=("Extension to use for fits files. For example "
+                    "'.processed.fits'.")
+    ),
     overwrite: Optional[bool] = typer.Option(
         None,
         help=("Overwrite existing cropped data"),
@@ -102,6 +115,9 @@ def main(
         crop_size,
         create_moc,
         compress,
+        directory_suffix,
+        cat_extension,
+        fits_extension,
         overwrite,
         verbose,
         debug,

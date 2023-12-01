@@ -150,10 +150,13 @@ def setup_configuration(
     crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
+    directory_suffix: Optional[str] = None,
+    cat_extension: Optional[str] = None,
+    fits_extension: Optional[str] = None,
     overwrite: Optional[bool] = None,
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
-) -> tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, bool, bool, bool]:
+) -> tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, str, str, str, bool, bool, bool]:
     """Set up the configuration settings for this run.
 
     Parameters
@@ -178,6 +181,15 @@ def setup_configuration(
         Flag to create MOCs, by default None.
     compress : Optional[bool], optional
         Flag to compress files, by default None.
+    directory_suffix : Optional[str], optional
+        Suffix to use for processed data directories (for example
+        `STOKESI_IMAGES_PROCESSED`), by default None.
+    cat_extension : Optional[str], optional
+        Extension to use for catalogue files (for example`.processed.xml`),
+        by default None.
+    fits_extension : Optional[str], optional
+        Extension to use for fits files (for example `.processed.fits`),
+        by default None.
     overwrite : Optional[bool], optional
         Flag to overwrite existing data, by default None.
     verbose : Optional[bool], optional
@@ -187,7 +199,7 @@ def setup_configuration(
 
     Returns
     -------
-    tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, bool, bool, bool]
+    tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, str, str, str, bool, bool, bool]
         Valid configuration settings for this run.
     """
     # Load in default configuration
@@ -215,6 +227,9 @@ def setup_configuration(
         "crop_size": crop_size,
         "create_moc": create_moc,
         "compress": compress,
+        "directory_suffix": directory_suffix,
+        "cat_extension": cat_extension,
+        "fits_extension": fits_extension,
         "overwrite": overwrite,
         "verbose": verbose,
         "debug": debug,
@@ -689,6 +704,9 @@ def run(
     crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
+    directory_suffix: Optional[str] = None,
+    cat_extension: Optional[str] = None,
+    fits_extension: Optional[str] = None,
     overwrite: Optional[bool] = None,
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
@@ -717,6 +735,15 @@ def run(
         Flag to create MOCs, by default None.
     compress : Optional[bool], optional
         Flag to compress files, by default None.
+    directory_suffix : Optional[str], optional
+        Suffix to use for processed data directories (for example
+        `STOKESI_IMAGES_PROCESSED`), by default None.
+    cat_extension : Optional[str], optional
+        Extension to use for catalogue files (for example`.processed.xml`),
+        by default None.
+    fits_extension : Optional[str], optional
+        Extension to use for fits files (for example `.processed.fits`),
+        by default None.
     overwrite : Optional[bool], optional
         Flag to overwrite existing data, by default None.
     verbose : Optional[bool], optional
@@ -734,6 +761,9 @@ def run(
         crop_size,
         create_moc,
         compress,
+        directory_suffix,
+        cat_extension,
+        fits_extension,
         overwrite,
         verbose,
         debug,
@@ -747,6 +777,9 @@ def run(
         crop_size=crop_size,
         create_moc=create_moc,
         compress=compress,
+        directory_suffix=directory_suffix,
+        cat_extension=cat_extension,
+        fits_extension=fits_extension,
         overwrite=overwrite,
         verbose=verbose,
         debug=debug,
@@ -755,7 +788,7 @@ def run(
     # Set up logger
     main_logger = logutils.setup_logger(verbose=verbose, debug=debug)
     
-    if stokes != 'I' and create_moc:
+    if stokes != ['I'] and stokes != 'I' and create_moc:
         main_logger.warning("Stokes != I, so setting create_moc=False")
         create_moc = False
 
@@ -824,6 +857,7 @@ def run(
             bkg_path=bkg_path,
             corrected_fits=corrected_fits,
             crop_size=crop_size,
+            file_extension=fits_extension,
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
@@ -844,6 +878,7 @@ def run(
             islands_path=islands_path,
             corrected_cats=corrected_cats,
             crop_size=crop_size,
+            file_extension=cat_extension,
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
