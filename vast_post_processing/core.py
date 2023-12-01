@@ -548,6 +548,7 @@ def crop_catalogs(
     overwrite: bool,
     verbose: bool,
     debug: bool,
+    file_extension: str = '.processed.xml'
 ):
     """Crop field catalogues.
 
@@ -575,6 +576,8 @@ def crop_catalogs(
         Flag to display status and progress to output.
     debug : bool
         Flag to display errors to output.
+    file_extension : str
+        File extension to use for output data - replaces `.xml`
     """
     # Locate directory to store cropped data, and create if nonexistent
     # TODO what suffix should we use? SEE ABOVE
@@ -585,7 +588,10 @@ def crop_catalogs(
     # Iterate over each catalogue xml file corresponding to a field
     for i, path in enumerate((components_path, islands_path)):
         # Path to output file
-        outfile = cat_output_dir / path.name
+        if file_extension is None or file_extension == "":
+            file_extension = '.xml'
+        out_name = path.name.replace(".xml", file_extension)
+        outfile = cat_output_dir / out_name
 
         # Display path if requested
         logger.debug(f"{outfile}")
