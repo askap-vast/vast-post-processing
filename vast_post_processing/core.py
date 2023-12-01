@@ -444,7 +444,7 @@ def crop_image(
     overwrite: bool,
     verbose: bool,
     debug: bool,
-    file_extension_add: str = 'processed',
+    file_extension: str = '.processed.fits',
 ) -> tuple[SkyCoord, fits.PrimaryHDU]:
     """Crop and compress data corresponding to image data.
 
