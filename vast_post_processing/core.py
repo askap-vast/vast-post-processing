@@ -46,8 +46,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 # Setup
 
-processed_suffix = "PROCESSED"
-
 
 def setup_configuration_variable(
     name: str,
@@ -264,6 +262,7 @@ def get_image_paths(
     verbose: bool,
     debug: bool,
     image_type: str = "IMAGES",
+    processed_dir_suffix: str = "PROCESSED"
 ) -> list[Path]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
@@ -281,6 +280,9 @@ def get_image_paths(
         Flag to display errors to output.
     image_type : str, optional
         Directory to list images from, defaults to "IMAGES".
+    processed_dir_suffix : str
+        Suffix to use for processed data directories. For example, 'PROCESSED'
+        results in images being output to `STOKESI_IMAGES_PROCESSED`.
 
     Returns
     -------
@@ -338,7 +340,7 @@ def get_image_paths(
                     data_root,
                     ["I"],
                     epoch,
-                    image_type=f"IMAGES_{processed_suffix}",
+                    image_type=f"IMAGES_{processed_dir_suffix}",
                     verbose=False,
                     debug=False,
                 )
@@ -352,7 +354,7 @@ def get_image_paths(
                 # Get expected path of processed corresponding Stokes I image
                 split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
                 str_path_i = (
-                    split_str_path_v[0] + f"STOKESI_IMAGES_{processed_suffix}" + split_str_path_v[1].replace("image.v", "image.i")
+                    split_str_path_v[0] + f"STOKESI_IMAGES_{processed_dir_suffix}" + split_str_path_v[1].replace("image.v", "image.i")
                 )
 
                 # If processed path is not found, terminate run
@@ -463,6 +465,7 @@ def crop_image(
     verbose: bool,
     debug: bool,
     file_extension: str = '.processed.fits',
+    processed_dir_suffix = "PROCESSED",
 ) -> tuple[SkyCoord, fits.PrimaryHDU]:
     """Crop and compress data corresponding to image data.
 
@@ -492,6 +495,9 @@ def crop_image(
         Flag to display errors to output.
     file_extension : str
         File extension to use for output data - replaces `.fits`
+    processed_dir_suffix : str
+        Suffix to use for processed data directories. For example, 'PROCESSED'
+        results in images being output to `STOKESI_IMAGES_PROCESSED`.
 
     Returns
     -------
@@ -507,9 +513,8 @@ def crop_image(
         logger.info(f"Cropping {path}")
 
         # Locate directory to store cropped data, and create if nonexistent
-        # TODO what suffix should we use?
         # TODO reorganize path handling
-        stokes_dir = f"{path.parent.parent.name}_{processed_suffix}"
+        stokes_dir = f"{path.parent.parent.name}_{processed_dir_suffix}"
         fits_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
         fits_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -566,7 +571,8 @@ def crop_catalogs(
     overwrite: bool,
     verbose: bool,
     debug: bool,
-    file_extension: str = '.processed.xml'
+    file_extension: str = '.processed.xml',
+    processed_dir_suffix: str = 'PROCESSED',
 ):
     """Crop field catalogues.
 
@@ -596,10 +602,13 @@ def crop_catalogs(
         Flag to display errors to output.
     file_extension : str
         File extension to use for output data - replaces `.xml`
+    processed_dir_suffix : str
+        Suffix to use for processed data directories. For example, 'PROCESSED'
+        results in images being output to `STOKESI_IMAGES_PROCESSED`.
     """
     # Locate directory to store cropped data, and create if nonexistent
     # TODO what suffix should we use? SEE ABOVE
-    stokes_dir = f"{components_path.parent.parent.name}_{processed_suffix}"
+    stokes_dir = f"{components_path.parent.parent.name}_{processed_dir_suffix}"
     cat_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
     cat_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -644,6 +653,7 @@ def create_mocs(
     overwrite: bool,
     verbose: bool,
     debug: bool,
+    processed_dir_suffix: str = 'PROCESSED',
 ):
     """Create a MOC and STMOC for a given field image.
 
@@ -665,12 +675,15 @@ def create_mocs(
         Flag to display status and progress to output.
     debug : bool
         Flag to display errors to output.
+    processed_dir_suffix : str
+        Suffix to use for processed data directories. For example, 'PROCESSED'
+        results in images being output to `STOKESI_IMAGES_PROCESSED`.
     """
     # Display progress if requested
     logger.info(f"Generating MOC for {image_path}")
 
     # Define path to MOC output file
-    moc_dir = f"STOKES{stokes}_MOC_{processed_suffix}"
+    moc_dir = f"STOKES{stokes}_MOC_{processed_dir_suffix}"
     moc_output_dir = Path(out_root / moc_dir / epoch_dir).resolve()
     moc_output_dir.mkdir(parents=True, exist_ok=True)
     moc_filename = image_path.name.replace(".fits", ".moc.fits")
@@ -803,7 +816,12 @@ def run(
 
     # Set up paths and required locations
     image_paths = get_image_paths(
-        data_root=data_root, stokes=stokes, epoch=epoch, verbose=verbose, debug=debug
+        data_root=data_root,
+        stokes=stokes,
+        epoch=epoch,
+        processed_dir_suffix=directory_suffix
+        verbose=verbose,
+        debug=debug
     )
 
     # Display paths if requested
@@ -867,6 +885,7 @@ def run(
             verbose=verbose,
             debug=debug,
             compress=compress,
+            processed_dir_suffix=directory_suffix,
         )
         if type(cropped_hdu) == fits.HDUList:
             # image HDU is the 1th element because of dummy PrimaryHDU
@@ -888,6 +907,7 @@ def run(
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
+            processed_dir_suffix=directory_suffix
         )
 
         # Create MOCs
@@ -901,4 +921,5 @@ def run(
                 overwrite=overwrite,
                 verbose=verbose,
                 debug=debug,
+                processed_dir_suffix=directory_suffix
             )
