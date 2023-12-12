@@ -819,7 +819,7 @@ def run(
         data_root=data_root,
         stokes=stokes,
         epoch=epoch,
-        processed_dir_suffix=directory_suffix
+        processed_dir_suffix=directory_suffix,
         verbose=verbose,
         debug=debug
     )
