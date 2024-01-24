@@ -467,10 +467,10 @@ def shift_and_scale_catalog(
     for col in cols:
         votable.array[col] = flux_scale * votable.array[col] + flux_offset_mJy
 
-    for i in range(len(FLUX_ERR_COLS)):
-        votable.array[FLUX_ERR_COLS[i]] = (
-            flux_scale_err**2 * votable.array[FLUX_COLS[i]] ** 2
-            + flux_scale**2 * votable.array[FLUX_ERR_COLS[i]] ** 2
+    for f in zip(FLUX_COLS, FLUX_ERR_COLS):
+        votable.array[f[1]] = (
+            flux_scale_err**2 * votable.array[f[0]] ** 2
+            + flux_scale**2 * votable.array[f[1]] ** 2
             + flux_offset_mJy_err**2
         ) ** 0.5
 
