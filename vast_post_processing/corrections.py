@@ -317,7 +317,7 @@ def shift_and_scale_image(
     # New coordinates should be old coordinates + offset
     crval = SkyCoord(w.wcs.crval[0] * u.deg, w.wcs.crval[1] * u.deg)
     crval_offset = SkyCoord(
-        crval.ra + ra_offset_arcsec * u.arcsec / np.cos(crval.dec),
+        crval.ra + ra_offset_arcsec * u.arcsec,
         crval.dec + dec_offset_arcsec * u.arcsec,
     )
     w.wcs.crval[0:2] = np.array([crval_offset.ra.deg, crval_offset.dec.deg])
@@ -331,7 +331,7 @@ def shift_and_scale_image(
     image_hdu.header.add_history(
         "Image has been corrected for astrometric position by an offset\
         in both directions given by RAOFF and DECOFF using a model\
-        RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
+        RA=RA+RAOFF, DEC=DEC+DECOFF"
     )
 
     # Update beam table
@@ -340,7 +340,7 @@ def shift_and_scale_image(
         beam_ras = beam_hdu.data["RA"] * u.deg
         beam_decs = beam_hdu.data["DEC"] * u.deg
 
-        beam_ras_corrected = beam_ras + ra_offset_arcsec * u.arcsec / np.cos(crval.dec)
+        beam_ras_corrected = beam_ras + ra_offset_arcsec * u.arcsec
         beam_decs_corrected = beam_decs + dec_offset_arcsec * u.arcsec
 
         beam_hdu.data["RA"] = beam_ras_corrected
@@ -352,7 +352,7 @@ def shift_and_scale_image(
         beam_hdu.header.add_history(
             "Beam positions have been corrected for astrometric position by an \
             offset in both directions given by RAOFF and DECOFF using a model\
-            RA=RA+RAOFF/COS(DEC), DEC=DEC+DECOFF"
+            RA=RA+RAOFF, DEC=DEC+DECOFF"
         )
 
     return hdul
@@ -422,15 +422,13 @@ def shift_and_scale_catalog(
     dec_deg = votable.array["col_dec_deg_cont"] * u.deg
     dec_err = votable.array["col_dec_err"] * u.arcsec
     coords_corrected = SkyCoord(
-        ra=ra_deg + ra_offset_arcsec * u.arcsec / np.cos(dec_deg),
+        ra=ra_deg + ra_offset_arcsec * u.arcsec,
         dec=dec_deg + dec_offset_arcsec * u.arcsec,
         unit="deg",
     )
 
     # Add position corrections
-    ra_err_corrected = (
-        ra_err**2 + (ra_offset_arcsec_err * u.arcsec) ** 2 / np.cos(dec_deg) ** 2
-    ) ** 0.5
+    ra_err_corrected = (ra_err**2 + (ra_offset_arcsec_err * u.arcsec) ** 2) ** 0.5
     ra_err_corrected = ra_err_corrected.to(u.arcsec)
 
     dec_err_corrected = (dec_err**2 + (dec_offset_arcsec_err * u.arcsec) ** 2) ** 0.5
