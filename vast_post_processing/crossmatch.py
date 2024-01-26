@@ -110,9 +110,11 @@ def crossmatch_qtables(
     )
     # compute the separations
     xmatch["separation"] = xmatch["coord_reference"].separation(xmatch["coord"])
-    xmatch["dra"], xmatch["ddec"] = xmatch["coord_reference"].spherical_offsets_to(
-        xmatch["coord"]
-    )
+    # xmatch["dra"], xmatch["ddec"] = xmatch["coord_reference"].spherical_offsets_to(
+    #     xmatch["coord"]
+    # )
+    xmatch["dra"] = xmatch["coord_reference"].ra - xmatch["coord"].ra
+    xmatch["ddec"] = xmatch["coord_reference"].dec - xmatch["coord"].dec
     xmatch["flux_peak_ratio"] = (
         xmatch["flux_peak"] / xmatch["flux_peak_reference"]
     ).decompose()
