@@ -15,7 +15,7 @@ from astropy.wcs import WCS
 
 
 def compress_hdu(
-    hdu: fits.ImageHDU, quantize_level: float = 1024.0, **kwargs
+    hdu: fits.ImageHDU, quantize_level: float = 64.0, **kwargs
 ) -> fits.CompImageHDU:
     """Convert a given astropy HDU into a compressed HDU.
 
@@ -37,7 +37,7 @@ def compress_hdu(
     header.update(wcs.to_header())
 
     # Update header history
-    header_str = f"Compressed and reduced to NAXIS=2 on {datetime.now()}"
+    header_str = f"Compressed with quantisation level {quantize_level} and reduced to NAXIS=2 on {datetime.now()}"
     header.add_history(header_str)
 
     # Remove empty/degenerated axes from data
