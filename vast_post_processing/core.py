@@ -44,9 +44,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 # Functions
 
 
-## Setup
-
-processed_suffix = "PROCESSED"
+# Setup
 
 
 def setup_configuration_variable(
@@ -150,10 +148,13 @@ def setup_configuration(
     crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
+    directory_suffix: Optional[str] = None,
+    cat_extension: Optional[str] = None,
+    fits_extension: Optional[str] = None,
     overwrite: Optional[bool] = None,
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
-) -> tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, bool, bool, bool]:
+) -> tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, str, str, str, bool, bool, bool]:
     """Set up the configuration settings for this run.
 
     Parameters
@@ -178,6 +179,15 @@ def setup_configuration(
         Flag to create MOCs, by default None.
     compress : Optional[bool], optional
         Flag to compress files, by default None.
+    directory_suffix : Optional[str], optional
+        Suffix to use for processed data directories (for example
+        `STOKESI_IMAGES_PROCESSED`), by default None.
+    cat_extension : Optional[str], optional
+        Extension to use for catalogue files (for example`.processed.xml`),
+        by default None.
+    fits_extension : Optional[str], optional
+        Extension to use for fits files (for example `.processed.fits`),
+        by default None.
     overwrite : Optional[bool], optional
         Flag to overwrite existing data, by default None.
     verbose : Optional[bool], optional
@@ -187,13 +197,15 @@ def setup_configuration(
 
     Returns
     -------
-    tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, bool, bool, bool]
+    tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, str, str, str, bool, bool, bool]
         Valid configuration settings for this run.
     """
     # Load in default configuration
-    default_config = yaml.safe_load(open(DATA_DIRECTORY / "default_config.yaml"))
+    default_config = yaml.safe_load(
+        open(DATA_DIRECTORY / "default_config.yaml"))
 
-    # Load in user configuration if passed and valid, otherwise create empty dict
+    # Load in user configuration if passed and valid, otherwise create empty
+    # dict
     if (config_file) and (Path(config_file).suffix == ".yaml"):
         user_config = yaml.safe_load(open(Path(config_file)))
 
@@ -215,6 +227,9 @@ def setup_configuration(
         "crop_size": crop_size,
         "create_moc": create_moc,
         "compress": compress,
+        "directory_suffix": directory_suffix,
+        "cat_extension": cat_extension,
+        "fits_extension": fits_extension,
         "overwrite": overwrite,
         "verbose": verbose,
         "debug": debug,
@@ -247,6 +262,7 @@ def get_image_paths(
     verbose: bool,
     debug: bool,
     image_type: str = "IMAGES",
+    processed_dir_suffix: str = "PROCESSED"
 ) -> list[Path]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
@@ -264,6 +280,9 @@ def get_image_paths(
         Flag to display errors to output.
     image_type : str, optional
         Directory to list images from, defaults to "IMAGES".
+    processed_dir_suffix : str
+        Suffix to use for processed data directories. For example, 'PROCESSED'
+        results in images being output to `STOKESI_IMAGES_PROCESSED`.
 
     Returns
     -------
@@ -310,7 +329,8 @@ def get_image_paths(
         # Check for processed data if Stokes V
         if parameter == "V":
             # Display progress if requested
-            logger.info("Checking corresponding Stokes I files have been processed.")
+            logger.info(
+                "Checking corresponding Stokes I files have been processed.")
 
             # Get list of Stokes I processed image paths as str
             # NOTE image_type may change in future development
@@ -320,7 +340,7 @@ def get_image_paths(
                     data_root,
                     ["I"],
                     epoch,
-                    image_type=f"IMAGES_{processed_suffix}",
+                    image_type=f"IMAGES_{processed_dir_suffix}",
                     verbose=False,
                     debug=False,
                 )
@@ -329,12 +349,12 @@ def get_image_paths(
 
             # Check that each Stokes V image has been processed as Stokes I
             logger.debug(image_paths)
-            #for epoch_list in image_paths:
+            # for epoch_list in image_paths:
             for image_path_v in image_paths:
                 # Get expected path of processed corresponding Stokes I image
                 split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
                 str_path_i = (
-                    split_str_path_v[0] + f"STOKESI_IMAGES_{processed_suffix}" + split_str_path_v[1].replace("image.v", "image.i")
+                    split_str_path_v[0] + f"STOKESI_IMAGES_{processed_dir_suffix}" + split_str_path_v[1].replace("image.v", "image.i")
                 )
 
                 # If processed path is not found, terminate run
@@ -348,7 +368,7 @@ def get_image_paths(
     return image_paths
 
 
-## Pipeline
+# Pipeline
 
 
 def get_corresponding_paths(
@@ -438,12 +458,14 @@ def crop_image(
     epoch_dir: str,
     rms_path: Path,
     bkg_path: Path,
-    corrected_fits: list[Union[fits.PrimaryHDU,fits.HDUList]],
+    corrected_fits: list[Union[fits.PrimaryHDU, fits.HDUList]],
     crop_size: u.Quantity,
     compress: bool,
     overwrite: bool,
     verbose: bool,
     debug: bool,
+    file_extension: str = '.processed.fits',
+    processed_dir_suffix = "PROCESSED",
 ) -> tuple[SkyCoord, fits.PrimaryHDU]:
     """Crop and compress data corresponding to image data.
 
@@ -471,6 +493,11 @@ def crop_image(
         Flag to display status and progress to output.
     debug : bool
         Flag to display errors to output.
+    file_extension : str
+        File extension to use for output data - replaces `.fits`
+    processed_dir_suffix : str
+        Suffix to use for processed data directories. For example, 'PROCESSED'
+        results in images being output to `STOKESI_IMAGES_PROCESSED`.
 
     Returns
     -------
@@ -486,9 +513,8 @@ def crop_image(
         logger.info(f"Cropping {path}")
 
         # Locate directory to store cropped data, and create if nonexistent
-        # TODO what suffix should we use?
         # TODO reorganize path handling
-        stokes_dir = f"{path.parent.parent.name}_{processed_suffix}"
+        stokes_dir = f"{path.parent.parent.name}_{processed_dir_suffix}"
         fits_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
         fits_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -496,28 +522,31 @@ def crop_image(
         logger.info(f"Using fits_output_dir: {fits_output_dir}")
 
         # Crop image data
-        outfile = fits_output_dir / path.name
+        if file_extension is None or file_extension == "":
+            file_extension = '.fits'
+        out_name = path.name.replace(".fits", file_extension)
+        outfile = fits_output_dir / out_name
         image_hdu = corrected_fits[i]
         hdul = None
         if type(image_hdu) is fits.HDUList:
             hdul = image_hdu
             image_hdu = hdul[0]
-            
+
         field_centre = crop.get_field_centre(image_hdu.header)
         cropped_hdu = crop.crop_hdu(image_hdu, field_centre, size=crop_size)
 
         # Compress image if requested
         processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
         fitsutils.update_header_history(processed_hdu.header)
-        
+
         if hdul is not None:
             # astropy fits requires the 0th element of a HDUList to be a
             # PrimaryHDU object. So we add a dummy one...
-            primary_hdu = fits.PrimaryHDU() 
+            primary_hdu = fits.PrimaryHDU()
             hdus = [primary_hdu, processed_hdu]
             if len(hdul) > 0:
                 hdus.extend(hdul[1:])
-            
+
             processed_hdu = fits.HDUList(hdus=hdus)
 
         # Write processed image to disk and update history
@@ -542,6 +571,8 @@ def crop_catalogs(
     overwrite: bool,
     verbose: bool,
     debug: bool,
+    file_extension: str = '.processed.xml',
+    processed_dir_suffix: str = 'PROCESSED',
 ):
     """Crop field catalogues.
 
@@ -569,17 +600,25 @@ def crop_catalogs(
         Flag to display status and progress to output.
     debug : bool
         Flag to display errors to output.
+    file_extension : str
+        File extension to use for output data - replaces `.xml`
+    processed_dir_suffix : str
+        Suffix to use for processed data directories. For example, 'PROCESSED'
+        results in images being output to `STOKESI_IMAGES_PROCESSED`.
     """
     # Locate directory to store cropped data, and create if nonexistent
     # TODO what suffix should we use? SEE ABOVE
-    stokes_dir = f"{components_path.parent.parent.name}_{processed_suffix}"
+    stokes_dir = f"{components_path.parent.parent.name}_{processed_dir_suffix}"
     cat_output_dir = Path(out_root / stokes_dir / epoch_dir).resolve()
     cat_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Iterate over each catalogue xml file corresponding to a field
     for i, path in enumerate((components_path, islands_path)):
         # Path to output file
-        outfile = cat_output_dir / path.name
+        if file_extension is None or file_extension == "":
+            file_extension = '.xml'
+        out_name = path.name.replace(".xml", file_extension)
+        outfile = cat_output_dir / out_name
 
         # Display path if requested
         logger.debug(f"{outfile}")
@@ -589,8 +628,9 @@ def crop_catalogs(
 
         # This uses the last cropped hdu from the previous for loop
         # which should be the image file, but doesn't actually matter
-        cropped_vot = crop.crop_catalogue(vot, cropped_hdu, field_centre, crop_size)
-        
+        cropped_vot = crop.crop_catalogue(
+            vot, cropped_hdu, field_centre, crop_size)
+
         # Add git hash
         catutils.add_hash_to_cat(cropped_vot)
 
@@ -613,6 +653,7 @@ def create_mocs(
     overwrite: bool,
     verbose: bool,
     debug: bool,
+    processed_dir_suffix: str = 'PROCESSED',
 ):
     """Create a MOC and STMOC for a given field image.
 
@@ -634,12 +675,15 @@ def create_mocs(
         Flag to display status and progress to output.
     debug : bool
         Flag to display errors to output.
+    processed_dir_suffix : str
+        Suffix to use for processed data directories. For example, 'PROCESSED'
+        results in images being output to `STOKESI_IMAGES_PROCESSED`.
     """
     # Display progress if requested
     logger.info(f"Generating MOC for {image_path}")
 
     # Define path to MOC output file
-    moc_dir = f"STOKES{stokes}_MOC_{processed_suffix}"
+    moc_dir = f"STOKES{stokes}_MOC_{processed_dir_suffix}"
     moc_output_dir = Path(out_root / moc_dir / epoch_dir).resolve()
     moc_output_dir.mkdir(parents=True, exist_ok=True)
     moc_filename = image_path.name.replace(".fits", ".moc.fits")
@@ -656,7 +700,8 @@ def create_mocs(
     stmoc_filename = image_path.name.replace(".fits", ".stmoc.fits")
     stmoc_outfile = moc_output_dir / stmoc_filename
 
-    # Wrute STMOC to output file from cropped image and MOC and output to logger
+    # Wrute STMOC to output file from cropped image and MOC and output to
+    # logger
     stmoc = crop.moc_to_stmoc(moc, cropped_hdu)
     stmoc.write(stmoc_outfile, overwrite=overwrite)
 
@@ -664,7 +709,7 @@ def create_mocs(
     logger.debug(f"Wrote {stmoc_outfile}")
 
 
-## Main
+# Main
 
 
 def run(
@@ -677,6 +722,9 @@ def run(
     crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
+    directory_suffix: Optional[str] = None,
+    cat_extension: Optional[str] = None,
+    fits_extension: Optional[str] = None,
     overwrite: Optional[bool] = None,
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
@@ -705,6 +753,15 @@ def run(
         Flag to create MOCs, by default None.
     compress : Optional[bool], optional
         Flag to compress files, by default None.
+    directory_suffix : Optional[str], optional
+        Suffix to use for processed data directories (for example
+        `STOKESI_IMAGES_PROCESSED`), by default None.
+    cat_extension : Optional[str], optional
+        Extension to use for catalogue files (for example`.processed.xml`),
+        by default None.
+    fits_extension : Optional[str], optional
+        Extension to use for fits files (for example `.processed.fits`),
+        by default None.
     overwrite : Optional[bool], optional
         Flag to overwrite existing data, by default None.
     verbose : Optional[bool], optional
@@ -722,6 +779,9 @@ def run(
         crop_size,
         create_moc,
         compress,
+        directory_suffix,
+        cat_extension,
+        fits_extension,
         overwrite,
         verbose,
         debug,
@@ -735,6 +795,9 @@ def run(
         crop_size=crop_size,
         create_moc=create_moc,
         compress=compress,
+        directory_suffix=directory_suffix,
+        cat_extension=cat_extension,
+        fits_extension=fits_extension,
         overwrite=overwrite,
         verbose=verbose,
         debug=debug,
@@ -742,8 +805,8 @@ def run(
 
     # Set up logger
     main_logger = logutils.setup_logger(verbose=verbose, debug=debug)
-    
-    if stokes != 'I' and create_moc:
+
+    if stokes != ['I'] and stokes != 'I' and create_moc:
         main_logger.warning("Stokes != I, so setting create_moc=False")
         create_moc = False
 
@@ -753,7 +816,12 @@ def run(
 
     # Set up paths and required locations
     image_paths = get_image_paths(
-        data_root=data_root, stokes=stokes, epoch=epoch, verbose=verbose, debug=debug
+        data_root=data_root,
+        stokes=stokes,
+        epoch=epoch,
+        processed_dir_suffix=directory_suffix,
+        verbose=verbose,
+        debug=debug
     )
 
     # Display paths if requested
@@ -812,13 +880,16 @@ def run(
             bkg_path=bkg_path,
             corrected_fits=corrected_fits,
             crop_size=crop_size,
+            file_extension=fits_extension,
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
             compress=compress,
+            processed_dir_suffix=directory_suffix,
         )
         if type(cropped_hdu) == fits.HDUList:
-            cropped_image_hdu = cropped_hdu[1] # image HDU is the 1th element because of dummy PrimaryHDU
+            # image HDU is the 1th element because of dummy PrimaryHDU
+            cropped_image_hdu = cropped_hdu[1]
         else:
             cropped_image_hdu = cropped_hdu
 
@@ -832,9 +903,11 @@ def run(
             islands_path=islands_path,
             corrected_cats=corrected_cats,
             crop_size=crop_size,
+            file_extension=cat_extension,
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
+            processed_dir_suffix=directory_suffix
         )
 
         # Create MOCs
@@ -848,4 +921,5 @@ def run(
                 overwrite=overwrite,
                 verbose=verbose,
                 debug=debug,
+                processed_dir_suffix=directory_suffix
             )

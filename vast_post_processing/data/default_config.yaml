@@ -30,6 +30,16 @@ create_moc: True
 # Flag to compress data following pipeline, by default True. 
 compress: True
 
+# Suffix to use for processed data directories
+# By default "PROCESSED" which results in e.g. `STOKESI_IMAGES_PROCESSED
+directory_suffix: "PROCESSED"
+
+# File extension to use for processed catalogues
+cat_extension: ".processed.xml"
+
+# File extension to use for processed fits files
+fits_extension: ".processed.fits"
+
 # Flag to overwrite FITS data to disk, by default False. 
 overwrite: False
 
