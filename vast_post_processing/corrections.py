@@ -436,7 +436,7 @@ def shift_and_scale_catalog(
     ra_err_corrected = (
         ra_err**2
         + (ra_offset_arcsec_err * u.arcsec / np.cos(dec_rad)) ** 2
-        + (dec_err * ra_offset_arcsec * u.arcsec * np.tan(dec_deg) / np.cos(dec_rad)) ** 2
+        + (dec_err * ra_offset_arcsec * u.arcsec * np.tan(dec_rad) / np.cos(dec_rad)) ** 2
     ) ** 0.5
     ra_err_corrected = ra_err_corrected.to(u.arcsec)
 
