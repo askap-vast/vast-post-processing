@@ -44,7 +44,7 @@ fits_extension: ".processed.fits"
 overwrite: False
 
 # Flag to display progress and status to screen, by default False.
-verbose: False
+verbose: True
 
 # Flag to display errors and functionality, by default False. 
 debug: False
