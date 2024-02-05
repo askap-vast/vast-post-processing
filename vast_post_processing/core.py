@@ -425,14 +425,12 @@ def get_corresponding_paths(
     islands_name = components_name.replace("components", "islands")
     selavy_dir = Path(data_root / f"STOKES{stokes}_SELAVY" / epoch_dir).resolve()
     components_path = selavy_dir / components_name
-    islands_path = selavy_dir / islands_name
 
     # Display paths if requested
     logger.debug(
         f"Noise Map: {rms_path}\n"
         + f"Mean Map: {bkg_path}\n"
         + f"Components: {components_path}\n"
-        + f"Islands: {islands_path}\n"
     )
 
     # If any of these paths are missing, terminate this run
@@ -444,12 +442,8 @@ def get_corresponding_paths(
         raise FileNotFoundError(
             f"Expected selavy components file ({components_path}) is missing."
         )
-    if not islands_path.exists():
-        raise FileNotFoundError(
-            f"Expected selavy islands file ({islands_path}) is missing."
-        )
 
-    return rms_path, bkg_path, components_path, islands_path
+    return rms_path, bkg_path, components_path
 
 
 def crop_image(
@@ -565,7 +559,6 @@ def crop_catalogs(
     cropped_hdu: fits.PrimaryHDU,
     field_centre: SkyCoord,
     components_path: Path,
-    islands_path: Path,
     corrected_cats: list[VOTableFile],
     crop_size: u.Quantity,
     overwrite: bool,
@@ -588,8 +581,6 @@ def crop_catalogs(
         Field centre of image.
     components_path : Path
         Path to the selavy components xml file for this field.
-    islands_path : Path
-        Path to the selavy islands xml file for this field.
     corrected_cats : list[VOTableFile]
         list of corrected catalogues to be cropped.
     crop_size : u.Quantity
@@ -613,7 +604,7 @@ def crop_catalogs(
     cat_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Iterate over each catalogue xml file corresponding to a field
-    for i, path in enumerate((components_path, islands_path)):
+    for i, path in enumerate((components_path, )):
         # Path to output file
         if file_extension is None or file_extension == "":
             file_extension = '.xml'
@@ -837,7 +828,7 @@ def run(
         field, sbid = misc.get_field_and_sbid(image_path)
 
         # Get and verify relevant paths for this file
-        rms_path, bkg_path, components_path, islands_path = get_corresponding_paths(
+        rms_path, bkg_path, components_path  = get_corresponding_paths(
             data_root=data_root,
             image_path=image_path,
             stokes=stokes_dir,
@@ -900,7 +891,6 @@ def run(
             cropped_hdu=cropped_image_hdu,
             field_centre=field_centre,
             components_path=components_path,
-            islands_path=islands_path,
             corrected_cats=corrected_cats,
             crop_size=crop_size,
             file_extension=cat_extension,

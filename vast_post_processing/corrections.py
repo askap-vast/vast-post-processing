@@ -660,18 +660,16 @@ def check_for_files(image_path: str, stokes: str = "I"):
     catalog_filepath = f"{catalog_root}/{catalog_filename}"
 
     component_file = Path(catalog_filepath)
-    island_file = Path(catalog_filepath.replace("components", "islands"))
-
+    
     skip = (
         not (
             (rms_path.exists())
             and (bkg_path.exists())
-            and (island_file.exists())
             and (component_file.exists())
         )
         or skip
     )
-    return skip, (bkg_path, rms_path, component_file, island_file)
+    return skip, (bkg_path, rms_path, component_file )
 
 
 def correct_field(
@@ -738,7 +736,7 @@ def correct_field(
     # check for auxiliary files
     skip, aux_files = check_for_files(image_path=image_path, stokes=stokes)
     skip |= ref_file is None
-    bkg_path, rms_path, component_file, island_file = aux_files
+    bkg_path, rms_path, component_file = aux_files
     if skip:
         if not ((rms_path.exists()) and (bkg_path.exists())):
             logger.warning(f"Skipping {image_path}, RMS/BKG maps do not exist")
@@ -846,7 +844,7 @@ def correct_field(
 
         # Do the same for catalog files
         corrected_catalogs = []
-        for path in (component_file, island_file):
+        for path in (component_file, ):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
             output_dir = outdir / stokes_dir / epoch_dir
             output_path = output_dir / path.with_suffix(".corrected.xml").name
