@@ -291,10 +291,12 @@ def shift_and_scale_image(
         data_unit = u.Jy
     else:
         data_unit = u.mJy
+
+    flux_offset = (flux_offset_mJy*u.mJy).to(data_unit)
     image_hdu.data = flux_scale * (
-        image_hdu.data + (flux_offset_mJy * (u.mJy.to(data_unit)))
+        image_hdu.data + flux_offset.value
     )
-    image_hdu.header["FLUXOFF"] = flux_offset_mJy * (u.mJy.to(data_unit))
+    image_hdu.header["FLUXOFF"] = flux_offset.value
     image_hdu.header["FLUXSCL"] = flux_scale
 
     image_hdu.header.add_history(
@@ -420,24 +422,32 @@ def shift_and_scale_catalog(
     ra_deg = votable.array["col_ra_deg_cont"] * u.deg
     ra_err = votable.array["col_ra_err"] * u.arcsec
     dec_deg = votable.array["col_dec_deg_cont"] * u.deg
+    dec_rad = dec_deg.to(u.radian)
     dec_err = votable.array["col_dec_err"] * u.arcsec
     coords_corrected = SkyCoord(
-        ra=ra_deg + ra_offset_arcsec * u.arcsec / np.cos(dec_deg),
+        ra=ra_deg + ra_offset_arcsec * u.arcsec / np.cos(dec_rad),
         dec=dec_deg + dec_offset_arcsec * u.arcsec,
         unit="deg",
     )
 
+    logger.debug(f"RA err: {ra_err}. RA offset arcsec err: {ra_offset_arcsec_err}.")
+    logger.debug(f"Dec err: {dec_err}. Dec: {dec_deg}")
     # Add position corrections
     ra_err_corrected = (
         ra_err**2
-        + (ra_offset_arcsec_err * u.arcsec / np.cos(dec_deg)) ** 2
-        + (dec_err * ra_offset_arcsec * u.arcsec * np.tan(dec_deg) / np.cos(dec_deg))
-        ** 2
+        + ((ra_offset_arcsec_err*u.arcsec) / np.cos(dec_rad)) ** 2
+        + (dec_err.to(u.radian).value * (ra_offset_arcsec * u.arcsec) * np.tan(dec_rad) / np.cos(dec_rad)) ** 2
     ) ** 0.5
     ra_err_corrected = ra_err_corrected.to(u.arcsec)
+    logger.debug(f"ra_err_corrected: {ra_err_corrected}")
+    logger.debug(f"ra_err: {ra_err}")
+    logger.debug(f"ra_offset_arcsec: {ra_offset_arcsec}")
 
-    dec_err_corrected = (dec_err**2 + (dec_offset_arcsec_err * u.arcsec) ** 2) ** 0.5
+    dec_err_corrected = ((dec_err.to(u.radian))**2 + ((dec_offset_arcsec_err * u.arcsec).to(u.radian)) ** 2) ** 0.5
+    logger.debug(f"dec_err_corrected: {dec_err_corrected}")
     dec_err_corrected = dec_err_corrected.to(u.arcsec)
+    logger.debug(f"dec_err_corrected: {dec_err_corrected}")
+    logger.debug(f"ra_err: {ra_err}")
 
     votable.array["col_ra_deg_cont"] = np.ma.array(
         coords_corrected.ra.deg, mask=votable.array["col_ra_deg_cont"].mask
@@ -650,18 +660,16 @@ def check_for_files(image_path: str, stokes: str = "I"):
     catalog_filepath = f"{catalog_root}/{catalog_filename}"
 
     component_file = Path(catalog_filepath)
-    island_file = Path(catalog_filepath.replace("components", "islands"))
-
+    
     skip = (
         not (
             (rms_path.exists())
             and (bkg_path.exists())
-            and (island_file.exists())
             and (component_file.exists())
         )
         or skip
     )
-    return skip, (bkg_path, rms_path, component_file, island_file)
+    return skip, (bkg_path, rms_path, component_file )
 
 
 def correct_field(
@@ -728,7 +736,7 @@ def correct_field(
     # check for auxiliary files
     skip, aux_files = check_for_files(image_path=image_path, stokes=stokes)
     skip |= ref_file is None
-    bkg_path, rms_path, component_file, island_file = aux_files
+    bkg_path, rms_path, component_file = aux_files
     if skip:
         if not ((rms_path.exists()) and (bkg_path.exists())):
             logger.warning(f"Skipping {image_path}, RMS/BKG maps do not exist")
@@ -778,15 +786,6 @@ def correct_field(
                 crossmatch_output=crossmatch_file,
                 csv_output=csv_file,
             )
-
-            flux_corr_mult_value = flux_corr_mult.n
-            flux_corr_mult_std = flux_corr_mult.s
-            flux_corr_add_value = flux_corr_add.n
-            flux_corr_add_std = flux_corr_add.s
-            dra_median_value = dra_median_value.item()
-            dra_median_std = dra_median_std.item()
-            ddec_median_value = ddec_median_value.item()
-            ddec_median_std = ddec_median_std.item()
         else:
             corrections_df = pd.read_csv(csv_file)
             _, _, field, sbid, *_ = image_path.name.split(".")
@@ -802,6 +801,15 @@ def correct_field(
             flux_corr_add = corrections_row["flux_corr_add_mean"].iloc[0]
             flux_corr_mult_std = corrections_row["flux_corr_mult_std"].iloc[0]
             flux_corr_add_std = corrections_row["flux_corr_mult_std"].iloc[0]
+
+        flux_corr_mult_value = flux_corr_mult.n
+        flux_corr_mult_std = flux_corr_mult.s
+        flux_corr_add_value = flux_corr_add.n
+        flux_corr_add_std = flux_corr_add.s
+        dra_median_value = dra_median_value.item()
+        dra_median_std = dra_median_std.item()
+        ddec_median_value = ddec_median_value.item()
+        ddec_median_std = ddec_median_std.item()
 
         logger.debug("Applying corrections:")
         logger.debug(f"dra_median_value = {dra_median_value}")
@@ -819,8 +827,8 @@ def correct_field(
             else:
                 corrected_hdu = shift_and_scale_image(
                     path,
-                    flux_scale=flux_corr_mult,
-                    flux_offset_mJy=flux_corr_add,
+                    flux_scale=flux_corr_mult_value,
+                    flux_offset_mJy=flux_corr_add_value,
                     ra_offset_arcsec=dra_median_value,
                     dec_offset_arcsec=ddec_median_value,
                 )
@@ -836,7 +844,7 @@ def correct_field(
 
         # Do the same for catalog files
         corrected_catalogs = []
-        for path in (component_file, island_file):
+        for path in (component_file, ):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
             output_dir = outdir / stokes_dir / epoch_dir
             output_path = output_dir / path.with_suffix(".corrected.xml").name
