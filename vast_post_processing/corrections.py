@@ -435,13 +435,19 @@ def shift_and_scale_catalog(
     # Add position corrections
     ra_err_corrected = (
         ra_err**2
-        + (ra_offset_arcsec_err * u.arcsec / np.cos(dec_rad)) ** 2
-        + (dec_err * ra_offset_arcsec * u.arcsec * np.tan(dec_rad) / np.cos(dec_rad)) ** 2
+        + ((ra_offset_arcsec_err*u.arcsec) / np.cos(dec_rad)) ** 2
+        + (dec_err.to(u.radian).value * (ra_offset_arcsec * u.arcsec) * np.tan(dec_rad) / np.cos(dec_rad)) ** 2
     ) ** 0.5
     ra_err_corrected = ra_err_corrected.to(u.arcsec)
+    logger.debug(f"ra_err_corrected: {ra_err_corrected}")
+    logger.debug(f"ra_err: {ra_err}")
+    logger.debug(f"ra_offset_arcsec: {ra_offset_arcsec}")
 
-    dec_err_corrected = (dec_err**2 + (dec_offset_arcsec_err * u.arcsec) ** 2) ** 0.5
+    dec_err_corrected = ((dec_err.to(u.radian))**2 + ((dec_offset_arcsec_err * u.arcsec).to(u.radian)) ** 2) ** 0.5
+    logger.debug(f"dec_err_corrected: {dec_err_corrected}")
     dec_err_corrected = dec_err_corrected.to(u.arcsec)
+    logger.debug(f"dec_err_corrected: {dec_err_corrected}")
+    logger.debug(f"ra_err: {ra_err}")
 
     votable.array["col_ra_deg_cont"] = np.ma.array(
         coords_corrected.ra.deg, mask=votable.array["col_ra_deg_cont"].mask
