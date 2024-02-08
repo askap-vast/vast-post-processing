@@ -502,7 +502,7 @@ def crop_image(
     logger.debug(f"corrected_fits: {corrected_fits}")
 
     # Iterate over each image to crop and write to a new directory
-    for i, path in enumerate((rms_path, bkg_path, image_path)):
+    for i, path in enumerate((image_path, rms_path, bkg_path)):
         # Display progress if requested
         logger.info(f"Cropping {path}")
 
