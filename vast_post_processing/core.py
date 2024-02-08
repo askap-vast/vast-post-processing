@@ -523,6 +523,7 @@ def crop_image(
         image_hdu = corrected_fits[i]
         hdul = None
         if type(image_hdu) is fits.HDUList:
+            logger.debug("image HDU is a HDUlist. Pulling out 0th element")
             hdul = image_hdu
             image_hdu = hdul[0]
 
@@ -536,8 +537,11 @@ def crop_image(
         if hdul is not None:
             # astropy fits requires the 0th element of a HDUList to be a
             # PrimaryHDU object. So we add a dummy one...
-            primary_hdu = fits.PrimaryHDU()
-            hdus = [primary_hdu, processed_hdu]
+            if type(processed_hdu) != fits.PrimaryHDU:
+                primary_hdu = fits.PrimaryHDU()
+                hdus = [primary_hdu, processed_hdu]
+            else:
+                hdus = [processed_hdu]
             if len(hdul) > 0:
                 hdus.extend(hdul[1:])
 
@@ -880,7 +884,11 @@ def run(
         )
         if type(cropped_hdu) == fits.HDUList:
             # image HDU is the 1th element because of dummy PrimaryHDU
-            cropped_image_hdu = cropped_hdu[1]
+            if compress:
+                image_hdu_index = 1
+            else:
+                image_hdu_index = 0
+            cropped_image_hdu = cropped_hdu[image_hdu_index]
         else:
             cropped_image_hdu = cropped_hdu
 
