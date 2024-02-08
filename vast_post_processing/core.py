@@ -523,11 +523,9 @@ def crop_image(
         image_hdu = corrected_fits[i]
         hdul = None
         if type(image_hdu) is fits.HDUList:
-            logger.debug("image HDU is a HDUlist")
+            logger.debug("image HDU is a HDUlist. Pulling out 0th element")
             hdul = image_hdu
             image_hdu = hdul[0]
-            logger.debug(f"hdul: {hdul}")
-            logger.debug(f"image_hdu: {image_hdu}")
 
         field_centre = crop.get_field_centre(image_hdu.header)
         cropped_hdu = crop.crop_hdu(image_hdu, field_centre, size=crop_size)
@@ -549,7 +547,6 @@ def crop_image(
 
             processed_hdu = fits.HDUList(hdus=hdus)
 
-        logger.debug(processed_hdu)
         # Write processed image to disk and update history
         processed_hdu.writeto(outfile, overwrite=overwrite)
 
