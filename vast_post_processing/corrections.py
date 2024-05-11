@@ -53,12 +53,14 @@ def vast_xmatch_qc(
     psf: Optional[Tuple[float, float]] = None,
     fix_m: bool = False,
     fix_b: bool = False,
+    init_m: float = 1,
+    init_b: float = 0,
     positional_unit: u.Unit = u.Unit("arcsec"),
     flux_unit: u.Unit = u.Unit("mJy"),
     flux_limit: float = 0,
     snr_limit: float = 20,
     nneighbor: float = 1,
-    outlier_lim: float = 3,
+    flux_ratio_sigma_clip: float = 5,
     apply_flux_limit: bool = True,
     select_point_sources: bool = True,
     crossmatch_output: Optional[str] = None,
@@ -88,6 +90,10 @@ def vast_xmatch_qc(
     fix_b : bool, optional
         Flag to fix intercept, by default False.
         TODO re: linear fit - variable or fixed slope?
+    init_m : float
+        Initial gradient parameter passed to the fitting function, default 1.0.
+    init_b : float
+        Initial offset parameter passed to the fitting function, default 0.0.
     positional_unit : u.Unit, optional
         Output unit of astrometric offset, by default u.Unit("arcsec").
     flux_unit : u.Unit, optional
@@ -101,6 +107,8 @@ def vast_xmatch_qc(
         that source, by default 1.
     apply_flux_limit : bool, optional
         Flag to apply flux limit, by default True.
+    flux_ratio_sigma_clip : float, optional
+        Reject all the points outside this value of standard deviation
     select_point_sources : bool, optional
         Flag to select point sources, by default True.
     crossmatch_output : Optional[str], optional
@@ -158,11 +166,26 @@ def vast_xmatch_qc(
     mask &= xmatch_qt["has_siblings_reference"] == 0
 
     # Also use a mask to try to remove outliers
-    mask &= ~(
-        sigma_clip(
-            data=xmatch_qt["flux_peak_ratio"], sigma=outlier_lim, maxiters=None
-        ).mask
+    # Do an interative fitting that reoves all the outilers
+    # beyond n-sigma standard deviation where n is the flux_ratio_sigma_clip
+    sigma_clip_mask = sigma_clip(
+        data=xmatch_qt["flux_peak_ratio"],
+        sigma=flux_ratio_sigma_clip,
+        maxiters=None,
+    ).mask
+
+    sigma_clip_ratio = sigma_clip_mask.sum() / len(xmatch_qt)
+
+    logger.info(
+        f"{sigma_clip_mask.sum()} sources have been clipped out for variability."
     )
+
+    if sigma_clip_ratio > 0.5:
+        logger.warning(
+            f"{sigma_clip_ratio * 100:.2f}% sources are removed for variability."
+        )
+
+    mask &= ~(sigma_clip_mask)
 
     data = xmatch_qt[mask]
     logger.info(
@@ -188,7 +211,7 @@ def vast_xmatch_qc(
 
     # Calculate flux offsets and ratio
     gradient, offset, gradient_err, offset_err = calculate_flux_offsets(
-        data, fix_m=fix_m, fix_b=fix_b
+        data, fix_m=fix_m, fix_b=fix_b, init_m=init_m, init_b=init_b
     )
     ugradient = ufloat(gradient, gradient_err)
     uoffset = ufloat(offset.to(flux_unit).value, offset_err.to(flux_unit).value)
@@ -701,7 +724,11 @@ def correct_field(
     flux_limit: float = 0,
     snr_limit: float = 20,
     nneighbor: float = 1,
-    outlier_lim: float = 3,
+    flux_ratio_sigma_clip: float = 5,
+    fix_m: bool = False,
+    fix_b: bool = True,
+    init_m: float = 1,
+    init_b: float = 0,
     apply_flux_limit: bool = True,
     select_point_sources: bool = True,
     write_output: bool = True,
@@ -722,6 +749,16 @@ def correct_field(
         condon (bool, optional): Flag to replace errros with Condon errors. Defaults to True.
         psf_ref (list[float], optional): PSF information of the reference catalog. Defaults to None.
         psf (list[float], optional): PSF information of the input catalog. Defaults to None.
+        init_m : float
+            Initial gradient parameter passed to the fitting function, default 1.0.
+        init_b : float
+            Initial offset parameter passed to the fitting function, default 0.0.
+        fix_m : bool
+            If True, do not allow the gradient to vary during fitting, default False.
+        fix_b : bool
+            If True, do not allow the offest to vary during fitting, default False.
+        flux_ratio_sigma_clip : float, optional
+            Reject all the points outside this value of standard deviation
         write_output (bool, optional): Write the corrected image and catalog files or return the
             corrected hdul and the corrected table?. Defaults to True, which means to write
         outdir (str, optional): The stem of the output directory to write the files to
@@ -795,13 +832,15 @@ def correct_field(
                 condon=condon,
                 psf_reference=psf_reference,
                 psf=psf_image,
-                fix_m=False,
-                fix_b=False,
+                fix_m=fix_m,
+                fix_b=fix_b,
+                init_m=init_m,
+                init_b=init_b,
                 flux_limit=flux_limit,
                 snr_limit=snr_limit,
                 nneighbor=nneighbor,
                 apply_flux_limit=apply_flux_limit,
-                outlier_lim=outlier_lim,
+                flux_ratio_sigma_clip=flux_ratio_sigma_clip,
                 select_point_sources=select_point_sources,
                 crossmatch_output=crossmatch_file,
                 csv_output=csv_file,
@@ -847,6 +886,8 @@ def correct_field(
             else:
                 # Scaling images is fine, but be sure not to offset RMS image
                 if path == rms_path:
+                    # For RMS maps, additive offset should not be added since changing
+                    # the zero point of flux density should not change the noise level.
                     corrected_hdu = shift_and_scale_image(
                         path,
                         flux_scale=flux_corr_mult_value,
@@ -923,7 +964,11 @@ def correct_files(
     flux_limit: float = 0,
     snr_limit: float = 20,
     nneighbor: float = 1,
-    outlier_lim: float = 3,
+    fix_m: bool = False,
+    fix_b: bool = True,
+    init_m: float = 1,
+    init_b: float = 0,
+    flux_ratio_sigma_clip: float = 5,
     apply_flux_limit: bool = True,
     select_point_sources: bool = True,
     write_output: bool = True,
@@ -947,6 +992,16 @@ def correct_files(
         condon (bool, optional): Flag to replace errros with Condon errors. Defaults to True.
         psf_ref (list[float], optional): PSF information of the reference catalog. Defaults to None.
         psf (list[float], optional): PSF information of the input catalog. Defaults to None.
+        init_m : float
+            Initial gradient parameter passed to the fitting function, default 1.0.
+        init_b : float
+            Initial offset parameter passed to the fitting function, default 0.0.
+        fix_m : bool
+            If True, do not allow the gradient to vary during fitting, default False.
+        fix_b : bool
+            If True, do not allow the offest to vary during fitting, default False.
+        flux_ratio_sigma_clip (float, optional):
+            Reject all the points outside this value of standard deviation
         write_output (bool, optional): Write the corrected image and catalog files or return the
             corrected hdul and the corrected table?. Defaults to True, which means to write
         outdir (str, optional): The stem of the output directory to write the files to
@@ -1003,7 +1058,11 @@ def correct_files(
                     psf=psf,
                     flux_limit=flux_limit,
                     snr_limit=snr_limit,
-                    outlier_lim=outlier_lim,
+                    fix_m=fix_m,
+                    fix_b=fix_b,
+                    init_m=init_m,
+                    init_b=init_b,
+                    flux_ratio_sigma_clip=flux_ratio_sigma_clip,
                     nneighbor=nneighbor,
                     apply_flux_limit=apply_flux_limit,
                     select_point_sources=select_point_sources,
