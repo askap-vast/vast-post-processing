@@ -169,7 +169,7 @@ def vast_xmatch_qc(
     # Do an interative fitting that reoves all the outilers
     # beyond n-sigma standard deviation where n is the flux_ratio_sigma_clip
     sigma_clip_mask = sigma_clip(
-        data=xmatch_qt["flux_peak_ratio"],
+        data=np.asarray(xmatch_qt["flux_peak_ratio"]),
         sigma=flux_ratio_sigma_clip,
         maxiters=None,
     ).mask
