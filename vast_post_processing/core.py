@@ -30,7 +30,7 @@ configuration for a run.
 """
 
 
-NEWEST_EPOCH: int = 42
+NEWEST_EPOCH: int = 57
 """Newest epoch whose data is available on the VAST data server.
 """
 
