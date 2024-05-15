@@ -1,7 +1,6 @@
 """Core Pipeline Entry Point for VAST Post-Processing.
 """
 
-
 # Imports
 
 
@@ -154,7 +153,21 @@ def setup_configuration(
     overwrite: Optional[bool] = None,
     verbose: Optional[bool] = None,
     debug: Optional[bool] = None,
-) -> tuple[Path, Path, list[str], list[int], u.Quantity, bool, bool, str, str, str, bool, bool, bool]:
+) -> tuple[
+    Path,
+    Path,
+    list[str],
+    list[int],
+    u.Quantity,
+    bool,
+    bool,
+    str,
+    str,
+    str,
+    bool,
+    bool,
+    bool,
+]:
     """Set up the configuration settings for this run.
 
     Parameters
@@ -201,8 +214,7 @@ def setup_configuration(
         Valid configuration settings for this run.
     """
     # Load in default configuration
-    default_config = yaml.safe_load(
-        open(DATA_DIRECTORY / "default_config.yaml"))
+    default_config = yaml.safe_load(open(DATA_DIRECTORY / "default_config.yaml"))
 
     # Load in user configuration if passed and valid, otherwise create empty
     # dict
@@ -262,7 +274,7 @@ def get_image_paths(
     verbose: bool,
     debug: bool,
     image_type: str = "IMAGES",
-    processed_dir_suffix: str = "PROCESSED"
+    processed_dir_suffix: str = "PROCESSED",
 ) -> list[Path]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
@@ -329,8 +341,7 @@ def get_image_paths(
         # Check for processed data if Stokes V
         if parameter == "V":
             # Display progress if requested
-            logger.info(
-                "Checking corresponding Stokes I files have been processed.")
+            logger.info("Checking corresponding Stokes I files have been processed.")
 
             # Get list of Stokes I processed image paths as str
             # NOTE image_type may change in future development
@@ -354,7 +365,9 @@ def get_image_paths(
                 # Get expected path of processed corresponding Stokes I image
                 split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
                 str_path_i = (
-                    split_str_path_v[0] + f"STOKESI_IMAGES_{processed_dir_suffix}" + split_str_path_v[1].replace("image.v", "image.i")
+                    split_str_path_v[0]
+                    + f"STOKESI_IMAGES_{processed_dir_suffix}"
+                    + split_str_path_v[1].replace("image.v", "image.i")
                 )
 
                 # If processed path is not found, terminate run
@@ -458,8 +471,8 @@ def crop_image(
     overwrite: bool,
     verbose: bool,
     debug: bool,
-    file_extension: str = '.processed.fits',
-    processed_dir_suffix = "PROCESSED",
+    file_extension: str = ".processed.fits",
+    processed_dir_suffix="PROCESSED",
 ) -> tuple[SkyCoord, fits.PrimaryHDU]:
     """Crop and compress data corresponding to image data.
 
@@ -517,7 +530,7 @@ def crop_image(
 
         # Crop image data
         if file_extension is None or file_extension == "":
-            file_extension = '.fits'
+            file_extension = ".fits"
         out_name = path.name.replace(".fits", file_extension)
         outfile = fits_output_dir / out_name
         image_hdu = corrected_fits[i]
@@ -568,8 +581,8 @@ def crop_catalogs(
     overwrite: bool,
     verbose: bool,
     debug: bool,
-    file_extension: str = '.processed.xml',
-    processed_dir_suffix: str = 'PROCESSED',
+    file_extension: str = ".processed.xml",
+    processed_dir_suffix: str = "PROCESSED",
 ):
     """Crop field catalogues.
 
@@ -608,10 +621,10 @@ def crop_catalogs(
     cat_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Iterate over each catalogue xml file corresponding to a field
-    for i, path in enumerate((components_path, )):
+    for i, path in enumerate((components_path,)):
         # Path to output file
         if file_extension is None or file_extension == "":
-            file_extension = '.xml'
+            file_extension = ".xml"
         out_name = path.name.replace(".xml", file_extension)
         outfile = cat_output_dir / out_name
 
@@ -623,8 +636,7 @@ def crop_catalogs(
 
         # This uses the last cropped hdu from the previous for loop
         # which should be the image file, but doesn't actually matter
-        cropped_vot = crop.crop_catalogue(
-            vot, cropped_hdu, field_centre, crop_size)
+        cropped_vot = crop.crop_catalogue(vot, cropped_hdu, field_centre, crop_size)
 
         # Add git hash
         catutils.add_hash_to_cat(cropped_vot)
@@ -648,7 +660,7 @@ def create_mocs(
     overwrite: bool,
     verbose: bool,
     debug: bool,
-    processed_dir_suffix: str = 'PROCESSED',
+    processed_dir_suffix: str = "PROCESSED",
 ):
     """Create a MOC and STMOC for a given field image.
 
@@ -801,7 +813,7 @@ def run(
     # Set up logger
     main_logger = logutils.setup_logger(verbose=verbose, debug=debug)
 
-    if stokes != ['I'] and stokes != 'I' and create_moc:
+    if stokes != ["I"] and stokes != "I" and create_moc:
         main_logger.warning("Stokes != I, so setting create_moc=False")
         create_moc = False
 
@@ -816,7 +828,7 @@ def run(
         epoch=epoch,
         processed_dir_suffix=directory_suffix,
         verbose=verbose,
-        debug=debug
+        debug=debug,
     )
 
     # Display paths if requested
@@ -832,7 +844,7 @@ def run(
         field, sbid = misc.get_field_and_sbid(image_path)
 
         # Get and verify relevant paths for this file
-        rms_path, bkg_path, components_path  = get_corresponding_paths(
+        rms_path, bkg_path, components_path = get_corresponding_paths(
             data_root=data_root,
             image_path=image_path,
             stokes=stokes_dir,
@@ -850,7 +862,7 @@ def run(
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
-            write_output=False
+            write_output=False,
         )
 
         # Display corrected files if requested
@@ -905,7 +917,7 @@ def run(
             overwrite=overwrite,
             verbose=verbose,
             debug=debug,
-            processed_dir_suffix=directory_suffix
+            processed_dir_suffix=directory_suffix,
         )
 
         # Create MOCs
@@ -919,5 +931,5 @@ def run(
                 overwrite=overwrite,
                 verbose=verbose,
                 debug=debug,
-                processed_dir_suffix=directory_suffix
+                processed_dir_suffix=directory_suffix,
             )

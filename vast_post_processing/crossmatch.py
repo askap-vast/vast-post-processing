@@ -1,7 +1,6 @@
 """Cross-match sources in VAST image observations.
 """
 
-
 # Imports
 
 

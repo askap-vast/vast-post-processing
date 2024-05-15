@@ -1,7 +1,6 @@
 """Apply various corrections to FITS image files. 
 """
 
-
 # Imports
 
 
@@ -22,6 +21,7 @@ from astropy.io.votable import parse
 from astropy.io.votable.tree import Param, VOTableFile, Table
 from astropy.wcs import WCS, FITSFixedWarning
 from astropy.coordinates import SkyCoord, Angle
+from astropy.stats import sigma_clip
 import astropy.units as u
 
 from .catalogs import Catalog
@@ -53,11 +53,14 @@ def vast_xmatch_qc(
     psf: Optional[Tuple[float, float]] = None,
     fix_m: bool = False,
     fix_b: bool = False,
+    init_m: float = 1,
+    init_b: float = 0,
     positional_unit: u.Unit = u.Unit("arcsec"),
     flux_unit: u.Unit = u.Unit("mJy"),
     flux_limit: float = 0,
     snr_limit: float = 20,
     nneighbor: float = 1,
+    flux_ratio_sigma_clip: float = 5,
     apply_flux_limit: bool = True,
     select_point_sources: bool = True,
     crossmatch_output: Optional[str] = None,
@@ -87,6 +90,10 @@ def vast_xmatch_qc(
     fix_b : bool, optional
         Flag to fix intercept, by default False.
         TODO re: linear fit - variable or fixed slope?
+    init_m : float
+        Initial gradient parameter passed to the fitting function, default 1.0.
+    init_b : float
+        Initial offset parameter passed to the fitting function, default 0.0.
     positional_unit : u.Unit, optional
         Output unit of astrometric offset, by default u.Unit("arcsec").
     flux_unit : u.Unit, optional
@@ -100,6 +107,8 @@ def vast_xmatch_qc(
         that source, by default 1.
     apply_flux_limit : bool, optional
         Flag to apply flux limit, by default True.
+    flux_ratio_sigma_clip : float, optional
+        Reject all the points outside this value of standard deviation
     select_point_sources : bool, optional
         Flag to select point sources, by default True.
     crossmatch_output : Optional[str], optional
@@ -155,6 +164,29 @@ def vast_xmatch_qc(
     mask &= xmatch_qt["flux_peak_err_reference"] > 0
     mask &= xmatch_qt["has_siblings"] == 0
     mask &= xmatch_qt["has_siblings_reference"] == 0
+
+    # Also use a mask to try to remove outliers
+    # Do an interative fitting that reoves all the outilers
+    # beyond n-sigma standard deviation where n is the flux_ratio_sigma_clip
+    sigma_clip_mask = sigma_clip(
+        data=np.asarray(xmatch_qt["flux_peak_ratio"]),
+        sigma=flux_ratio_sigma_clip,
+        maxiters=None,
+    ).mask
+
+    sigma_clip_ratio = sigma_clip_mask.sum() / len(xmatch_qt)
+
+    logger.info(
+        f"{sigma_clip_mask.sum()} sources have been clipped out for variability."
+    )
+
+    if sigma_clip_ratio > 0.5:
+        logger.warning(
+            f"{sigma_clip_ratio * 100:.2f}% sources are removed for variability."
+        )
+
+    mask &= ~(sigma_clip_mask)
+
     data = xmatch_qt[mask]
     logger.info(
         f"{len(data):.0f} crossmatched sources remaining"
@@ -179,7 +211,7 @@ def vast_xmatch_qc(
 
     # Calculate flux offsets and ratio
     gradient, offset, gradient_err, offset_err = calculate_flux_offsets(
-        data, fix_m=fix_m, fix_b=fix_b
+        data, fix_m=fix_m, fix_b=fix_b, init_m=init_m, init_b=init_b
     )
     ugradient = ufloat(gradient, gradient_err)
     uoffset = ufloat(offset.to(flux_unit).value, offset_err.to(flux_unit).value)
@@ -292,7 +324,7 @@ def shift_and_scale_image(
     else:
         data_unit = u.mJy
 
-    flux_offset = (flux_offset_mJy*u.mJy).to(data_unit)
+    flux_offset = (flux_offset_mJy * u.mJy).to(data_unit)
     image_hdu.data = flux_scale * image_hdu.data + flux_offset.value
 
     image_hdu.header["FLUXOFF"] = flux_offset.value
@@ -393,15 +425,15 @@ def shift_and_scale_catalog(
         "col_flux_int_err",
     )
 
-    COMPONENT_FLUX_COLS = (
+    COMPONENT_FLUX_RES_COLS = (
         "col_rms_fit_gauss",
         "col_rms_image",
     )
 
     # Flux-unit columns in the island catalogs only
-    ISLAND_FLUX_COLS = (
-        "col_mean_background",
-        "col_background_noise",
+    ISLAND_FLUX_COLS = ("col_mean_background",)
+    ISLAND_FLUX_ERR_COLS = ("col_background_noise",)
+    ISLAND_FLUX_RES_COLS = (
         "col_max_residual",
         "col_min_residual",
         "col_mean_residual",
@@ -434,15 +466,24 @@ def shift_and_scale_catalog(
     # Add position corrections
     ra_err_corrected = (
         ra_err**2
-        + ((ra_offset_arcsec_err*u.arcsec) / np.cos(dec_rad)) ** 2
-        + (dec_err.to(u.radian).value * (ra_offset_arcsec * u.arcsec) * np.tan(dec_rad) / np.cos(dec_rad)) ** 2
+        + ((ra_offset_arcsec_err * u.arcsec) / np.cos(dec_rad)) ** 2
+        + (
+            dec_err.to(u.radian).value
+            * (ra_offset_arcsec * u.arcsec)
+            * np.tan(dec_rad)
+            / np.cos(dec_rad)
+        )
+        ** 2
     ) ** 0.5
     ra_err_corrected = ra_err_corrected.to(u.arcsec)
     logger.debug(f"ra_err_corrected: {ra_err_corrected}")
     logger.debug(f"ra_err: {ra_err}")
     logger.debug(f"ra_offset_arcsec: {ra_offset_arcsec}")
 
-    dec_err_corrected = ((dec_err.to(u.radian))**2 + ((dec_offset_arcsec_err * u.arcsec).to(u.radian)) ** 2) ** 0.5
+    dec_err_corrected = (
+        (dec_err.to(u.radian)) ** 2
+        + ((dec_offset_arcsec_err * u.arcsec).to(u.radian)) ** 2
+    ) ** 0.5
     logger.debug(f"dec_err_corrected: {dec_err_corrected}")
     dec_err_corrected = dec_err_corrected.to(u.arcsec)
     logger.debug(f"dec_err_corrected: {dec_err_corrected}")
@@ -472,19 +513,24 @@ def shift_and_scale_catalog(
     )
 
     # Correct flux columns
-    cols = (
-        FLUX_COLS + ISLAND_FLUX_COLS if is_island else FLUX_COLS + COMPONENT_FLUX_COLS
-    )
+    # cols = FLUX_COLS + ISLAND_FLUX_COLS if is_island else FLUX_COLS
+    flux_cols = FLUX_COLS + ISLAND_FLUX_COLS if is_island else FLUX_COLS
+    rms_cols = FLUX_ERR_COLS + ISLAND_FLUX_ERR_COLS if is_island else FLUX_ERR_COLS
 
-    for col in cols:
+    for col in flux_cols:
         votable.array[col] = flux_scale * votable.array[col] + flux_offset_mJy
 
-    for f in zip(FLUX_COLS, FLUX_ERR_COLS):
+    for f in zip(flux_cols, rms_cols):
         votable.array[f[1]] = (
             flux_scale_err**2 * votable.array[f[0]] ** 2
             + flux_scale**2 * votable.array[f[1]] ** 2
             + flux_offset_mJy_err**2
         ) ** 0.5
+
+    # Now come to residuals and just scale them, no offset
+    res_cols = ISLAND_FLUX_RES_COLS if is_island else COMPONENT_FLUX_RES_COLS
+    for col in res_cols:
+        votable.array[col] = flux_scale * votable.array[col]
 
     # Add in the corrections to the votable
     flux_scl_param = Param(
@@ -659,16 +705,12 @@ def check_for_files(image_path: str, stokes: str = "I"):
     catalog_filepath = f"{catalog_root}/{catalog_filename}"
 
     component_file = Path(catalog_filepath)
-    
+
     skip = (
-        not (
-            (rms_path.exists())
-            and (bkg_path.exists())
-            and (component_file.exists())
-        )
+        not ((rms_path.exists()) and (bkg_path.exists()) and (component_file.exists()))
         or skip
     )
-    return skip, (bkg_path, rms_path, component_file )
+    return skip, (bkg_path, rms_path, component_file)
 
 
 def correct_field(
@@ -682,6 +724,11 @@ def correct_field(
     flux_limit: float = 0,
     snr_limit: float = 20,
     nneighbor: float = 1,
+    flux_ratio_sigma_clip: float = 5,
+    fix_m: bool = False,
+    fix_b: bool = True,
+    init_m: float = 1,
+    init_b: float = 0,
     apply_flux_limit: bool = True,
     select_point_sources: bool = True,
     write_output: bool = True,
@@ -702,6 +749,16 @@ def correct_field(
         condon (bool, optional): Flag to replace errros with Condon errors. Defaults to True.
         psf_ref (list[float], optional): PSF information of the reference catalog. Defaults to None.
         psf (list[float], optional): PSF information of the input catalog. Defaults to None.
+        init_m : float
+            Initial gradient parameter passed to the fitting function, default 1.0.
+        init_b : float
+            Initial offset parameter passed to the fitting function, default 0.0.
+        fix_m : bool
+            If True, do not allow the gradient to vary during fitting, default False.
+        fix_b : bool
+            If True, do not allow the offest to vary during fitting, default False.
+        flux_ratio_sigma_clip : float, optional
+            Reject all the points outside this value of standard deviation
         write_output (bool, optional): Write the corrected image and catalog files or return the
             corrected hdul and the corrected table?. Defaults to True, which means to write
         outdir (str, optional): The stem of the output directory to write the files to
@@ -775,12 +832,15 @@ def correct_field(
                 condon=condon,
                 psf_reference=psf_reference,
                 psf=psf_image,
-                fix_m=False,
-                fix_b=False,
+                fix_m=fix_m,
+                fix_b=fix_b,
+                init_m=init_m,
+                init_b=init_b,
                 flux_limit=flux_limit,
                 snr_limit=snr_limit,
                 nneighbor=nneighbor,
                 apply_flux_limit=apply_flux_limit,
+                flux_ratio_sigma_clip=flux_ratio_sigma_clip,
                 select_point_sources=select_point_sources,
                 crossmatch_output=crossmatch_file,
                 csv_output=csv_file,
@@ -824,13 +884,25 @@ def correct_field(
             if output_path.exists() and not overwrite:
                 logger.warning(f"Will not overwrite existing image: {output_path}.")
             else:
-                corrected_hdu = shift_and_scale_image(
-                    path,
-                    flux_scale=flux_corr_mult_value,
-                    flux_offset_mJy=flux_corr_add_value,
-                    ra_offset_arcsec=dra_median_value,
-                    dec_offset_arcsec=ddec_median_value,
-                )
+                # Scaling images is fine, but be sure not to offset RMS image
+                if path == rms_path:
+                    # For RMS maps, additive offset should not be added since changing
+                    # the zero point of flux density should not change the noise level.
+                    corrected_hdu = shift_and_scale_image(
+                        path,
+                        flux_scale=flux_corr_mult_value,
+                        flux_offset_mJy=0.0,
+                        ra_offset_arcsec=dra_median_value,
+                        dec_offset_arcsec=ddec_median_value,
+                    )
+                else:
+                    corrected_hdu = shift_and_scale_image(
+                        path,
+                        flux_scale=flux_corr_mult_value,
+                        flux_offset_mJy=flux_corr_add_value,
+                        ra_offset_arcsec=dra_median_value,
+                        dec_offset_arcsec=ddec_median_value,
+                    )
                 if write_output:
                     output_dir.mkdir(parents=True, exist_ok=True)
                     if output_path.exists() and overwrite:
@@ -843,7 +915,7 @@ def correct_field(
 
         # Do the same for catalog files
         corrected_catalogs = []
-        for path in (component_file, ):
+        for path in (component_file,):
             stokes_dir = f"{path.parent.parent.name}_CORRECTED"
             output_dir = outdir / stokes_dir / epoch_dir
             output_path = output_dir / path.with_suffix(".corrected.xml").name
@@ -892,6 +964,11 @@ def correct_files(
     flux_limit: float = 0,
     snr_limit: float = 20,
     nneighbor: float = 1,
+    fix_m: bool = False,
+    fix_b: bool = True,
+    init_m: float = 1,
+    init_b: float = 0,
+    flux_ratio_sigma_clip: float = 5,
     apply_flux_limit: bool = True,
     select_point_sources: bool = True,
     write_output: bool = True,
@@ -915,6 +992,16 @@ def correct_files(
         condon (bool, optional): Flag to replace errros with Condon errors. Defaults to True.
         psf_ref (list[float], optional): PSF information of the reference catalog. Defaults to None.
         psf (list[float], optional): PSF information of the input catalog. Defaults to None.
+        init_m : float
+            Initial gradient parameter passed to the fitting function, default 1.0.
+        init_b : float
+            Initial offset parameter passed to the fitting function, default 0.0.
+        fix_m : bool
+            If True, do not allow the gradient to vary during fitting, default False.
+        fix_b : bool
+            If True, do not allow the offest to vary during fitting, default False.
+        flux_ratio_sigma_clip (float, optional):
+            Reject all the points outside this value of standard deviation
         write_output (bool, optional): Write the corrected image and catalog files or return the
             corrected hdul and the corrected table?. Defaults to True, which means to write
         outdir (str, optional): The stem of the output directory to write the files to
@@ -971,6 +1058,11 @@ def correct_files(
                     psf=psf,
                     flux_limit=flux_limit,
                     snr_limit=snr_limit,
+                    fix_m=fix_m,
+                    fix_b=fix_b,
+                    init_m=init_m,
+                    init_b=init_b,
+                    flux_ratio_sigma_clip=flux_ratio_sigma_clip,
                     nneighbor=nneighbor,
                     apply_flux_limit=apply_flux_limit,
                     select_point_sources=select_point_sources,
