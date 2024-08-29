@@ -30,7 +30,7 @@ create_moc: True
 # Flag to compress data following pipeline, by default True. 
 compress: True
 
-#Compression quantisation level to use, by default 1024. 
+# Compression quantisation level to use, by default 1024. 
 compress_quant: 1024
 
 # Suffix to use for processed data directories
