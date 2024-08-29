@@ -30,7 +30,7 @@ configuration for a run.
 """
 
 
-NEWEST_EPOCH: int = 42
+NEWEST_EPOCH: int = 1000
 """Newest epoch whose data is available on the VAST data server.
 """
 
@@ -703,7 +703,7 @@ def create_mocs(
     logger.info(f"Generating MOC for {image_path}")
 
     # Define path to MOC output file
-    moc_dir = f"STOKES{stokes}_MOC_{processed_dir_suffix}"
+    moc_dir = f"STOKES{stokes}_MOCS_{processed_dir_suffix}"
     moc_output_dir = Path(out_root / moc_dir / epoch_dir).resolve()
     moc_output_dir.mkdir(parents=True, exist_ok=True)
     moc_filename = image_path.name.replace(".fits", ".moc.fits")
