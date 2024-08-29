@@ -80,6 +80,9 @@ def main(
     compress: Optional[bool] = typer.Option(
         None, help=("Compress all processed FITS files")
     ),
+    compress_quant: Optional[int] = typer.Option(
+        None, help=("Compression quantisation to use, if compressing.")
+    ),
     directory_suffix: Optional[str] = typer.Option(
         None, help=("Suffix to use for processed data directories. For "
                     "example, passing 'PROCESSED' results in images being "
@@ -116,6 +119,7 @@ def main(
         crop_size,
         create_moc,
         compress,
+        compress_quant,
         directory_suffix,
         cat_extension,
         fits_extension,
