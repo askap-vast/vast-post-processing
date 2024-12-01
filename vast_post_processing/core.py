@@ -108,8 +108,6 @@ def setup_configuration_variable(
             for epoch in value:
                 if isinstance(epoch, str):
                     epoch = int(epoch.replace('x', ''))
-                if (epoch < 1):
-                    raise ValueError(f"Cannot process epoch {epoch} as it is the reference.")
 
         # If variable is crop size, test that it is a possible angle
         elif name == "crop_size":
