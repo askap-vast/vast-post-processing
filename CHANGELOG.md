@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Generalised reference catalogue path [#108](https://github.com/askap-vast/vast-post-processing/pull/108)
 ### Fixed
 
 - Fixed astrometric correction error - corrections were being applied in the wrong direction, resulting in the offset doubling [#104](https://github.com/askap-vast/vast-post-processing/pull/104)
@@ -23,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### List of PRs
 
+- [#108](https://github.com/askap-vast/vast-post-processing/pull/108): feat: Generalised reference catalogue path
 - [#104](https://github.com/askap-vast/vast-post-processing/pull/104): fix: Fix error in astrometric correction application
 - [#101](https://github.com/askap-vast/vast-post-processing/pull/101): feat: Allow users to specify quantisation level
 - [#106](https://github.com/askap-vast/vast-post-processing/pull/106): docs: Added changelog
