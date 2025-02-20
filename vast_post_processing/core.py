@@ -142,6 +142,7 @@ def setup_configuration(
     crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
+    compress_quant: Optional[int] = None,
     directory_suffix: Optional[str] = None,
     cat_extension: Optional[str] = None,
     fits_extension: Optional[str] = None,
@@ -156,6 +157,7 @@ def setup_configuration(
     u.Quantity,
     bool,
     bool,
+    int,
     str,
     str,
     str,
@@ -187,6 +189,8 @@ def setup_configuration(
         Flag to create MOCs, by default None.
     compress : Optional[bool], optional
         Flag to compress files, by default None.
+    compress_quant : Optional[int], optional
+        Compression quantisation level to use, by default None.
     directory_suffix : Optional[str], optional
         Suffix to use for processed data directories (for example
         `STOKESI_IMAGES_PROCESSED`), by default None.
@@ -234,6 +238,7 @@ def setup_configuration(
         "crop_size": crop_size,
         "create_moc": create_moc,
         "compress": compress,
+        "compress_quant": compress_quant,
         "directory_suffix": directory_suffix,
         "cat_extension": cat_extension,
         "fits_extension": fits_extension,
@@ -463,6 +468,7 @@ def crop_image(
     corrected_fits: list[Union[fits.PrimaryHDU, fits.HDUList]],
     crop_size: u.Quantity,
     compress: bool,
+    compress_quant: int,
     overwrite: bool,
     verbose: bool,
     debug: bool,
@@ -489,6 +495,8 @@ def crop_image(
         Angular size of crop to be applied.
     compress : bool
         Flag to compress image data.
+    compress_quant : int
+        Compression quantisation to use.
     overwrite : bool
         Flag to overwrite image data.
     verbose : bool
@@ -539,7 +547,12 @@ def crop_image(
         cropped_hdu = crop.crop_hdu(image_hdu, field_centre, size=crop_size)
 
         # Compress image if requested
-        processed_hdu = compress_hdu(cropped_hdu) if compress else cropped_hdu
+        if compress:
+            processed_hdu = compress_hdu(cropped_hdu,
+                                         quantize_level=compress_quant
+                                         )
+        else:
+            processed_hdu = cropped_hdu
         fitsutils.update_header_history(processed_hdu.header)
 
         if hdul is not None:
@@ -724,6 +737,7 @@ def run(
     crop_size: Optional[float] = None,
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
+    compress_quant: Optional[int] = None,
     directory_suffix: Optional[str] = None,
     cat_extension: Optional[str] = None,
     fits_extension: Optional[str] = None,
@@ -755,6 +769,8 @@ def run(
         Flag to create MOCs, by default None.
     compress : Optional[bool], optional
         Flag to compress files, by default None.
+    compress_quant : Optional[int], optional
+        Compression quantisation to use, by default None.
     directory_suffix : Optional[str], optional
         Suffix to use for processed data directories (for example
         `STOKESI_IMAGES_PROCESSED`), by default None.
@@ -781,6 +797,7 @@ def run(
         crop_size,
         create_moc,
         compress,
+        compress_quant,
         directory_suffix,
         cat_extension,
         fits_extension,
@@ -797,6 +814,7 @@ def run(
         crop_size=crop_size,
         create_moc=create_moc,
         compress=compress,
+        compress_quant=compress_quant,
         directory_suffix=directory_suffix,
         cat_extension=cat_extension,
         fits_extension=fits_extension,
@@ -887,6 +905,7 @@ def run(
             verbose=verbose,
             debug=debug,
             compress=compress,
+            compress_quant=compress_quant,
             processed_dir_suffix=directory_suffix,
         )
         if type(cropped_hdu) == fits.HDUList:
