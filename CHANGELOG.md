@@ -8,11 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- Allow users to specify quantisation level [#101](https://github.com/askap-vast/vast-post-processing/pull/101)
 - Added changelog [#106](https://github.com/askap-vast/vast-post-processing/pull/106)
 
 ### Changed
 
 ### Fixed
+
+- Fixed astrometric correction error - corrections were being applied in the wrong direction, resulting in the offset doubling [#104](https://github.com/askap-vast/vast-post-processing/pull/104)
 
 ### Removed
 
@@ -20,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### List of PRs
 
+- [#104](https://github.com/askap-vast/vast-post-processing/pull/104): fix: Fix error in astrometric correction application
+- [#101](https://github.com/askap-vast/vast-post-processing/pull/101): feat: Allow users to specify quantisation level
 - [#106](https://github.com/askap-vast/vast-post-processing/pull/106): docs: Added changelog
 - [#107](https://github.com/askap-vast/vast-post-processing/pull/107): fix: Removed hardcoded newest epoch variable
 

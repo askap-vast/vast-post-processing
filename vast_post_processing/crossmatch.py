@@ -108,9 +108,9 @@ def crossmatch_qtables(
         [col.rstrip("_") for col in xmatch.colnames if col.endswith("_")],
     )
     # compute the separations
-    xmatch["separation"] = xmatch["coord_reference"].separation(xmatch["coord"])
-    xmatch["dra"], xmatch["ddec"] = xmatch["coord_reference"].spherical_offsets_to(
-        xmatch["coord"]
+    xmatch["separation"] = xmatch["coord"].separation(xmatch["coord_reference"])
+    xmatch["dra"], xmatch["ddec"] = xmatch["coord"].spherical_offsets_to(
+        xmatch["coord_reference"]
     )
     xmatch["flux_peak_ratio"] = (
         xmatch["flux_peak"] / xmatch["flux_peak_reference"]
