@@ -16,9 +16,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Removed
 
+- Removed hardcoded newest epoch variable [#107](https://github.com/askap-vast/vast-post-processing/pull/107)
+
 ### List of PRs
 
 - [#106](https://github.com/askap-vast/vast-post-processing/pull/106): docs: Added changelog
+- [#107](https://github.com/askap-vast/vast-post-processing/pull/107): fix: Removed hardcoded newest epoch variable
 
 ## [v2.0.0](https://github.com/askap-vast/vast-post-processing/releases/tag/v2.0.0) (2024-06-12)
 
