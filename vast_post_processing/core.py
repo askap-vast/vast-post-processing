@@ -30,11 +30,6 @@ configuration for a run.
 """
 
 
-NEWEST_EPOCH: int = 1000
-"""Newest epoch whose data is available on the VAST data server.
-"""
-
-
 logger: logging.Logger = logging.getLogger(__name__)
 """Global reference to the logger for this module.
 """
@@ -112,7 +107,7 @@ def setup_configuration_variable(
         # If variable is epoch number, test that it is an existing epoch
         elif name == "epoch":
             for epoch in value:
-                if (epoch < 1) or (epoch > NEWEST_EPOCH):
+                if epoch < 1:
                     raise ValueError(f"{epoch} is not a valid epoch.")
 
         # If variable is crop size, test that it is a possible angle
