@@ -636,7 +636,7 @@ def get_correct_file(correction_files_dir: list, img_field: str):
     if img_field[-1] == "A":
         img_field = img_field[:-1]
     img_field = img_field.replace("VAST", "RACS")
-    cat_glob_str = f"*{img_field}*restored.components.xml"
+    cat_glob_str = f"*{img_field}*.components.xml"
     matched_field = list(correction_files_dir.glob(cat_glob_str))
     if len(matched_field) > 0:
         # This means that there are multpile files with the same field,
