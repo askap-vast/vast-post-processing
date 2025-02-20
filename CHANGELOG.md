@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- Added changelog [#106](https://github.com/askap-vast/vast-post-processing/pull/106)
+
 ### Changed
 
 ### Fixed
@@ -16,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### List of PRs
 
+- [#106](https://github.com/askap-vast/vast-post-processing/pull/106): docs: Added changelog
 
 ## [v2.0.0](https://github.com/askap-vast/vast-post-processing/releases/tag/v2.0.0) (2024-06-12)
 
