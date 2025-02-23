@@ -33,6 +33,8 @@ SELAVY_COLUMN_UNITS: dict[str, u.Quantity] = {
     "dec_err": u.arcsec,
     "flux_peak": u.mJy / u.beam,
     "flux_peak_err": u.mJy / u.beam,
+    "flux_int": u.mJy / u.beam,
+    "flux_int_err": u.mJy / u.beam,
     "maj_axis": u.arcsec,
     "maj_axis_err": u.arcsec,
     "min_axis": u.arcsec,
@@ -53,6 +55,8 @@ AEGEAN_COLUMN_MAP: dict[str, tuple[str, u.Quantity]] = {
     "err_dec": ("dec_err", u.deg),
     "peak_flux": ("flux_peak", u.Jy / u.beam),
     "err_peak_flux": ("flux_peak_err", u.Jy / u.beam),
+    "int_flux": ("flux_int", u.Jy / u.beam),
+    "err_int_flux": ("flux_int_err", u.Jy / u.beam),
     "a": ("maj_axis", u.arcsec),
     "b": ("min_axis", u.arcsec),
     "pa": ("pos_ang", u.arcsec),
@@ -93,6 +97,7 @@ def read_selavy(catalog_path: Path) -> QTable:
         - `ra_deg_cont` and `dec_deg_cont`: degrees.
         - `ra_err` and `dec_err`: arcseconds.
         - `flux_peak` and `flux_peak_err`: mJy/beam.
+        - `flux_int` and `flux_int_err`: mJy/beam.
         - `maj_axis`, `maj_axis_err`, `min_axis`, `min_axis_err`: arcseconds.
         - `pos_ang` and `pos_ang_err`: degrees.
         - `rms_image`: mJy/beam.
@@ -150,6 +155,7 @@ def read_aegean_csv(catalog_path: Path) -> QTable:
         - `ra` and `dec`: degrees.
         - `err_ra` and `err_dec`: degrees.
         - `peak_flux` and `err_peak_flux`: Jy/beam.
+        - `int_flux` and `err_int_flux`: Jy/beam.
         - `a`, `err_a`, `b`, `err_b`: fitted semi-major and -minor axes in arcseconds.
         - `pa` and `err_pa`: degrees.
         - `local_rms`: Jy/beam.
@@ -326,7 +332,7 @@ class Catalog:
             lim = self.flux_lim
             flux_mask = flux_peak > lim
             logger.info(
-                f"Filtering {len(sources[~flux_mask])} sources with fluxes <= {lim}"
+                f"Filtering {len(sources[~flux_mask])} sources with peak fluxes <= {lim}"
             )
 
         # Add good psf flag

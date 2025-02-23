@@ -218,7 +218,7 @@ def vast_xmatch_qc(
     flux_corr_mult = 1 / ugradient
     flux_corr_add = -1 * uoffset
     logger.info(
-        f"ODR fit parameters: Sp = Sp,ref * {ugradient} + {uoffset} {flux_unit}.",
+        f"ODR fit parameters: Sint = Sint,ref * {ugradient} + {uoffset} {flux_unit}.",
     )
 
     # Write output to csv if requested
