@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Removed
 
+- Removed filtering on `has_siblings` as this should be already handled by the nearest-neighbour checks [#110](https://github.com/askap-vast/vast-post-processing/pull/110/)
 - Removed hardcoded newest epoch variable [#107](https://github.com/askap-vast/vast-post-processing/pull/107)
 
 ### List of PRs
