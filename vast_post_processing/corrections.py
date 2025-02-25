@@ -129,7 +129,7 @@ def vast_xmatch_qc(
     catalog_path = Path(catalog_path).resolve()
 
     # Add beam divisor as we currently only work with peak fluxes
-    flux_unit /= u.beam
+    #flux_unit /= u.beam
 
     # Create Catalog objects for the reference and pre-corrected catalogues
     reference_catalog = Catalog(
