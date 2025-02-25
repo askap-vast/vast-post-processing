@@ -240,9 +240,9 @@ class Catalog:
         self.input_format: Optional[str]
         self.flux_flag: Optional[bool]
         self.flux_lim: Optional[float]
-        self.field: Optional[str]
-        self.epoch: Optional[str]
-        self.sbid: Optional[str]
+        #self.field: Optional[str]
+        #self.epoch: Optional[str]
+        #self.sbid: Optional[str]
         self.psf_major: Optional[u.Quantity]
         self.psf_minor: Optional[u.Quantity]
         self.type: str
@@ -264,10 +264,10 @@ class Catalog:
         # Get epoch, field, sbid from the file name
         epoch_name = path.parent.name
         logger.debug(f"Building catalog from {path.name}")
-        _, _, field, sbid, *_ = path.name.split(".")
-        self.epoch = epoch_name
-        self.field = field.replace("VAST_", "")
-        self.sbid = sbid
+        #_, _, field, sbid, *_ = path.name.split(".")
+        #self.epoch = epoch_name
+        #self.field = field.replace("VAST_", "")
+        #self.sbid = sbid
 
         # Parse the psf info
         if psf is not None:
