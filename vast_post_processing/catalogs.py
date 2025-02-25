@@ -231,10 +231,10 @@ class Catalog:
             input_format (str, optional): are the component files selavy or aegean generated?.
                 Defaults to "selavy".
             condon (bool, optional): Apply condon corrections. Defaults to True.
-            flux_limit (float, optional): Flux limit to select sources (sources with peak flux
+            flux_limit (float, optional): Flux limit to select sources (sources with integrated flux
                 > this will be selected). Defaults to 0.
             snr_limit (float, optional): SNR limit to select sources (sources with SNR > this
-                will be selected). Defaults to 20.
+                will be selected). SNR is defined as integrated flux over local rms. Defaults to 20.
             nneighbor (float, optional): Distance to nearest neighbor (in arcmin). Sources with
                 neighbors < this will be removed. Defaults to 1.
             apply_flux_limit (bool, optional): Flag to decide to apply flux limit. Defaults to True.
@@ -330,9 +330,9 @@ class Catalog:
         # Add a flux threshold flag
         if self.flux_flag:
             lim = self.flux_lim
-            flux_mask = flux_peak > lim
+            flux_mask = flux_int > lim
             logger.info(
-                f"Filtering {len(sources[~flux_mask])} sources with peak fluxes <= {lim}"
+                f"Filtering {len(sources[~flux_mask])} sources with integrated fluxes <= {lim}"
             )
 
         # Add good psf flag
@@ -347,16 +347,16 @@ class Catalog:
             )
             ps_mask = ps_metric < 1.5
             logger.info(
-                f"Filtering {len(sources[~ps_mask])} sources that are not point sources."
+                f"Filtering {len(sources[~ps_mask])} sources that are not point sources (flux_peak/flux_int<1.5)."
             )
         else:
             ps_mask = np.ones(len(self.table)).astype(bool)
 
         # Add snr flag
-        snr = np.divide(flux_peak, rms, where=rms != 0, out=np.zeros_like(rms))
+        snr = np.divide(flux_int, rms, where=rms != 0, out=np.zeros_like(rms))
         snr_mask = snr > self.snr_lim
         logger.info(
-            f"Filtering {len(sources[~snr_mask])} sources with SNR <= {self.snr_lim}"
+            f"Filtering {len(sources[~snr_mask])} sources with SNR (=flux_int/rms) <= {self.snr_lim}"
         )
 
         # Select distant sources
