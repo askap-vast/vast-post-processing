@@ -215,7 +215,7 @@ class Catalog:
         nneighbor: float = 1,
         apply_flux_limit: bool = True,
         select_point_sources: bool = True,
-        reference_cat: bool = False,
+        reference_catalog: bool = False,
     ):
         """Defines a catalog class to read the component files
 
