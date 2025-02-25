@@ -263,6 +263,7 @@ class Catalog:
 
         # Get epoch, field, sbid from the file name
         epoch_name = path.parent.name
+        logger.debug(f"Building catalog from {path.name}")
         _, _, field, sbid, *_ = path.name.split(".")
         self.epoch = epoch_name
         self.field = field.replace("VAST_", "")
