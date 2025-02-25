@@ -665,11 +665,15 @@ def get_psf_from_image(image_path: str):
     image_path = image_path.replace("SELAVY", "IMAGES")
     image_path = image_path.replace("selavy-", "")
     image_path = image_path.replace(".components.xml", ".fits")
-    hdr = fits.getheader(image_path)
-    psf_maj = hdr["BMAJ"] * u.degree
-    psf_min = hdr["BMIN"] * u.degree
-    # hdu.close()
-    return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
+    image_path = Path(image_path)
+    
+    if image_path.is_file():
+        hdr = fits.getheader(image_path)
+        psf_maj = hdr["BMAJ"] * u.degree
+        psf_min = hdr["BMIN"] * u.degree
+        return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
+    else:
+        return None
 
 
 def check_for_files(image_path: str, stokes: str = "I"):
@@ -807,7 +811,7 @@ def correct_field(
         csv_file = epoch_corr_dir / "all_fields_corrections.csv"
 
         if stokes == "I":
-            # Get the psf measurements to estimate errors follwoing Condon 1997
+            # Get the psf measurements to estimate errors following Condon 1997
             if len(psf_ref) > 0:
                 psf_reference = psf_ref
             else:
