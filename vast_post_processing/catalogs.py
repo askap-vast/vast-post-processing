@@ -235,7 +235,7 @@ class Catalog:
             apply_flux_limit (bool, optional): Flag to decide to apply flux limit. Defaults to True.
             select_point_sources (bool, optional): Flag to decide to select point sources.
                 Defaults to True.
-            reference_cat (bool, optional): Flag to note whether the catalogue is the reference or
+            reference_catalog (bool, optional): Flag to note whether the catalogue is the reference or
                 the science catalogue. Defaults to False.
         """
         self.path: Path
@@ -265,7 +265,7 @@ class Catalog:
         self._filter_sources()
 
         # Get epoch, field, sbid from the file name
-        if not reference_cat:
+        if not reference_catalog:
             epoch_name = path.parent.name
             logger.debug(f"Building catalog from {path.name}")
             _, _, field, sbid, *_ = path.name.split(".")

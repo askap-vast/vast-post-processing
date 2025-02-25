@@ -142,6 +142,7 @@ def vast_xmatch_qc(
         nneighbor=nneighbor,
         apply_flux_limit=apply_flux_limit,
         select_point_sources=select_point_sources,
+        reference_catalog=True,
     )
     catalog = Catalog(
         catalog_path,
