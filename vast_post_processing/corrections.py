@@ -159,11 +159,9 @@ def vast_xmatch_qc(
     xmatch_qt = crossmatch_qtables(catalog, reference_catalog, radius=radius)
 
     # Select xmatches with non-zero flux errors and no siblings
-    logger.info("Removing crossmatched sources with siblings or flux peak errors = 0.")
+    logger.info("Removing crossmatched sources with flux peak errors = 0.")
     mask = xmatch_qt["flux_peak_err"] > 0
     mask &= xmatch_qt["flux_peak_err_reference"] > 0
-    mask &= xmatch_qt["has_siblings"] == 0
-    mask &= xmatch_qt["has_siblings_reference"] == 0
 
     # Also use a mask to try to remove outliers
     # Do an interative fitting that reoves all the outilers
