@@ -8,14 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- Added `reference_catalog` arg to Catalog class, which only sets the sbid, epoch and field for non-reference observations [#110](https://github.com/askap-vast/vast-post-processing/pull/110/)
 - Allow users to specify quantisation level [#101](https://github.com/askap-vast/vast-post-processing/pull/101)
 - Added changelog [#106](https://github.com/askap-vast/vast-post-processing/pull/106)
 
 ### Changed
 
 - Generalised reference catalogue path [#108](https://github.com/askap-vast/vast-post-processing/pull/108)
+
 ### Fixed
 
+- Fixed bug where critical error was being thrown if the reference images do not exist [#110](https://github.com/askap-vast/vast-post-processing/pull/110/)
 - Fixed astrometric correction error - corrections were being applied in the wrong direction, resulting in the offset doubling [#104](https://github.com/askap-vast/vast-post-processing/pull/104)
 
 ### Removed
@@ -24,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### List of PRs
 
+- [#110](https://github.com/askap-vast/vast-post-processing/pull/110/): feat, fix: add reference_catalog arg to catalog class, handle non-existence of reference images
 - [#108](https://github.com/askap-vast/vast-post-processing/pull/108): feat: Generalised reference catalogue path
 - [#104](https://github.com/askap-vast/vast-post-processing/pull/104): fix: Fix error in astrometric correction application
 - [#101](https://github.com/askap-vast/vast-post-processing/pull/101): feat: Allow users to specify quantisation level
