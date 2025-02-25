@@ -142,6 +142,7 @@ def vast_xmatch_qc(
         nneighbor=nneighbor,
         apply_flux_limit=apply_flux_limit,
         select_point_sources=select_point_sources,
+        reference_catalog=True,
     )
     catalog = Catalog(
         catalog_path,
@@ -159,11 +160,9 @@ def vast_xmatch_qc(
     xmatch_qt = crossmatch_qtables(catalog, reference_catalog, radius=radius)
 
     # Select xmatches with non-zero flux errors and no siblings
-    logger.info("Removing crossmatched sources with siblings or flux peak errors = 0.")
+    logger.info("Removing crossmatched sources with flux peak errors = 0.")
     mask = xmatch_qt["flux_peak_err"] > 0
     mask &= xmatch_qt["flux_peak_err_reference"] > 0
-    mask &= xmatch_qt["has_siblings"] == 0
-    mask &= xmatch_qt["has_siblings_reference"] == 0
 
     # Also use a mask to try to remove outliers
     # Do an interative fitting that reoves all the outilers
@@ -665,11 +664,15 @@ def get_psf_from_image(image_path: str):
     image_path = image_path.replace("SELAVY", "IMAGES")
     image_path = image_path.replace("selavy-", "")
     image_path = image_path.replace(".components.xml", ".fits")
-    hdr = fits.getheader(image_path)
-    psf_maj = hdr["BMAJ"] * u.degree
-    psf_min = hdr["BMIN"] * u.degree
-    # hdu.close()
-    return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
+    image_path = Path(image_path)
+    
+    if image_path.is_file():
+        hdr = fits.getheader(image_path)
+        psf_maj = hdr["BMAJ"] * u.degree
+        psf_min = hdr["BMIN"] * u.degree
+        return (psf_maj.to(u.arcsec), psf_min.to(u.arcsec))
+    else:
+        return None
 
 
 def check_for_files(image_path: str, stokes: str = "I"):
@@ -807,7 +810,7 @@ def correct_field(
         csv_file = epoch_corr_dir / "all_fields_corrections.csv"
 
         if stokes == "I":
-            # Get the psf measurements to estimate errors follwoing Condon 1997
+            # Get the psf measurements to estimate errors following Condon 1997
             if len(psf_ref) > 0:
                 psf_reference = psf_ref
             else:
