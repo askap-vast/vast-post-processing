@@ -158,15 +158,18 @@ def calculate_flux_offsets(
     fix_m: bool = False,
     fix_b: bool = False,
 ) -> Tuple[float, u.Quantity, float, u.Quantity]:
-    """Calculate the gradient and offset of a straight-line fit to the peak fluxes for
-    crossmatched sources. The function `y = mx + b` is fit to the reference peak fluxes
-    vs the peak fluxes using orthogonal distance regression with `scipy.odr`.
+    """Calculate the gradient and offset of a straight-line fit to the integrated fluxes for
+    crossmatched sources. The function `y = mx + b` is fit to the reference int fluxes
+    vs the int fluxes using orthogonal distance regression with `scipy.odr`.
+    
+    Note in Feb 2025 this method was changed to calculate the gradient and offset based on 
+    the integrated fluxes.
 
     Parameters
     ----------
     xmatch_qt : QTable
-        QTable of crossmatched sources. Must contain columns: flux_peak,
-        flux_peak_reference, flux_peak_err, flux_peak_err_reference.
+        QTable of crossmatched sources. Must contain columns: flux_int,
+        flux_int_reference, flux_int_err, flux_int_err_reference.
     init_m : float
         Initial gradient parameter passed to the fitting function, default 1.0.
     init_b : float
@@ -180,18 +183,18 @@ def calculate_flux_offsets(
     -------
     Tuple[float, u.Quantity, float, u.Quantity]
         Model fit parameters: the gradient, intercept (offset), gradient error, and
-        intercept error. Offset and offset error unit match the reference flux peak
+        intercept error. Offset and offset error unit match the reference flux int
         input and are of spectral flux density type.
     """
     ifixb = [0 if fix_m else 1, 0 if fix_b else 1]
-    flux_unit = xmatch_qt["flux_peak_reference"].unit
+    flux_unit = xmatch_qt["flux_int_reference"].unit
     linear_model = odr.Model(straight_line)
     # convert all to reference flux unit as ODR does not preserve Quantity objects
     odr_data = odr.RealData(
-        xmatch_qt["flux_peak_reference"].to(flux_unit).value,
-        xmatch_qt["flux_peak"].to(flux_unit).value,
-        sx=xmatch_qt["flux_peak_err_reference"].to(flux_unit).value,
-        sy=xmatch_qt["flux_peak_err"].to(flux_unit).value,
+        xmatch_qt["flux_int_reference"].to(flux_unit).value,
+        xmatch_qt["flux_int"].to(flux_unit).value,
+        sx=xmatch_qt["flux_int_err_reference"].to(flux_unit).value,
+        sy=xmatch_qt["flux_int_err"].to(flux_unit).value,
     )
     odr_obj = odr.ODR(odr_data, linear_model, beta0=[init_m, init_b], ifixb=ifixb)
     odr_out = odr_obj.run()

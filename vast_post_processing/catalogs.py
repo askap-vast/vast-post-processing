@@ -33,6 +33,8 @@ SELAVY_COLUMN_UNITS: dict[str, u.Quantity] = {
     "dec_err": u.arcsec,
     "flux_peak": u.mJy / u.beam,
     "flux_peak_err": u.mJy / u.beam,
+    "flux_int": u.mJy / u.beam,
+    "flux_int_err": u.mJy / u.beam,
     "maj_axis": u.arcsec,
     "maj_axis_err": u.arcsec,
     "min_axis": u.arcsec,
@@ -53,6 +55,8 @@ AEGEAN_COLUMN_MAP: dict[str, tuple[str, u.Quantity]] = {
     "err_dec": ("dec_err", u.deg),
     "peak_flux": ("flux_peak", u.Jy / u.beam),
     "err_peak_flux": ("flux_peak_err", u.Jy / u.beam),
+    "int_flux": ("flux_int", u.Jy / u.beam),
+    "err_int_flux": ("flux_int_err", u.Jy / u.beam),
     "a": ("maj_axis", u.arcsec),
     "b": ("min_axis", u.arcsec),
     "pa": ("pos_ang", u.arcsec),
@@ -93,6 +97,7 @@ def read_selavy(catalog_path: Path) -> QTable:
         - `ra_deg_cont` and `dec_deg_cont`: degrees.
         - `ra_err` and `dec_err`: arcseconds.
         - `flux_peak` and `flux_peak_err`: mJy/beam.
+        - `flux_int` and `flux_int_err`: mJy/beam.
         - `maj_axis`, `maj_axis_err`, `min_axis`, `min_axis_err`: arcseconds.
         - `pos_ang` and `pos_ang_err`: degrees.
         - `rms_image`: mJy/beam.
@@ -150,6 +155,7 @@ def read_aegean_csv(catalog_path: Path) -> QTable:
         - `ra` and `dec`: degrees.
         - `err_ra` and `err_dec`: degrees.
         - `peak_flux` and `err_peak_flux`: Jy/beam.
+        - `int_flux` and `err_int_flux`: Jy/beam.
         - `a`, `err_a`, `b`, `err_b`: fitted semi-major and -minor axes in arcseconds.
         - `pa` and `err_pa`: degrees.
         - `local_rms`: Jy/beam.
@@ -226,10 +232,10 @@ class Catalog:
             input_format (str, optional): are the component files selavy or aegean generated?.
                 Defaults to "selavy".
             condon (bool, optional): Apply condon corrections. Defaults to True.
-            flux_limit (float, optional): Flux limit to select sources (sources with peak flux
+            flux_limit (float, optional): Flux limit to select sources (sources with integrated flux
                 > this will be selected). Defaults to 0.
             snr_limit (float, optional): SNR limit to select sources (sources with SNR > this
-                will be selected). Defaults to 20.
+                will be selected). SNR is defined as integrated flux over local rms. Defaults to 20.
             nneighbor (float, optional): Distance to nearest neighbor (in arcmin). Sources with
                 neighbors < this will be removed. Defaults to 1.
             apply_flux_limit (bool, optional): Flag to decide to apply flux limit. Defaults to True.
@@ -329,9 +335,9 @@ class Catalog:
         # Add a flux threshold flag
         if self.flux_flag:
             lim = self.flux_lim
-            flux_mask = flux_peak > lim
+            flux_mask = flux_int > lim
             logger.info(
-                f"Filtering {len(sources[~flux_mask])} sources with fluxes <= {lim}"
+                f"Filtering {len(sources[~flux_mask])} sources with integrated fluxes <= {lim}"
             )
 
         # Add good psf flag
@@ -346,16 +352,16 @@ class Catalog:
             )
             ps_mask = ps_metric < 1.5
             logger.info(
-                f"Filtering {len(sources[~ps_mask])} sources that are not point sources."
+                f"Filtering {len(sources[~ps_mask])} sources that are not point sources (flux_peak/flux_int<1.5)."
             )
         else:
             ps_mask = np.ones(len(self.table)).astype(bool)
 
         # Add snr flag
-        snr = np.divide(flux_peak, rms, where=rms != 0, out=np.zeros_like(rms))
+        snr = np.divide(flux_int, rms, where=rms != 0, out=np.zeros_like(rms))
         snr_mask = snr > self.snr_lim
         logger.info(
-            f"Filtering {len(sources[~snr_mask])} sources with SNR <= {self.snr_lim}"
+            f"Filtering {len(sources[~snr_mask])} sources with SNR (=flux_int/rms) <= {self.snr_lim}"
         )
 
         # Select distant sources
