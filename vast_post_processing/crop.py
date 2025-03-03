@@ -69,7 +69,7 @@ def get_field_centre(header: fits.header.Header):
 def crop_hdu(
     hdu: fits.hdu.image.PrimaryHDU,
     field_centre: SkyCoord,
-    size: Optional[u.Quantity] = 6.3 * u.deg,
+    size: Optional[u.Quantity] = 6.67 * u.deg,
     rotation: Optional[u.Quantity] = 0.0 * u.deg,
 ):
     """Crop the data and update the header of a FITS image HDU
@@ -81,7 +81,7 @@ def crop_hdu(
     field_centre : astropy.coordinates.SkyCoord,
         The corresponding field centre.
     size : astropy.units.quantity.Quantity, optional
-        The size of each side of the square crop, by default 6.3 * u.deg.
+        The size of each side of the square crop, by default 6.67 * u.deg.
     rotation : astropy.units.quantity.Quantity
         The rotation to apply, by default 0.0 * u.deg.
 

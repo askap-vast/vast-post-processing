@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Changed crop size to 6.67 degrees [#111](https://github.com/askap-vast/vast-post-processing/pull/111)
 - Change the flux scale corrections to use integrated rather than peak flux density [#109](https://github.com/askap-vast/vast-post-processing/pull/109)
 - Generalised reference catalogue path [#108](https://github.com/askap-vast/vast-post-processing/pull/108)
 
@@ -29,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### List of PRs
 
+- [#111](https://github.com/askap-vast/vast-post-processing/pull/111): fix: Changed crop size to 6.67 degrees
 - [#109](https://github.com/askap-vast/vast-post-processing/pull/109): feat: Switch flux scale corrections from peak to integrated
 - [#110](https://github.com/askap-vast/vast-post-processing/pull/110/): feat, fix: add reference_catalog arg to catalog class, handle non-existence of reference images
 - [#108](https://github.com/askap-vast/vast-post-processing/pull/108): feat: Generalised reference catalogue path

@@ -21,8 +21,8 @@ stokes:
 epoch: null
 
 # Image crop size for this run, in degrees.
-# Defaults to 6.3 degrees.
-crop_size: 6.3
+# Defaults to 6.67 degrees.
+crop_size: 6.67
 
 # Flag to create MOCs for this run, by default True. 
 create_moc: True
