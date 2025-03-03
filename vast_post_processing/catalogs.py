@@ -221,6 +221,7 @@ class Catalog:
         nneighbor: float = 1,
         apply_flux_limit: bool = True,
         select_point_sources: bool = True,
+        reference_catalog: bool = False,
     ):
         """Defines a catalog class to read the component files
 
@@ -239,7 +240,9 @@ class Catalog:
                 neighbors < this will be removed. Defaults to 1.
             apply_flux_limit (bool, optional): Flag to decide to apply flux limit. Defaults to True.
             select_point_sources (bool, optional): Flag to decide to select point sources.
-                Defaults to True
+                Defaults to True.
+            reference_catalog (bool, optional): Flag to note whether the catalogue is the reference or
+                the science catalogue. Defaults to False.
         """
         self.path: Path
         self.table: QTable
@@ -268,11 +271,13 @@ class Catalog:
         self._filter_sources()
 
         # Get epoch, field, sbid from the file name
-        epoch_name = path.parent.name
-        _, _, field, sbid, *_ = path.name.split(".")
-        self.epoch = epoch_name
-        self.field = field.replace("VAST_", "")
-        self.sbid = sbid
+        if not reference_catalog:
+            epoch_name = path.parent.name
+            logger.debug(f"Building catalog from {path.name}")
+            _, _, field, sbid, *_ = path.name.split(".")
+            self.epoch = epoch_name
+            self.field = field.replace("VAST_", "")
+            self.sbid = sbid
 
         # Parse the psf info
         if psf is not None:
