@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Changed compress_quant from 1024 to 16 [#113](https://github.com/askap-vast/vast-post-processing/pull/113)
 - Changed crop size to 6.67 degrees [#111](https://github.com/askap-vast/vast-post-processing/pull/111)
 - Change the flux scale corrections to use integrated rather than peak flux density [#109](https://github.com/askap-vast/vast-post-processing/pull/109)
 - Generalised reference catalogue path [#108](https://github.com/askap-vast/vast-post-processing/pull/108)
