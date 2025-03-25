@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- Allow users to specify whether or not to calculate Condon errors, and default to False [#114](https://github.com/askap-vast/vast-post-processing/pull/114)
 - Added `reference_catalog` arg to Catalog class, which only sets the sbid, epoch and field for non-reference observations [#110](https://github.com/askap-vast/vast-post-processing/pull/110/)
 - Allow users to specify quantisation level [#101](https://github.com/askap-vast/vast-post-processing/pull/101)
 - Added changelog [#106](https://github.com/askap-vast/vast-post-processing/pull/106)
@@ -30,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### List of PRs
 
+- [#114](https://github.com/askap-vast/vast-post-processing/pull/114): Allow users to specify whether or not to calculate Condon errors, and default to False
 - [#111](https://github.com/askap-vast/vast-post-processing/pull/111): fix: Changed crop size to 6.67 degrees
 - [#109](https://github.com/askap-vast/vast-post-processing/pull/109): feat: Switch flux scale corrections from peak to integrated
 - [#110](https://github.com/askap-vast/vast-post-processing/pull/110/): feat, fix: add reference_catalog arg to catalog class, handle non-existence of reference images
