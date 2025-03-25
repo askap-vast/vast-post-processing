@@ -881,6 +881,7 @@ def run(
             outdir=out_root,
             stokes=stokes_dir,
             vast_corrections_root=corrections_path,
+            condon=use_condon,
             image_path=image_path,
             overwrite=overwrite,
             verbose=verbose,
