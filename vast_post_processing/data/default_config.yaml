@@ -31,7 +31,7 @@ create_moc: True
 compress: True
 
 # Compression quantisation level to use, by default 1024. 
-compress_quant: 1024
+compress_quant: 16
 
 # Suffix to use for processed data directories
 # By default "PROCESSED" which results in e.g. `STOKESI_IMAGES_PROCESSED
