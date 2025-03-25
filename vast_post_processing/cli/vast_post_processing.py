@@ -83,6 +83,9 @@ def main(
     compress_quant: Optional[int] = typer.Option(
         None, help=("Compression quantisation to use, if compressing.")
     ),
+    use_condon: Optional[bool] = typer.Option(
+        None, help=("Whether or not to calculate Condon errors (if possible).")
+    ),
     directory_suffix: Optional[str] = typer.Option(
         None, help=("Suffix to use for processed data directories. For "
                     "example, passing 'PROCESSED' results in images being "
@@ -120,6 +123,7 @@ def main(
         create_moc,
         compress,
         compress_quant,
+        use_condon,
         directory_suffix,
         cat_extension,
         fits_extension,

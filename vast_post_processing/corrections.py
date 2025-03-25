@@ -721,7 +721,7 @@ def correct_field(
     stokes: str = "I",
     vast_corrections_root: Path = "/data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY",
     radius: float = 10,
-    condon: bool = True,
+    condon: bool = False,
     psf_ref: list[float] = [],
     psf: list[float] = [],
     flux_limit: float = 0,
