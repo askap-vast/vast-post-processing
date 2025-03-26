@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Fixed versioning issues [#115](https://github.com/askap-vast/vast-post-processing/pull/115)
 - Fixed bug where critical error was being thrown if the reference images do not exist [#110](https://github.com/askap-vast/vast-post-processing/pull/110/)
 - Fixed astrometric correction error - corrections were being applied in the wrong direction, resulting in the offset doubling [#104](https://github.com/askap-vast/vast-post-processing/pull/104)
 
@@ -32,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### List of PRs
 
+- [#115](https://github.com/askap-vast/vast-post-processing/pull/115): fix: Fixed versioning issues
 - [#114](https://github.com/askap-vast/vast-post-processing/pull/114): feat: Allow users to specify whether or not to calculate Condon errors, and default to False
 - [#113](https://github.com/askap-vast/vast-post-processing/pull/113): fix: Changed compress_quant from 1024 to 16
 - [#111](https://github.com/askap-vast/vast-post-processing/pull/111): fix: Changed crop size to 6.67 degrees
