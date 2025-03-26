@@ -143,6 +143,7 @@ def setup_configuration(
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
     compress_quant: Optional[int] = None,
+    use_condon: Optional[bool] = None,
     directory_suffix: Optional[str] = None,
     cat_extension: Optional[str] = None,
     fits_extension: Optional[str] = None,
@@ -158,6 +159,7 @@ def setup_configuration(
     bool,
     bool,
     int,
+    bool,
     str,
     str,
     str,
@@ -191,6 +193,8 @@ def setup_configuration(
         Flag to compress files, by default None.
     compress_quant : Optional[int], optional
         Compression quantisation level to use, by default None.
+    use_condon : Optional[bool], optional
+        Whether or not to calculate Condon errors (if possible), by default None.
     directory_suffix : Optional[str], optional
         Suffix to use for processed data directories (for example
         `STOKESI_IMAGES_PROCESSED`), by default None.
@@ -239,6 +243,7 @@ def setup_configuration(
         "create_moc": create_moc,
         "compress": compress,
         "compress_quant": compress_quant,
+        "use_condon": use_condon,
         "directory_suffix": directory_suffix,
         "cat_extension": cat_extension,
         "fits_extension": fits_extension,
@@ -738,6 +743,7 @@ def run(
     create_moc: Optional[bool] = None,
     compress: Optional[bool] = None,
     compress_quant: Optional[int] = None,
+    use_condon: Optional[bool] = None,
     directory_suffix: Optional[str] = None,
     cat_extension: Optional[str] = None,
     fits_extension: Optional[str] = None,
@@ -771,6 +777,8 @@ def run(
         Flag to compress files, by default None.
     compress_quant : Optional[int], optional
         Compression quantisation to use, by default None.
+    use_condon : Optional[bool], optional
+        Whether or not to calculate Condon errors (if possible), by default None.
     directory_suffix : Optional[str], optional
         Suffix to use for processed data directories (for example
         `STOKESI_IMAGES_PROCESSED`), by default None.
@@ -798,6 +806,7 @@ def run(
         create_moc,
         compress,
         compress_quant,
+        use_condon,
         directory_suffix,
         cat_extension,
         fits_extension,
@@ -815,6 +824,7 @@ def run(
         create_moc=create_moc,
         compress=compress,
         compress_quant=compress_quant,
+        use_condon=use_condon,
         directory_suffix=directory_suffix,
         cat_extension=cat_extension,
         fits_extension=fits_extension,
@@ -871,6 +881,7 @@ def run(
             outdir=out_root,
             stokes=stokes_dir,
             vast_corrections_root=corrections_path,
+            condon=use_condon,
             image_path=image_path,
             overwrite=overwrite,
             verbose=verbose,

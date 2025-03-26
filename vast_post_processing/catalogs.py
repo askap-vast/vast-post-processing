@@ -215,7 +215,7 @@ class Catalog:
         path: Path,
         psf: Optional[tuple[float, float]] = None,
         input_format: str = "selavy",
-        condon: bool = True,
+        condon: bool = False,
         flux_limit: float = 0,
         snr_limit: float = 20,
         nneighbor: float = 1,
@@ -231,7 +231,7 @@ class Catalog:
                 in arcsec. Defaults to None. Used to calculate condon errors
             input_format (str, optional): are the component files selavy or aegean generated?.
                 Defaults to "selavy".
-            condon (bool, optional): Apply condon corrections. Defaults to True.
+            condon (bool, optional): Apply condon corrections. Defaults to False.
             flux_limit (float, optional): Flux limit to select sources (sources with integrated flux
                 > this will be selected). Defaults to 0.
             snr_limit (float, optional): SNR limit to select sources (sources with SNR > this
