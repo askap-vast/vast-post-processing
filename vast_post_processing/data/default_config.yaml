@@ -33,6 +33,9 @@ compress: True
 # Compression quantisation level to use, by default 1024. 
 compress_quant: 16
 
+# Whether to calculate Condon errors (if possible)
+use_condon: False
+
 # Suffix to use for processed data directories
 # By default "PROCESSED" which results in e.g. `STOKESI_IMAGES_PROCESSED
 directory_suffix: "PROCESSED"
