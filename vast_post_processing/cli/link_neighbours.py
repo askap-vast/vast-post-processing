@@ -1,14 +1,27 @@
+"""Link neighbouring sources. 
+"""
+
+
+# Import
+
+
 from pathlib import Path
 from typing import Optional
+
 import typer
 
-from vast_post_processing.neighbours import (
-    read_release_epochs,
-    find_vast_neighbours_by_release_epoch,
-)
+from vast_post_processing import neighbours
+
+
+# Constants
 
 
 app = typer.Typer()
+"""Typer app for this module.
+"""
+
+
+# Functions
 
 
 @app.command()
@@ -79,61 +92,15 @@ def main(
         ),
     ),
 ):
-    # get the release epochs
-    release_epochs = read_release_epochs(release_epochs_csv)
-    # get the neighbours DataFrame and filter for the requested release epoch and
-    # overlap area threshold
-    vast_neighbours_df = find_vast_neighbours_by_release_epoch(
+    neighbours.link_neighbours(
         release_epoch,
         vast_data_root,
+        release_epochs_csv,
+        output_root,
         vast_db_repo,
-        release_epochs,
-        racs_db_repo=racs_db_repo,
-        use_corrected=use_corrected,
-    ).query(
-        "release_epoch_a == @release_epoch and overlap_frac >= @overlap_frac_thresh"
+        racs_db_repo,
+        overlap_frac_thresh,
+        use_corrected,
+        neighbours_output,
+        make_links,
     )
-
-    if neighbours_output is not None:
-        vast_neighbours_df[
-            [
-                "field_a",
-                "sbid_a",
-                "obs_epoch_a",
-                "release_epoch_a",
-                "field_b",
-                "sbid_b",
-                "obs_epoch_b",
-                "release_epoch_b",
-                "overlap_frac",
-                "delta_t_days",
-            ]
-        ].to_csv(neighbours_output, index=False)
-
-    # create a directory for each field and create links to the neighbouring images
-    if make_links:
-        release_output_path = output_root / release_epoch
-        release_output_path.mkdir(parents=True, exist_ok=True)
-        for _, obs_pair in vast_neighbours_df.iterrows():
-            # create directories
-            field_inputs_path_a = release_output_path / obs_pair.field_a / "inputs"
-            field_inputs_path_a.mkdir(parents=True, exist_ok=True)
-            field_inputs_path_b = release_output_path / obs_pair.field_b / "inputs"
-            field_inputs_path_b.mkdir(parents=True, exist_ok=True)
-
-            # create a hard link for each field in the pair in both directions, e.g.
-            # A/inputs/A.fits, A/inputs/B.fits, B/inputs/A.fits, B/inputs/B.fits (plus weights)
-            for output_path in (field_inputs_path_a, field_inputs_path_b):
-                target_image_a = output_path / obs_pair.image_path_a.name
-                target_weights_a = output_path / obs_pair.weights_path_a.name
-                if not target_image_a.exists():
-                    obs_pair.image_path_a.link_to(target_image_a)
-                if not target_weights_a.exists():
-                    obs_pair.weights_path_a.link_to(target_weights_a)
-
-                target_image_b = output_path / obs_pair.image_path_b.name
-                target_weights_b = output_path / obs_pair.weights_path_b.name
-                if not target_image_b.exists():
-                    obs_pair.image_path_b.link_to(target_image_b)
-                if not target_weights_b.exists():
-                    obs_pair.weights_path_b.link_to(target_weights_b)

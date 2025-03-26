@@ -1,0 +1,56 @@
+---
+# Path to root data directory for this run. 
+# Expects same structure as on `data:/mnt/data/VAST/vast-data/TILES/`.
+# Not set by default, should be specified at runtime.
+data_root: null
+
+# Path to output directory for this run. 
+# By default None, and set to data_root in program.
+out_root: null
+
+# Path to locate corresponding reference catalogues.
+# By default /data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY. 
+corrections_path: "/data/RACS/release-format/EPOCH00/TILES/STOKESI_SELAVY"
+
+# Stokes parameter to operate on for this run, by default I.
+stokes: 
+  - I
+
+# Epoch number for this run. 
+# By default None, and interpreted as all in program.
+epoch: null
+
+# Image crop size for this run, in degrees.
+# Defaults to 6.67 degrees.
+crop_size: 6.67
+
+# Flag to create MOCs for this run, by default True. 
+create_moc: True
+
+# Flag to compress data following pipeline, by default True. 
+compress: True
+
+# Compression quantisation level to use, by default 1024. 
+compress_quant: 16
+
+# Whether to calculate Condon errors (if possible)
+use_condon: False
+
+# Suffix to use for processed data directories
+# By default "PROCESSED" which results in e.g. `STOKESI_IMAGES_PROCESSED
+directory_suffix: "PROCESSED"
+
+# File extension to use for processed catalogues
+cat_extension: ".processed.xml"
+
+# File extension to use for processed fits files
+fits_extension: ".processed.fits"
+
+# Flag to overwrite FITS data to disk, by default False. 
+overwrite: False
+
+# Flag to display progress and status to screen, by default False.
+verbose: False
+
+# Flag to display errors and functionality, by default False. 
+debug: False
