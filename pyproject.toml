@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "vast-post-processing"
-version = "0.1.0"
+version = "2.1.0"
 description = ""
 authors = ["Andrew O'Brien <obrienan@uwm.edu>"]
 license = "MIT"
