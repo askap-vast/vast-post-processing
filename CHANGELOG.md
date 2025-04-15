@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), with an added `List of PRs` section and links to the relevant PRs on the individal updates. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.1](https://github.com/askap-vast/vast-post-processing/releases/tag/v2.1.1) (2025-04-15)
+
+### Fixed
+
+- Fixed path image path matching for Stokes V processing [#117](https://github.com/askap-vast/vast-post-processing/pull/117)
+- Fixed correction application for Stokes V processing [#117](https://github.com/askap-vast/vast-post-processing/pull/117)
+
+### List of PRs
+
+- [#117](https://github.com/askap-vast/vast-post-processing/pull/117): fix: Fixed Stokes V path finding and correction application
+
 ## [v2.1.0](https://github.com/askap-vast/vast-post-processing/releases/tag/v2.1.0) (2025-03-27)
 
 ### Added

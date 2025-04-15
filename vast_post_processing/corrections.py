@@ -848,6 +848,15 @@ def correct_field(
                 crossmatch_output=crossmatch_file,
                 csv_output=csv_file,
             )
+            
+            flux_corr_mult_value = flux_corr_mult.n
+            flux_corr_mult_std = flux_corr_mult.s
+            flux_corr_add_value = flux_corr_add.n
+            flux_corr_add_std = flux_corr_add.s
+            dra_median_value = dra_median_value.item()
+            dra_median_std = dra_median_std.item()
+            ddec_median_value = ddec_median_value.item()
+            ddec_median_std = ddec_median_std.item()
         else:
             corrections_df = pd.read_csv(csv_file)
             _, _, field, sbid, *_ = image_path.name.split(".")
@@ -859,25 +868,18 @@ def correct_field(
             dra_median_std = corrections_df["dra_madfm"].iloc[0]
             ddec_median_value = corrections_row["ddec_median"].iloc[0]
             ddec_median_std = corrections_row["ddec_madfm"].iloc[0]
-            flux_corr_mult = corrections_row["flux_corr_mult_mean"].iloc[0]
-            flux_corr_add = corrections_row["flux_corr_add_mean"].iloc[0]
+            flux_corr_mult_value  = corrections_row["flux_corr_mult_mean"].iloc[0]
+            flux_corr_add_value = corrections_row["flux_corr_add_mean"].iloc[0]
             flux_corr_mult_std = corrections_row["flux_corr_mult_std"].iloc[0]
             flux_corr_add_std = corrections_row["flux_corr_mult_std"].iloc[0]
 
-        flux_corr_mult_value = flux_corr_mult.n
-        flux_corr_mult_std = flux_corr_mult.s
-        flux_corr_add_value = flux_corr_add.n
-        flux_corr_add_std = flux_corr_add.s
-        dra_median_value = dra_median_value.item()
-        dra_median_std = dra_median_std.item()
-        ddec_median_value = ddec_median_value.item()
-        ddec_median_std = ddec_median_std.item()
+
 
         logger.debug("Applying corrections:")
         logger.debug(f"dra_median_value = {dra_median_value}")
         logger.debug(f"ddec_median_value = {ddec_median_value}")
-        logger.debug(f"flux_corr_mult = {flux_corr_mult}")
-        logger.debug(f"flux_corr_add = {flux_corr_add}")
+        logger.debug(f"flux_corr_mult = {flux_corr_mult_value} ({flux_corr_mult_std})")
+        logger.debug(f"flux_corr_add = {flux_corr_add_value} ({flux_corr_add_std})")
 
         corrected_hdus = []
         for path in (image_path, rms_path, bkg_path):
