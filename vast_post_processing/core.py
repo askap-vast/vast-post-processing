@@ -280,6 +280,7 @@ def get_image_paths(
     debug: bool,
     image_type: str = "IMAGES",
     processed_dir_suffix: str = "PROCESSED",
+    fits_extension: str = ".processed.fits"
 ) -> list[Path]:
     """Get paths to all FITS images for a given Stokes parameter and epoch.
 
@@ -300,6 +301,9 @@ def get_image_paths(
     processed_dir_suffix : str
         Suffix to use for processed data directories. For example, 'PROCESSED'
         results in images being output to `STOKESI_IMAGES_PROCESSED`.
+    fits_extension : Optional[str], optional
+        Extension to use for fits files (for example `.processed.fits`),
+        defaults to ".processed.fits"
 
     Returns
     -------
@@ -369,10 +373,12 @@ def get_image_paths(
             for image_path_v in image_paths:
                 # Get expected path of processed corresponding Stokes I image
                 split_str_path_v = str(image_path_v).split("STOKESV_IMAGES")
+                i_fname = split_str_path_v[1].replace("image.v", "image.i")
+                i_fname = i_fname.replace(".fits", fits_extension)
                 str_path_i = (
                     split_str_path_v[0]
                     + f"STOKESI_IMAGES_{processed_dir_suffix}"
-                    + split_str_path_v[1].replace("image.v", "image.i")
+                    + i_fname
                 )
 
                 # If processed path is not found, terminate run
@@ -852,6 +858,7 @@ def run(
         processed_dir_suffix=directory_suffix,
         verbose=verbose,
         debug=debug,
+        fits_extension=fits_extension,
     )
 
     # Display paths if requested
