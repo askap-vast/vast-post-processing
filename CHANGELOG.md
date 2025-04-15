@@ -12,10 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Fixed path image path matching for Stokes V processing [#117](https://github.com/askap-vast/vast-post-processing/pull/117)
+- Fixed correction application for Stokes V processing [#117](https://github.com/askap-vast/vast-post-processing/pull/117)
+
 ### Removed
 
 ### List of PRs
 
+- [#117](https://github.com/askap-vast/vast-post-processing/pull/117): fix: Fixed Stokes V path finding and correction application
 
 ## [v2.1.0](https://github.com/askap-vast/vast-post-processing/releases/tag/v2.1.0) (2025-03-27)
 
