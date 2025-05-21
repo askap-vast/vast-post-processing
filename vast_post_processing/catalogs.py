@@ -343,11 +343,11 @@ class Catalog:
         # point source flag
         if self.point_sources:
             ps_metric = np.divide(
-                flux_peak, flux_int, where=flux_int != 0, out=np.zeros_like(flux_int)
+                flux_int, flux_peak, where=flux_int != 0, out=np.zeros_like(flux_int)
             )
             ps_mask = ps_metric < 1.5
             logger.info(
-                f"Filtering {len(sources[~ps_mask])} sources that are not point sources (flux_peak/flux_int<1.5)."
+                f"Filtering {len(sources[~ps_mask])} sources that are not point sources (flux_int/flux_peak<1.5)."
             )
         else:
             ps_mask = np.ones(len(self.table)).astype(bool)
