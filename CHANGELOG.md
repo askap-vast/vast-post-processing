@@ -12,10 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Fixed error in extending source filtering that reversed numerator and denominator [#120](https://github.com/askap-vast/vast-post-processing/pull/120)
+
 ### Removed
 
 ### List of PRs
 
+- [#120](https://github.com/askap-vast/vast-post-processing/pull/120): fix: Fixed error in extending source filtering that reversed numerator and denominator
 
 ## [v2.1.1](https://github.com/askap-vast/vast-post-processing/releases/tag/v2.1.1) (2025-04-15)
 
