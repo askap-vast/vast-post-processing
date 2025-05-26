@@ -9,6 +9,7 @@ from typing import Tuple
 
 import numpy as np
 from scipy import odr
+from astropy.io import fits
 
 from astropy.coordinates import SkyCoord, Angle, match_coordinates_sky
 from astropy.table import QTable, join, join_skycoord
@@ -16,6 +17,7 @@ import astropy.units as u
 
 from vast_post_processing.catalogs import Catalog
 
+from vast_post_processing.crop import get_field_centre
 
 # Constants
 
@@ -79,6 +81,7 @@ def join_match_coordinates_sky(
 def crossmatch_qtables(
     catalog: Catalog,
     catalog_reference: Catalog,
+    image_path:str,
     radius: Angle = Angle("10 arcsec"),
 ) -> QTable:
     """Main function to filter cross-matched sources.
@@ -112,6 +115,13 @@ def crossmatch_qtables(
     xmatch["dra"], xmatch["ddec"] = xmatch["coord"].spherical_offsets_to(
         xmatch["coord_reference"]
     )
+
+     # Calculate distance to field center
+    hdu = fits.open(image_path)[0]
+    field_centre = get_field_centre(hdu.header)
+    xmatch["fc_dra"], xmatch["fc_ddec"] = xmatch["coord"].spherical_offsets_to(field_centre)
+
+
     xmatch["flux_peak_ratio"] = (
         xmatch["flux_peak"] / xmatch["flux_peak_reference"]
     ).decompose()
