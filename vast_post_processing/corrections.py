@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 def vast_xmatch_qc(
-    image_path:str,
+    image_path: Path,
     reference_catalog_path: str,
     catalog_path: str,
     radius: Angle = Angle("10arcsec"),
@@ -72,6 +72,8 @@ def vast_xmatch_qc(
 
     Parameters
     ----------
+    image_path: Path 
+        Path for the input image
     reference_catalog_path : str
         Path to reference catalogue.
     catalog_path : str
@@ -104,6 +106,8 @@ def vast_xmatch_qc(
         Minimum for a source's maximum flux to select that source, by default 0.
     snr_limit : float, optional
         Minimum for a source's maximum SNR to select that source, by default 20.
+    crop_size : float, optional
+        The size of each side of the square crop, by default 6.67 * u.deg.
     nneighbor : float, optional
         Minimum distance, in arcmin, to a source's nearest neighbour to select
         that source, by default 1.
@@ -732,7 +736,7 @@ def correct_field(
     psf: list[float] = [],
     flux_limit: float = 0,
     snr_limit: float = 20,
-    crop_size: float=6.67,
+    crop_size: float = 6.67,
     nneighbor: float = 1,
     flux_ratio_sigma_clip: float = 5,
     fix_m: bool = False,
