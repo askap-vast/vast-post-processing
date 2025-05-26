@@ -119,7 +119,9 @@ def crossmatch_qtables(
      # Calculate distance to field center
     hdu = fits.open(image_path)[0]
     field_centre = get_field_centre(hdu.header)
-    xmatch["fc_dra"], xmatch["fc_ddec"] = xmatch["coord"].spherical_offsets_to(field_centre)
+    
+    # Explicitly transform coordinates to fk5 to match same frames
+    xmatch["fc_dra"], xmatch["fc_ddec"] = xmatch["coord"].fk5.spherical_offsets_to(field_centre)
 
 
     xmatch["flux_peak_ratio"] = (
