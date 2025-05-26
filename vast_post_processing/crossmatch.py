@@ -15,6 +15,7 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord, Angle, match_coordinates_sky
 from astropy.table import QTable, join, join_skycoord
 import astropy.units as u
+from astropy.stats import mad_std
 
 from vast_post_processing.catalogs import Catalog
 
@@ -29,20 +30,6 @@ logger = logging.getLogger(__name__)
 
 
 # Functions
-
-
-def median_abs_deviation(data):
-    """helper function to calculate the median offset
-
-    Args:
-        data (list): List/array of offsets
-
-    Returns:
-        float: the median offset
-    """
-    median = np.median(data)
-    return np.median(np.abs(data - median))
-
 
 def straight_line(B, x):
     """Helper function for fitting. Defines a straight line
@@ -158,53 +145,44 @@ def calculate_positional_offsets(
         angular type.
     """
     dra_median = np.median(xmatch_qt["dra"])
-    dra_madfm = median_abs_deviation(xmatch_qt["dra"])
+    dra_madfm = mad_std(xmatch_qt["dra"])
     ddec_median = np.median(xmatch_qt["ddec"])
-    ddec_madfm = median_abs_deviation(xmatch_qt["ddec"])
-
+    ddec_madfm = mad_std(xmatch_qt["ddec"])
+    
     return dra_median, ddec_median, dra_madfm, ddec_madfm
 
 
 def calculate_flux_offsets_median(
     xmatch_qt: QTable,
-    init_m: float = 1.0,
-    init_b: float = 0.0,
-    fix_m: bool = False,
-    fix_b: bool = False,
-) -> Tuple[float, u.Quantity, float, u.Quantity]:
-    
-    """Calculate the median positional offsets and the median absolute deviation between
-    matched sources.
+) -> Tuple[u.Quantity, u.Quantity, u.Quantity, u.Quantity]:
+    """Calculate the median of the flux ratio between the observed and reference sources.
+    Give the median absolute deviation of this flux ratio distribution as the error.
 
     Parameters
     ----------
     xmatch_qt : QTable
-        QTable of crossmatched sources. Must contain columns: dra, ddec.
+        QTable of crossmatched sources. Must contain columns: flux_int,
+        flux_int_reference.
 
     Returns
     -------
     Tuple[u.Quantity, u.Quantity, u.Quantity, u.Quantity]
-        Median RA offset, median Dec offset, median absolute deviation of RA offsets,
-        median absolute deviation of Dec offsets. Units match their inputs and are of
-        angular type.
+        Median (integrated_flux/integrated_flux_reference), 
+        offset undefined for this method, defaults to zero
+        median absolute deviation of (integrated_flux/integrated_flux_reference),
+        offset_err undefined for this method, defaults to zero.
+        median absolute deviation of integrated_flux_reference offsets. Median of flux ratio 
+        distribution and median absolute deviation unit match thereference flux int input 
+        and are of spectral flux density type.
     """
 
-    ifixb = [0 if fix_m else 1, 0 if fix_b else 1]
     flux_unit = xmatch_qt["flux_int_reference"].unit
-    linear_model = odr.Model(straight_line)
-    # convert all to reference flux unit as ODR does not preserve Quantity objects
-    odr_data = odr.RealData(
-        xmatch_qt["flux_int_reference"].to(flux_unit).value,
-        xmatch_qt["flux_int"].to(flux_unit).value,
-        sx=xmatch_qt["flux_int_err_reference"].to(flux_unit).value,
-        sy=xmatch_qt["flux_int_err"].to(flux_unit).value,
-    )
-    odr_obj = odr.ODR(odr_data, linear_model, beta0=[init_m, init_b], ifixb=ifixb)
-    odr_out = odr_obj.run()
-    gradient, offset = odr_out.beta
-    gradient_err, offset_err = odr_out.sd_beta
 
-    return gradient, offset * flux_unit, gradient_err, offset_err * flux_unit
+    flux_ratio_distribution = xmatch_qt["flux_int"]/xmatch_qt["flux_int_reference"]
+
+    return np.median(flux_ratio_distribution), 0 * flux_unit, mad_std(flux_ratio_distribution), 0 * flux_unit
+
+
 
 
 def calculate_flux_offsets_old(
