@@ -6,9 +6,11 @@
 
 import logging
 from typing import Tuple
+from pathlib import Path
 
 import numpy as np
 from scipy import odr
+from astropy.io import fits
 
 from astropy.coordinates import SkyCoord, Angle, match_coordinates_sky
 from astropy.table import QTable, join, join_skycoord
@@ -16,6 +18,7 @@ import astropy.units as u
 
 from vast_post_processing.catalogs import Catalog
 
+from vast_post_processing.crop import get_field_centre
 
 # Constants
 
@@ -79,6 +82,7 @@ def join_match_coordinates_sky(
 def crossmatch_qtables(
     catalog: Catalog,
     catalog_reference: Catalog,
+    image_path: Path,
     radius: Angle = Angle("10 arcsec"),
 ) -> QTable:
     """Main function to filter cross-matched sources.
@@ -86,6 +90,7 @@ def crossmatch_qtables(
     Args:
         catalog (Catalog): Input catalog
         catalog_reference (Catalog): Reference catalog
+        image_path (Path): Path for the input image
         radius (Angle, optional): cross-match radius. Defaults to Angle("10 arcsec").
 
     Returns:
@@ -112,6 +117,15 @@ def crossmatch_qtables(
     xmatch["dra"], xmatch["ddec"] = xmatch["coord"].spherical_offsets_to(
         xmatch["coord_reference"]
     )
+
+     # Calculate distance to field center
+    hdu = fits.open(image_path)[0]
+    field_centre = get_field_centre(hdu.header)
+    
+    # Explicitly transform coordinates to fk5 to match same frames
+    xmatch["fc_dra"], xmatch["fc_ddec"] = xmatch["coord"].fk5.spherical_offsets_to(field_centre)
+
+
     xmatch["flux_peak_ratio"] = (
         xmatch["flux_peak"] / xmatch["flux_peak_reference"]
     ).decompose()
@@ -149,6 +163,7 @@ def calculate_positional_offsets(
     ddec_madfm = median_abs_deviation(xmatch_qt["ddec"])
 
     return dra_median, ddec_median, dra_madfm, ddec_madfm
+
 
 
 def calculate_flux_offsets(

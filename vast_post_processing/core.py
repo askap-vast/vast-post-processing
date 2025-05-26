@@ -894,6 +894,7 @@ def run(
             verbose=verbose,
             debug=debug,
             write_output=False,
+            crop_size=crop_size
         )
 
         # Display corrected files if requested

@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 def vast_xmatch_qc(
+    image_path: Path,
     reference_catalog_path: str,
     catalog_path: str,
     radius: Angle = Angle("10arcsec"),
@@ -59,6 +60,7 @@ def vast_xmatch_qc(
     flux_unit: u.Unit = u.Unit("mJy"),
     flux_limit: float = 0,
     snr_limit: float = 20,
+    crop_size: float = 6.67,
     nneighbor: float = 1,
     flux_ratio_sigma_clip: float = 5,
     apply_flux_limit: bool = True,
@@ -70,6 +72,8 @@ def vast_xmatch_qc(
 
     Parameters
     ----------
+    image_path: Path 
+        Path for the input image
     reference_catalog_path : str
         Path to reference catalogue.
     catalog_path : str
@@ -102,6 +106,8 @@ def vast_xmatch_qc(
         Minimum for a source's maximum flux to select that source, by default 0.
     snr_limit : float, optional
         Minimum for a source's maximum SNR to select that source, by default 20.
+    crop_size : float, optional
+        The size of each side of the square crop, by default 6.67 * u.deg.
     nneighbor : float, optional
         Minimum distance, in arcmin, to a source's nearest neighbour to select
         that source, by default 1.
@@ -157,12 +163,16 @@ def vast_xmatch_qc(
     )
 
     # Perform the crossmatch
-    xmatch_qt = crossmatch_qtables(catalog, reference_catalog, radius=radius)
-
+    xmatch_qt = crossmatch_qtables(catalog, reference_catalog, image_path, radius=radius)
+    
     # Select xmatches with non-zero flux errors and no siblings
     logger.info("Removing crossmatched sources with flux peak errors = 0.")
     mask = xmatch_qt["flux_peak_err"] > 0
     mask &= xmatch_qt["flux_peak_err_reference"] > 0
+
+    # Remove sources that lie more than crop_size/2 away from field center
+    mask &= xmatch_qt["fc_ddec"].to(u.deg) < (crop_size/2)
+    mask &= xmatch_qt["fc_dra"].to(u.deg) < (crop_size/2)
 
     # Also use a mask to try to remove outliers
     # Do an interative fitting that reoves all the outilers
@@ -726,6 +736,7 @@ def correct_field(
     psf: list[float] = [],
     flux_limit: float = 0,
     snr_limit: float = 20,
+    crop_size: float = 6.67,
     nneighbor: float = 1,
     flux_ratio_sigma_clip: float = 5,
     fix_m: bool = False,
@@ -829,6 +840,7 @@ def correct_field(
                 flux_corr_mult,
                 flux_corr_add,
             ) = vast_xmatch_qc(
+                image_path=image_path,
                 reference_catalog_path=ref_file,
                 catalog_path=component_file.as_posix(),
                 radius=Angle(radius * u.arcsec),
@@ -847,6 +859,7 @@ def correct_field(
                 select_point_sources=select_point_sources,
                 crossmatch_output=crossmatch_file,
                 csv_output=csv_file,
+                crop_size=crop_size
             )
             
             flux_corr_mult_value = flux_corr_mult.n
