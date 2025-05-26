@@ -7,16 +7,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased](https://github.com/askap-vast/vast-post-processing/compare/v2.1.1...HEAD)
 
 ### Added
+- Added a filter that removes sources at the edges of observations when calculating the astromteric and flux corrections. These sources will be cropped out later. [#121](https://github.com/askap-vast/vast-post-processing/pull/121)
 
 ### Changed
+- Changed the way the flux offset factor is calculated. Instead of using the slope of the linear fit to the flux_int vs. flux_int_reference plane, we now use the median of the distribution flux_int/flux_int_reference. This is similar to how the correction is calculate for the astrometry. Both flux and astrometry correction now use the median absolute deviation as an error. [#122](https://github.com/askap-vast/vast-post-processing/pull/122)
 
 ### Fixed
-
 - Fixed error in extending source filtering that reversed numerator and denominator [#120](https://github.com/askap-vast/vast-post-processing/pull/120)
 
 ### Removed
+- In crossmatch.py, removed the calculate_flux_offsets() function. Replaced with calculate_flux_offsets_median() [#122](https://github.com/askap-vast/vast-post-processing/pull/122)
+- In crossmatch.py, removed the faulty median_abs_deviation() function. Replaced with astropy.stats.mad_std [#122](https://github.com/askap-vast/vast-post-processing/pull/122)
 
 ### List of PRs
+- [#122](https://github.com/askap-vast/vast-post-processing/pull/122): changed:  Changed the way the flux offset factor is calculated. Instead of using the slope of the linear fit to the flux_int vs. flux_int_reference plane, we now use the median of the distribution flux_int/flux_int_reference. This is similar to how the correction is calculate for the astrometry. Both flux and astrometry correction now use the median absolute deviation as an error.
+
+- [#121](https://github.com/askap-vast/vast-post-processing/pull/121): added: Added a filter that removes sources at the edges of observations when calculating the astromteric and flux corrections. These sources will be cropped out later.
 
 - [#120](https://github.com/askap-vast/vast-post-processing/pull/120): fix: Fixed error in extending source filtering that reversed numerator and denominator
 
