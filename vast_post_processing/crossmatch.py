@@ -152,6 +152,7 @@ def calculate_positional_offsets(
     return dra_median, ddec_median, dra_madfm, ddec_madfm
 
 
+
 def calculate_flux_offsets_median(
     xmatch_qt: QTable,
 ) -> Tuple[u.Quantity, u.Quantity, u.Quantity, u.Quantity]:
@@ -181,5 +182,4 @@ def calculate_flux_offsets_median(
     flux_ratio_distribution = xmatch_qt["flux_int"]/xmatch_qt["flux_int_reference"]
 
     return np.median(flux_ratio_distribution), 0 * flux_unit, mad_std(flux_ratio_distribution), 0 * flux_unit
-
 
