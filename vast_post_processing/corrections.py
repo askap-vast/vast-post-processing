@@ -171,8 +171,8 @@ def vast_xmatch_qc(
     mask &= xmatch_qt["flux_peak_err_reference"] > 0
 
     # Remove sources that lie more than crop_size/2 away from field center
-    mask &= xmatch_qt["fc_ddec"].to(u.deg) < (crop_size/2)
-    mask &= xmatch_qt["fc_dra"].to(u.deg) < (crop_size/2)
+    mask &= abs(xmatch_qt["fc_ddec"].to(u.deg)) < (crop_size/2)
+    mask &= abs(xmatch_qt["fc_dra"].to(u.deg)) < (crop_size/2)
 
     # Also use a mask to try to remove outliers
     # Do an interative fitting that reoves all the outilers
