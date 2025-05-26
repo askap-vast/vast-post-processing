@@ -165,49 +165,8 @@ def calculate_positional_offsets(
     return dra_median, ddec_median, dra_madfm, ddec_madfm
 
 
-def calculate_flux_offsets_median(
-    xmatch_qt: QTable,
-    init_m: float = 1.0,
-    init_b: float = 0.0,
-    fix_m: bool = False,
-    fix_b: bool = False,
-) -> Tuple[float, u.Quantity, float, u.Quantity]:
-    
-    """Calculate the median positional offsets and the median absolute deviation between
-    matched sources.
 
-    Parameters
-    ----------
-    xmatch_qt : QTable
-        QTable of crossmatched sources. Must contain columns: dra, ddec.
-
-    Returns
-    -------
-    Tuple[u.Quantity, u.Quantity, u.Quantity, u.Quantity]
-        Median RA offset, median Dec offset, median absolute deviation of RA offsets,
-        median absolute deviation of Dec offsets. Units match their inputs and are of
-        angular type.
-    """
-
-    ifixb = [0 if fix_m else 1, 0 if fix_b else 1]
-    flux_unit = xmatch_qt["flux_int_reference"].unit
-    linear_model = odr.Model(straight_line)
-    # convert all to reference flux unit as ODR does not preserve Quantity objects
-    odr_data = odr.RealData(
-        xmatch_qt["flux_int_reference"].to(flux_unit).value,
-        xmatch_qt["flux_int"].to(flux_unit).value,
-        sx=xmatch_qt["flux_int_err_reference"].to(flux_unit).value,
-        sy=xmatch_qt["flux_int_err"].to(flux_unit).value,
-    )
-    odr_obj = odr.ODR(odr_data, linear_model, beta0=[init_m, init_b], ifixb=ifixb)
-    odr_out = odr_obj.run()
-    gradient, offset = odr_out.beta
-    gradient_err, offset_err = odr_out.sd_beta
-
-    return gradient, offset * flux_unit, gradient_err, offset_err * flux_unit
-
-
-def calculate_flux_offsets_old(
+def calculate_flux_offsets(
     xmatch_qt: QTable,
     init_m: float = 1.0,
     init_b: float = 0.0,
