@@ -28,7 +28,7 @@ from .catalogs import Catalog
 from .crossmatch import (
     crossmatch_qtables,
     calculate_positional_offsets,
-    calculate_flux_offsets_median
+    calculate_flux_offsets_Huber
 )
 from .utils import logutils
 
@@ -219,7 +219,7 @@ def vast_xmatch_qc(
     )
 
     # Calculate flux offsets and ratio
-    gradient, offset, gradient_err, offset_err = calculate_flux_offsets_median(
+    gradient, offset, gradient_err, offset_err = calculate_flux_offsets_Huber(
         data
     )
     ugradient = ufloat(gradient, gradient_err)
@@ -230,7 +230,7 @@ def vast_xmatch_qc(
         f"The median(flux_int/flux_int_reference) is {ugradient} + {uoffset} {flux_unit}. "
         f"The flux correction factor is the inverse of this median {flux_corr_mult}.",
     )
-
+    
     # Write output to csv if requested
     if csv_output is not None:
         # Get path to output csv file

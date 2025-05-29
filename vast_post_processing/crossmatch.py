@@ -9,13 +9,14 @@ from typing import Tuple
 from pathlib import Path
 
 import numpy as np
-from scipy import odr
 from astropy.io import fits
 
 from astropy.coordinates import SkyCoord, Angle, match_coordinates_sky
 from astropy.table import QTable, join, join_skycoord
 import astropy.units as u
+
 from astropy.stats import mad_std
+import statsmodels.api as sm
 
 from vast_post_processing.catalogs import Catalog
 
@@ -152,12 +153,13 @@ def calculate_positional_offsets(
     return dra_median, ddec_median, dra_madfm, ddec_madfm
 
 
-
-def calculate_flux_offsets_median(
+def calculate_flux_offsets_Huber(
     xmatch_qt: QTable,
 ) -> Tuple[u.Quantity, u.Quantity, u.Quantity, u.Quantity]:
-    """Calculate the median of the flux ratio between the observed and reference sources.
-    Give the median absolute deviation of this flux ratio distribution as the error.
+    """Fit the (flux_int_reference, flux_int)-plane with a HuberRegressor (linear model
+    that is robus against outliers/heteroscedasticity). The statsmodel implementation
+    returns both a slope/gradient and error on the gradient. The intercept is fixed at
+    zero, by not adding a constant to the model. 
 
     Parameters
     ----------
@@ -168,18 +170,20 @@ def calculate_flux_offsets_median(
     Returns
     -------
     Tuple[u.Quantity, u.Quantity, u.Quantity, u.Quantity]
-        Median (integrated_flux/integrated_flux_reference), 
+        gradient of the sources in the (flux_int_reference, flux_int)-plane 
+            this is the flux correction factor, 
         offset undefined for this method, defaults to zero
-        median absolute deviation of (integrated_flux/integrated_flux_reference),
+        gradient_err on the gradient/flux correction factor
         offset_err undefined for this method, defaults to zero.
-        median absolute deviation of integrated_flux_reference offsets. Median of flux ratio 
-        distribution and median absolute deviation unit match thereference flux int input 
-        and are of spectral flux density type.
-    """
+        
+        flux_int_reference and flux_int unit match and are of spectral flux density type.
+    """ 
+    rlm_model = sm.RLM(endog = xmatch_qt["flux_int"], 
+                    exog= xmatch_qt["flux_int_reference"],
+                    M=sm.robust.norms.HuberT())
 
+    rlm_results = rlm_model.fit()
     flux_unit = xmatch_qt["flux_int_reference"].unit
 
-    flux_ratio_distribution = xmatch_qt["flux_int"]/xmatch_qt["flux_int_reference"]
-
-    return np.median(flux_ratio_distribution), 0 * flux_unit, mad_std(flux_ratio_distribution), 0 * flux_unit
+    return rlm_results.params[0], 0*flux_unit, rlm_results.bse[0], 0*flux_unit
 
