@@ -564,7 +564,9 @@ def crop_image(
                                          )
         else:
             processed_hdu = cropped_hdu
+
         fitsutils.update_header_history(processed_hdu.header)
+        fitsutils.strip_degenerate_axes(processed_hdu.header)
 
         if hdul is not None:
             # astropy fits requires the 0th element of a HDUList to be a

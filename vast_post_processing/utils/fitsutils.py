@@ -58,3 +58,34 @@ def update_header_history(header: fits.Header):
 
     # Write usage and hash to FITS history
     header["HISTORY"] = f"Processed with VAST Post-Processing commit {__githash__}"
+
+
+def strip_degenerate_axes(header) -> None:
+    """
+    Remove header info related to degenerate axes that have been removed in the
+    cutout process. This assumed NAXIS=4 originally.
+    
+    ----------
+    header : fits.Header
+        FITS header to update.
+    """
+
+    prefixes = ['CTYPE', 'CRVAL', 'CDELT', 'CRPIX', 'CUNIT']
+    
+    for i in [3, 4]:
+        for prefix in prefixes:
+            header_key = f'{prefix}{i}'
+            if header_key in header.keys():
+                del header[header_key]
+
+        for j in [1, 2, 3, 4]:
+            if j>i:
+                break
+            header_key = f'PC{i}_{j}'
+            if header_key in header.keys():
+                del header[header_key]
+            
+            if i != j:
+                header_key = f'PC{j}_{i}'
+                if header_key in header.keys():
+                    del header[header_key]
