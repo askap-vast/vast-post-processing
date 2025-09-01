@@ -9,12 +9,14 @@ from typing import Tuple
 from pathlib import Path
 
 import numpy as np
-from scipy import odr
 from astropy.io import fits
 
 from astropy.coordinates import SkyCoord, Angle, match_coordinates_sky
 from astropy.table import QTable, join, join_skycoord
 import astropy.units as u
+
+from astropy.stats import mad_std
+import statsmodels.api as sm
 
 from vast_post_processing.catalogs import Catalog
 
@@ -29,20 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 # Functions
-
-
-def median_abs_deviation(data):
-    """helper function to calculate the median offset
-
-    Args:
-        data (list): List/array of offsets
-
-    Returns:
-        float: the median offset
-    """
-    median = np.median(data)
-    return np.median(np.abs(data - median))
-
 
 def straight_line(B, x):
     """Helper function for fitting. Defines a straight line
@@ -158,62 +146,44 @@ def calculate_positional_offsets(
         angular type.
     """
     dra_median = np.median(xmatch_qt["dra"])
-    dra_madfm = median_abs_deviation(xmatch_qt["dra"])
+    dra_madfm = mad_std(xmatch_qt["dra"])
     ddec_median = np.median(xmatch_qt["ddec"])
-    ddec_madfm = median_abs_deviation(xmatch_qt["ddec"])
-
+    ddec_madfm = mad_std(xmatch_qt["ddec"])
+    
     return dra_median, ddec_median, dra_madfm, ddec_madfm
 
 
-
-def calculate_flux_offsets(
+def calculate_flux_offsets_Huber(
     xmatch_qt: QTable,
-    init_m: float = 1.0,
-    init_b: float = 0.0,
-    fix_m: bool = False,
-    fix_b: bool = False,
-) -> Tuple[float, u.Quantity, float, u.Quantity]:
-    """Calculate the gradient and offset of a straight-line fit to the integrated fluxes for
-    crossmatched sources. The function `y = mx + b` is fit to the reference int fluxes
-    vs the int fluxes using orthogonal distance regression with `scipy.odr`.
-    
-    Note in Feb 2025 this method was changed to calculate the gradient and offset based on 
-    the integrated fluxes.
+) -> Tuple[u.Quantity, u.Quantity, u.Quantity, u.Quantity]:
+    """Fit the (flux_int_reference, flux_int)-plane with a HuberRegressor (linear model
+    that is robus against outliers/heteroscedasticity). The statsmodel implementation
+    returns both a slope/gradient and error on the gradient. The intercept is fixed at
+    zero, by not adding a constant to the model. 
 
     Parameters
     ----------
     xmatch_qt : QTable
         QTable of crossmatched sources. Must contain columns: flux_int,
-        flux_int_reference, flux_int_err, flux_int_err_reference.
-    init_m : float
-        Initial gradient parameter passed to the fitting function, default 1.0.
-    init_b : float
-        Initial offset parameter passed to the fitting function, default 0.0.
-    fix_m : bool
-        If True, do not allow the gradient to vary during fitting, default False.
-    fix_b : bool
-        If True, do not allow the offest to vary during fitting, default False.
+        flux_int_reference.
 
     Returns
     -------
-    Tuple[float, u.Quantity, float, u.Quantity]
-        Model fit parameters: the gradient, intercept (offset), gradient error, and
-        intercept error. Offset and offset error unit match the reference flux int
-        input and are of spectral flux density type.
-    """
-    ifixb = [0 if fix_m else 1, 0 if fix_b else 1]
-    flux_unit = xmatch_qt["flux_int_reference"].unit
-    linear_model = odr.Model(straight_line)
-    # convert all to reference flux unit as ODR does not preserve Quantity objects
-    odr_data = odr.RealData(
-        xmatch_qt["flux_int_reference"].to(flux_unit).value,
-        xmatch_qt["flux_int"].to(flux_unit).value,
-        sx=xmatch_qt["flux_int_err_reference"].to(flux_unit).value,
-        sy=xmatch_qt["flux_int_err"].to(flux_unit).value,
-    )
-    odr_obj = odr.ODR(odr_data, linear_model, beta0=[init_m, init_b], ifixb=ifixb)
-    odr_out = odr_obj.run()
-    gradient, offset = odr_out.beta
-    gradient_err, offset_err = odr_out.sd_beta
+    Tuple[u.Quantity, u.Quantity, u.Quantity, u.Quantity]
+        gradient of the sources in the (flux_int_reference, flux_int)-plane 
+            this is the flux correction factor, 
+        offset undefined for this method, defaults to zero
+        gradient_err on the gradient/flux correction factor
+        offset_err undefined for this method, defaults to zero.
+        
+        flux_int_reference and flux_int unit match and are of spectral flux density type.
+    """ 
+    rlm_model = sm.RLM(endog = xmatch_qt["flux_int"], 
+                    exog= xmatch_qt["flux_int_reference"],
+                    M=sm.robust.norms.HuberT())
 
-    return gradient, offset * flux_unit, gradient_err, offset_err * flux_unit
+    rlm_results = rlm_model.fit()
+    flux_unit = xmatch_qt["flux_int_reference"].unit
+
+    return rlm_results.params[0], 0*flux_unit, rlm_results.bse[0], 0*flux_unit
+

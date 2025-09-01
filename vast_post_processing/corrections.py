@@ -28,7 +28,7 @@ from .catalogs import Catalog
 from .crossmatch import (
     crossmatch_qtables,
     calculate_positional_offsets,
-    calculate_flux_offsets,
+    calculate_flux_offsets_Huber
 )
 from .utils import logutils
 
@@ -171,8 +171,8 @@ def vast_xmatch_qc(
     mask &= xmatch_qt["flux_peak_err_reference"] > 0
 
     # Remove sources that lie more than crop_size/2 away from field center
-    mask &= xmatch_qt["fc_ddec"].to(u.deg) < (crop_size/2)
-    mask &= xmatch_qt["fc_dra"].to(u.deg) < (crop_size/2)
+    mask &= abs(xmatch_qt["fc_ddec"].to(u.deg)) < (crop_size/2)
+    mask &= abs(xmatch_qt["fc_dra"].to(u.deg)) < (crop_size/2)
 
     # Also use a mask to try to remove outliers
     # Do an interative fitting that reoves all the outilers
@@ -219,17 +219,18 @@ def vast_xmatch_qc(
     )
 
     # Calculate flux offsets and ratio
-    gradient, offset, gradient_err, offset_err = calculate_flux_offsets(
-        data, fix_m=fix_m, fix_b=fix_b, init_m=init_m, init_b=init_b
+    gradient, offset, gradient_err, offset_err = calculate_flux_offsets_Huber(
+        data
     )
     ugradient = ufloat(gradient, gradient_err)
     uoffset = ufloat(offset.to(flux_unit).value, offset_err.to(flux_unit).value)
     flux_corr_mult = 1 / ugradient
     flux_corr_add = -1 * uoffset
     logger.info(
-        f"ODR fit parameters: Sint = Sint,ref * {ugradient} + {uoffset} {flux_unit}.",
+        f"The median(flux_int/flux_int_reference) is {ugradient} + {uoffset} {flux_unit}. "
+        f"The flux correction factor is the inverse of this median {flux_corr_mult}.",
     )
-
+    
     # Write output to csv if requested
     if csv_output is not None:
         # Get path to output csv file
