@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 - Fixed error in extending source filtering that reversed numerator and denominator [#120](https://github.com/askap-vast/vast-post-processing/pull/120)
-- Fixed how post-processing parameters were inserted in the catalogues/xml tables [#124](https://github.com/askap-vast/vast-post-processing/pull/124)
+- Fixed how post-processing parameters were inserted in the catalogues/xml tables [#125](https://github.com/askap-vast/vast-post-processing/pull/125)
 
 ### Removed
 - In crossmatch.py, removed the calculate_flux_offsets() function. Replaced with calculate_flux_offsets_median() [#122](https://github.com/askap-vast/vast-post-processing/pull/122)
