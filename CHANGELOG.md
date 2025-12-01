@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - [#122](https://github.com/askap-vast/vast-post-processing/pull/122): removed:  Changed the way the flux offset factor is calculated. Instead of using the slope of the linear fit to the flux_int vs. flux_int_reference plane, we now use the median of the distribution flux_int/flux_int_reference. Redundant now that we use the Huber regressor. Pull request was not implemented, closed.
 
 ### List of PRs
-- [#124](https://github.com/askap-vast/vast-post-processing/pull/124): fixed: Fixed how post-processing parameters were inserted in the catalogues/xml tables.
+- [#125](https://github.com/askap-vast/vast-post-processing/pull/125): fixed: Fixed how post-processing parameters were inserted in the catalogues/xml tables.
 
 - [#123](https://github.com/askap-vast/vast-post-processing/pull/123): added: Added a method that uses a linear fit with a Huber regressor to calculate the flux correction factor. Made this the default.
 
