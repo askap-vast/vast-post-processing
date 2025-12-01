@@ -615,7 +615,7 @@ def shift_and_scale_catalog(
         unit=u.arcsec,
     )
 
-    votablefile.params.extend(
+    votable.params.extend(
         [
             ra_offset_param,
             ra_offset_err_param,
