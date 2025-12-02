@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 - Fixed error in extending source filtering that reversed numerator and denominator [#120](https://github.com/askap-vast/vast-post-processing/pull/120)
+- Fixed how post-processing parameters were inserted in the catalogues/xml tables [#125](https://github.com/askap-vast/vast-post-processing/pull/125)
 
 ### Removed
 - In crossmatch.py, removed the calculate_flux_offsets() function. Replaced with calculate_flux_offsets_median() [#122](https://github.com/askap-vast/vast-post-processing/pull/122)
@@ -23,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - [#122](https://github.com/askap-vast/vast-post-processing/pull/122): removed:  Changed the way the flux offset factor is calculated. Instead of using the slope of the linear fit to the flux_int vs. flux_int_reference plane, we now use the median of the distribution flux_int/flux_int_reference. Redundant now that we use the Huber regressor. Pull request was not implemented, closed.
 
 ### List of PRs
+- [#125](https://github.com/askap-vast/vast-post-processing/pull/125): fixed: Fixed how post-processing parameters were inserted in the catalogues/xml tables.
+
 - [#123](https://github.com/askap-vast/vast-post-processing/pull/123): added: Added a method that uses a linear fit with a Huber regressor to calculate the flux correction factor. Made this the default.
 
 - [#122](https://github.com/askap-vast/vast-post-processing/pull/122): changed:  Changed the way the flux offset factor is calculated. Instead of using the slope of the linear fit to the flux_int vs. flux_int_reference plane, we now use the median of the distribution flux_int/flux_int_reference. This is similar to how the correction is calculate for the astrometry. Both flux and astrometry correction now use the median absolute deviation as an error. Pull request was not implemented, closed.
