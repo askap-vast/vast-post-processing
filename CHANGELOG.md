@@ -34,7 +34,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - [#126](https://github.com/askap-vast/vast-post-processing/pull/126): fix: Fixed broken degenerate axis removal and made changelog formatting consistent between releases
 - [#125](https://github.com/askap-vast/vast-post-processing/pull/125): fix: Fixed how post-processing parameters were inserted in the catalogues/xml tables.
 - [#123](https://github.com/askap-vast/vast-post-processing/pull/123): feat: Added a method that uses a linear fit with a Huber regressor to calculate the flux correction factor. Made this the default.
-
 - [#122](https://github.com/askap-vast/vast-post-processing/pull/122): fix:  Changed the way the flux offset factor is calculated. Instead of using the slope of the linear fit to the flux_int vs. flux_int_reference plane, we now use the median of the distribution flux_int/flux_int_reference. This is similar to how the correction is calculate for the astrometry. Both flux and astrometry correction now use the median absolute deviation as an error. Pull request was not implemented, closed.
 
 - [#121](https://github.com/askap-vast/vast-post-processing/pull/121): feat: Added a filter that removes sources at the edges of observations when calculating the astromteric and flux corrections. These sources will be cropped out later.
