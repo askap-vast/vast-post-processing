@@ -69,8 +69,14 @@ def strip_degenerate_axes(header) -> None:
     header : fits.Header
         FITS header to update.
     """
+    
+    # Do nothing unless the frequency and Stokes axes exist
+    if header['NAXIS'] != 4:
+        return
 
     prefixes = ['CTYPE', 'CRVAL', 'CDELT', 'CRPIX', 'CUNIT']
+    
+    freq = header['CRVAL3']
     
     for i in [3, 4]:
         for prefix in prefixes:
@@ -89,3 +95,6 @@ def strip_degenerate_axes(header) -> None:
                 header_key = f'PC{j}_{i}'
                 if header_key in header.keys():
                     del header[header_key]
+
+    # Put the frequency keyword back in to avoid breaking the pipeline
+    header['RESTFREQ'] = freq
